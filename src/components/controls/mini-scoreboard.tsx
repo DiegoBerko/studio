@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useGameState, formatTime, getPeriodText } from '@/contexts/game-state-context';
+import { useGameState, formatTime, getActualPeriodText } from '@/contexts/game-state-context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function MiniScoreboard() {
@@ -20,7 +20,9 @@ export function MiniScoreboard() {
         <div className="flex-1">
           <p className="text-3xl font-bold text-accent">{formatTime(state.currentTime)}</p>
           <div className="relative">
-            <p className="text-lg text-primary-foreground">{getPeriodText(state.currentPeriod)}</p>
+            <p className="text-lg text-primary-foreground uppercase">
+              {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride)}
+            </p>
             {!state.isClockRunning && state.currentTime > 0 && (
               <span className="absolute top-[-0.25rem] right-1 text-[0.6rem] font-normal text-muted-foreground normal-case px-1 rounded-sm bg-background/30">
                 Paused
@@ -36,4 +38,3 @@ export function MiniScoreboard() {
     </Card>
   );
 }
-

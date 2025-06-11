@@ -6,7 +6,7 @@ import { useGameState } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Play, Pause, RotateCcw, Plus, Minus, TimerReset } from 'lucide-react';
+import { Play, Pause, RotateCcw, Plus, Minus, TimerReset, Coffee } from 'lucide-react';
 import { ControlCardWrapper } from './control-card-wrapper';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,6 +14,7 @@ export function TimeControlCard() {
   const { state, dispatch } = useGameState();
   const [minutes, setMinutes] = useState(Math.floor(state.currentTime / 60));
   const [seconds, setSeconds] = useState(state.currentTime % 60);
+  const [breakMinutes, setBreakMinutes] = useState(2); // Default break time
   const { toast } = useToast();
 
   const handleSetTime = () => {
@@ -31,6 +32,15 @@ export function TimeControlCard() {
     setMinutes(20); // Default period duration
     setSeconds(0);
     toast({ title: "Period Clock Reset", description: "Clock reset to 20:00 and paused." });
+  };
+
+  const handleStartBreak = () => {
+    if (breakMinutes <= 0) {
+        toast({ title: "Error", description: "Break duration must be greater than 0 minutes.", variant: "destructive" });
+        return;
+    }
+    dispatch({ type: 'START_BREAK', payload: { minutes: Number(breakMinutes) } });
+    toast({ title: "Break Started", description: `Break started for ${breakMinutes} minutes. Clock is running.`});
   };
 
   React.useEffect(() => {
@@ -93,8 +103,26 @@ export function TimeControlCard() {
             <Button onClick={() => handleAdjustTime(-1)} variant="outline"><Minus className="mr-1 h-4 w-4" />1 Sec</Button>
           </div>
         </div>
+
+        <div className="border-t border-border pt-4 space-y-2">
+            <Label htmlFor="breakMinutes">Break Duration</Label>
+            <div className="flex items-center gap-2">
+            <Input
+                id="breakMinutes"
+                type="number"
+                value={breakMinutes}
+                onChange={(e) => setBreakMinutes(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                placeholder="Min"
+                className="w-1/3"
+                aria-label="Set break duration in minutes"
+            />
+            <Button onClick={handleStartBreak} variant="outline" className="flex-1" aria-label="Start Break">
+                <Coffee className="mr-2 h-4 w-4" /> Start Break
+            </Button>
+            </div>
+        </div>
+
       </div>
     </ControlCardWrapper>
   );
 }
-
