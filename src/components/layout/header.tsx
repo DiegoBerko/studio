@@ -1,10 +1,11 @@
+
 "use client";
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, Settings } from 'lucide-react';
+import { Home, Settings, Wrench } from 'lucide-react'; // Added Wrench for Config
 
 export function Header() {
   const pathname = usePathname();
@@ -34,6 +35,15 @@ export function Header() {
           >
             Controls
           </Link>
+          <Link
+            href="/config"
+            className={cn(
+              "transition-colors hover:text-foreground/80",
+              pathname === "/config" ? "text-foreground" : "text-foreground/60"
+            )}
+          >
+            Configuración
+          </Link>
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
            <Button variant="ghost" size="icon" asChild className={pathname === "/" ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
@@ -46,8 +56,15 @@ export function Header() {
               <Settings className="h-5 w-5" />
             </Link>
           </Button>
+          <Button variant="ghost" size="icon" asChild className={pathname === "/config" ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
+            <Link href="/config" aria-label="Configuración">
+              <Wrench className="h-5 w-5" />
+            </Link>
+          </Button>
         </div>
       </div>
     </header>
   );
 }
+
+    

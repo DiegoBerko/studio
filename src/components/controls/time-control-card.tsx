@@ -12,24 +12,14 @@ import { useToast } from '@/hooks/use-toast';
 
 export function TimeControlCard() {
   const { state, dispatch } = useGameState();
-  // Local state for inputs, sync with global state
   const [displayMinutes, setDisplayMinutes] = useState(Math.floor(state.currentTime / 60));
   const [displaySeconds, setDisplaySeconds] = useState(state.currentTime % 60);
-  const [inputBreakMinutes, setInputBreakMinutes] = useState(state.configurableBreakMinutes);
   const { toast } = useToast();
 
   useEffect(() => {
     setDisplayMinutes(Math.floor(state.currentTime / 60));
     setDisplaySeconds(state.currentTime % 60);
   }, [state.currentTime]);
-
-  useEffect(() => {
-    // Sync local inputBreakMinutes if global configurableBreakMinutes changes externally
-    if (state.configurableBreakMinutes !== inputBreakMinutes) {
-      setInputBreakMinutes(state.configurableBreakMinutes);
-    }
-  }, [state.configurableBreakMinutes]);
-
 
   const handleSetTime = () => {
     dispatch({ type: 'SET_TIME', payload: { minutes: Number(displayMinutes), seconds: Number(displaySeconds) } });
@@ -43,23 +33,18 @@ export function TimeControlCard() {
 
   const handleResetPeriodClock = () => {
     dispatch({ type: 'RESET_PERIOD_CLOCK' });
-    // displayMinutes and displaySeconds will update via useEffect
-    toast({ title: "Reloj de Período Reiniciado", description: "Reloj reiniciado a 20:00 y pausado." });
+    toast({ title: "Reloj de Período Reiniciado", description: `Reloj reiniciado a la duración por defecto (${Math.floor(state.defaultPeriodDuration/60)} min) y pausado.` });
   };
 
-  const handleStartBreak = () => {
-    // Validation for inputBreakMinutes is handled by SET_CONFIGURABLE_BREAK_MINUTES in reducer (min 1)
-    // Dispatching START_BREAK will use state.configurableBreakMinutes
+  const handleStartRegularBreak = () => {
     dispatch({ type: 'START_BREAK' }); 
-    toast({ title: "Descanso Iniciado", description: `Descanso iniciado por ${state.configurableBreakMinutes} minutos. Reloj corriendo.`});
+    const breakType = "Descanso Regular";
+    const autoStart = state.autoStartBreaks;
+    toast({ 
+        title: `${breakType} Iniciado`, 
+        description: `${breakType} de ${Math.floor(state.defaultBreakDuration/60)} minutos. Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
+    });
   };
-
-  const handleBreakMinutesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newBreakMinutes = Math.max(1, parseInt(e.target.value, 10) || 1);
-    setInputBreakMinutes(newBreakMinutes);
-    dispatch({ type: 'SET_CONFIGURABLE_BREAK_MINUTES', payload: newBreakMinutes });
-  };
-
 
   return (
     <ControlCardWrapper title="Controles de Reloj">
@@ -70,6 +55,7 @@ export function TimeControlCard() {
             className="flex-1"
             variant={state.isClockRunning ? "destructive" : "default"}
             aria-label={state.isClockRunning ? "Pausar Reloj" : "Iniciar Reloj"}
+            disabled={state.currentTime <= 0 && !state.isClockRunning} // Disable start if time is 0
           >
             {state.isClockRunning ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
             {state.isClockRunning ? 'Pausar' : 'Iniciar'} Reloj
@@ -111,32 +97,24 @@ export function TimeControlCard() {
           <Label>Ajustar Tiempo</Label>
           <div className="grid grid-cols-2 gap-2 mt-1">
             <Button onClick={() => handleAdjustTime(10)} variant="outline"><Plus className="mr-1 h-4 w-4" />10 Seg</Button>
-            <Button onClick={() => handleAdjustTime(-10)} variant="outline"><Minus className="mr-1 h-4 w-4" />10 Seg</Button>
             <Button onClick={() => handleAdjustTime(1)} variant="outline"><Plus className="mr-1 h-4 w-4" />1 Seg</Button>
+            <Button onClick={() => handleAdjustTime(-10)} variant="outline"><Minus className="mr-1 h-4 w-4" />10 Seg</Button>
             <Button onClick={() => handleAdjustTime(-1)} variant="outline"><Minus className="mr-1 h-4 w-4" />1 Seg</Button>
           </div>
         </div>
 
-        <div className="border-t border-border pt-4 space-y-2">
-            <Label htmlFor="breakMinutes">Duración del Descanso (min)</Label>
-            <div className="flex items-center gap-2">
-            <Input
-                id="breakMinutes"
-                type="number"
-                value={inputBreakMinutes}
-                onChange={handleBreakMinutesChange}
-                min="1"
-                placeholder="Min"
-                className="w-1/3"
-                aria-label="Establecer duración del descanso en minutos"
-            />
-            <Button onClick={handleStartBreak} variant="outline" className="flex-1" aria-label="Iniciar Descanso">
-                <Coffee className="mr-2 h-4 w-4" /> Iniciar Descanso
+        <div className="border-t border-border pt-4">
+            <Button onClick={handleStartRegularBreak} variant="outline" className="w-full" aria-label="Iniciar Descanso Regular">
+                <Coffee className="mr-2 h-4 w-4" /> Iniciar Descanso Regular
             </Button>
-            </div>
+            <p className="text-xs text-muted-foreground mt-1 text-center">
+                Utilizará la duración y configuración de auto-inicio definidas en Configuración.
+            </p>
         </div>
 
       </div>
     </ControlCardWrapper>
   );
 }
+
+    

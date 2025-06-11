@@ -5,28 +5,42 @@ import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { Penalty } from '@/types';
 
-const PERIOD_DURATION = 20 * 60; // 20 minutes in seconds
+// Duraciones por defecto iniciales, se guardarán en segundos
+const INITIAL_PERIOD_DURATION = 20 * 60;
+const INITIAL_BREAK_DURATION = 2 * 60;
+const INITIAL_PRE_OT_BREAK_DURATION = 1 * 60;
+const INITIAL_MAX_CONCURRENT_PENALTIES = 2;
+const INITIAL_AUTO_START_BREAKS = true;
+const INITIAL_AUTO_START_PRE_OT_BREAKS = false;
+
 
 interface GameState {
   homeScore: number;
   awayScore: number;
   currentTime: number; // in seconds
-  currentPeriod: number; // Represents the numeric period (1, 2, 3 for regular, 4 for OT1, 5 for OT2, etc.)
+  currentPeriod: number; 
   isClockRunning: boolean;
   homePenalties: Penalty[];
   awayPenalties: Penalty[];
   homeTeamName: string;
   awayTeamName: string;
-  periodDisplayOverride: string | null; // e.g., "Break", "Halftime"
-  configurableBreakMinutes: number; // Duración del break configurable por el usuario
+  periodDisplayOverride: "Break" | "Pre-OT Break" | null;
+  
+  // Nuevos campos de configuración
+  defaultPeriodDuration: number; // en segundos
+  defaultBreakDuration: number; // en segundos
+  defaultPreOTBreakDuration: number; // en segundos
+  maxConcurrentPenalties: number;
+  autoStartBreaks: boolean;
+  autoStartPreOTBreaks: boolean;
 }
 
 type GameAction =
   | { type: 'TOGGLE_CLOCK' }
   | { type: 'SET_TIME'; payload: { minutes: number; seconds: number } }
   | { type: 'ADJUST_TIME'; payload: number }
-  | { type: 'SET_PERIOD'; payload: number } // Sets to a numeric period, clears override
-  | { type: 'RESET_PERIOD_CLOCK' } // Resets to PERIOD_DURATION, clears override
+  | { type: 'SET_PERIOD'; payload: number } 
+  | { type: 'RESET_PERIOD_CLOCK' } 
   | { type: 'SET_SCORE'; payload: { team: 'home' | 'away'; score: number } }
   | { type: 'ADJUST_SCORE'; payload: { team: 'home' | 'away'; delta: number } }
   | { type: 'ADD_PENALTY'; payload: { team: 'home' | 'away'; penalty: Omit<Penalty, 'id'> } }
@@ -34,15 +48,21 @@ type GameAction =
   | { type: 'TICK' }
   | { type: 'SET_HOME_TEAM_NAME'; payload: string }
   | { type: 'SET_AWAY_TEAM_NAME'; payload: string }
-  | { type: 'START_BREAK' } // Uses configurableBreakMinutes, sets override to "Break"
-  | { type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' } // Sets currentPeriod to prev, then starts break
-  | { type: 'SET_PERIOD_DISPLAY_OVERRIDE'; payload: string | null } // For custom overrides if needed
-  | { type: 'SET_CONFIGURABLE_BREAK_MINUTES'; payload: number };
+  | { type: 'START_BREAK' } // Inicia un descanso regular
+  | { type: 'START_PRE_OT_BREAK' } // Inicia un descanso antes de OT o entre OTs
+  | { type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' }
+  | { type: 'SET_DEFAULT_PERIOD_DURATION'; payload: number } // en segundos
+  | { type: 'SET_DEFAULT_BREAK_DURATION'; payload: number } // en segundos
+  | { type: 'SET_DEFAULT_PRE_OT_BREAK_DURATION'; payload: number } // en segundos
+  | { type: 'SET_MAX_CONCURRENT_PENALTIES'; payload: number }
+  | { type: 'TOGGLE_AUTO_START_BREAKS' }
+  | { type: 'TOGGLE_AUTO_START_PRE_OT_BREAKS' };
+
 
 const initialState: GameState = {
   homeScore: 0,
   awayScore: 0,
-  currentTime: PERIOD_DURATION,
+  currentTime: INITIAL_PERIOD_DURATION,
   currentPeriod: 1,
   isClockRunning: false,
   homePenalties: [],
@@ -50,7 +70,12 @@ const initialState: GameState = {
   homeTeamName: 'Local',
   awayTeamName: 'Visitante',
   periodDisplayOverride: null,
-  configurableBreakMinutes: 2, // Default break time
+  defaultPeriodDuration: INITIAL_PERIOD_DURATION,
+  defaultBreakDuration: INITIAL_BREAK_DURATION,
+  defaultPreOTBreakDuration: INITIAL_PRE_OT_BREAK_DURATION,
+  maxConcurrentPenalties: INITIAL_MAX_CONCURRENT_PENALTIES,
+  autoStartBreaks: INITIAL_AUTO_START_BREAKS,
+  autoStartPreOTBreaks: INITIAL_AUTO_START_PRE_OT_BREAKS,
 };
 
 const GameStateContext = createContext<{
@@ -61,7 +86,15 @@ const GameStateContext = createContext<{
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
     case 'TOGGLE_CLOCK':
-      if (state.currentTime <= 0 && !state.isClockRunning) return state;
+      if (state.currentTime <= 0 && !state.isClockRunning) { // No iniciar si el tiempo es 0
+        // Si es un break y no auto-inicia, o un periodo terminado, no hacer nada.
+        if (state.periodDisplayOverride !== null) { // Estamos en un break
+          const autoStart = state.periodDisplayOverride === "Break" ? state.autoStartBreaks : state.autoStartPreOTBreaks;
+          if (!autoStart && state.currentTime === 0) return state;
+        } else if (state.currentTime === 0) { // Periodo terminado
+             return state;
+        }
+      }
       return { ...state, isClockRunning: !state.isClockRunning };
     case 'SET_TIME': {
       const newTime = Math.max(0, action.payload.minutes * 60 + action.payload.seconds);
@@ -77,12 +110,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         currentPeriod: Math.max(1, action.payload), 
         periodDisplayOverride: null, 
         isClockRunning: false,
-        currentTime: PERIOD_DURATION, 
+        currentTime: state.defaultPeriodDuration, 
       };
     case 'RESET_PERIOD_CLOCK':
       return { 
         ...state, 
-        currentTime: PERIOD_DURATION, 
+        currentTime: state.defaultPeriodDuration, 
         isClockRunning: false, 
         periodDisplayOverride: null 
       };
@@ -109,13 +142,27 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       
       let homePenalties = state.homePenalties;
       let awayPenalties = state.awayPenalties;
-      if (state.periodDisplayOverride !== 'Break') { // Penalties only run if not in a "Break"
-        const updatePenalties = (penalties: Penalty[]) =>
-          penalties
-            .map(p => ({ ...p, remainingTime: p.remainingTime - 1 }))
-            .filter(p => p.remainingTime > 0);
-        homePenalties = updatePenalties(state.homePenalties);
-        awayPenalties = updatePenalties(state.awayPenalties);
+
+      if (state.periodDisplayOverride === null) { // Penalties only run if not in any kind of break
+        const updatePenalties = (penalties: Penalty[], maxConcurrent: number) => {
+          let runningCount = 0;
+          return penalties.map(p => {
+            if (runningCount < maxConcurrent) {
+              runningCount++;
+              return { ...p, remainingTime: Math.max(0, p.remainingTime - 1) };
+            }
+            return p; 
+          }).filter(p => p.remainingTime > 0);
+        };
+        homePenalties = updatePenalties(state.homePenalties, state.maxConcurrentPenalties);
+        awayPenalties = updatePenalties(state.awayPenalties, state.maxConcurrentPenalties);
+      }
+      
+      let newIsClockRunning = state.isClockRunning;
+      if (newTime <= 0) { // Time reached zero
+        newIsClockRunning = false; // Stop the clock
+        // If it was a break, check autoStart for the *next* phase (which isn't directly handled here, but clock stops)
+        // For simplicity, clock stops. User manually advances or starts.
       }
 
       return {
@@ -123,38 +170,55 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         currentTime: newTime,
         homePenalties,
         awayPenalties,
-        isClockRunning: newTime > 0,
+        isClockRunning: newIsClockRunning,
       };
     }
     case 'SET_HOME_TEAM_NAME':
       return { ...state, homeTeamName: action.payload || 'Local' };
     case 'SET_AWAY_TEAM_NAME':
       return { ...state, awayTeamName: action.payload || 'Visitante' };
-    case 'START_BREAK': {
-      const breakDurationSeconds = Math.max(1, state.configurableBreakMinutes) * 60;
+    case 'START_BREAK': 
       return {
         ...state,
-        currentTime: breakDurationSeconds,
+        currentTime: state.defaultBreakDuration,
         periodDisplayOverride: 'Break',
-        isClockRunning: true, 
+        isClockRunning: state.autoStartBreaks, 
       };
-    }
+    case 'START_PRE_OT_BREAK':
+        return {
+          ...state,
+          currentTime: state.defaultPreOTBreakDuration,
+          periodDisplayOverride: 'Pre-OT Break',
+          isClockRunning: state.autoStartPreOTBreaks,
+        };
     case 'START_BREAK_AFTER_PREVIOUS_PERIOD': {
-      if (state.currentPeriod <= 1) return state; // Safety: cannot start break before P1
-      const basePeriodForBreak = state.currentPeriod - 1;
-      const breakDurationSeconds = Math.max(1, state.configurableBreakMinutes) * 60;
+      if (state.currentPeriod <= 1 && state.periodDisplayOverride === null) return state; 
+      
+      const periodBeforeBreak = state.periodDisplayOverride !== null ? state.currentPeriod : state.currentPeriod -1;
+      if (periodBeforeBreak < 1) return state;
+
+      const isPreOT = periodBeforeBreak >= 3; // Break after P3 or any OT is considered Pre-OT for duration/auto-start
+      
       return {
         ...state,
-        currentPeriod: basePeriodForBreak, // The break is "after" this period
-        currentTime: breakDurationSeconds,
-        periodDisplayOverride: 'Break',
-        isClockRunning: true,
+        currentPeriod: periodBeforeBreak, 
+        currentTime: isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration,
+        periodDisplayOverride: isPreOT ? 'Pre-OT Break' : 'Break',
+        isClockRunning: isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks,
       };
     }
-    case 'SET_PERIOD_DISPLAY_OVERRIDE':
-      return { ...state, periodDisplayOverride: action.payload };
-    case 'SET_CONFIGURABLE_BREAK_MINUTES':
-      return { ...state, configurableBreakMinutes: Math.max(1, action.payload) }; 
+    case 'SET_DEFAULT_PERIOD_DURATION':
+      return { ...state, defaultPeriodDuration: Math.max(60, action.payload) }; // Min 1 minuto
+    case 'SET_DEFAULT_BREAK_DURATION':
+      return { ...state, defaultBreakDuration: Math.max(10, action.payload) }; // Min 10 segundos
+    case 'SET_DEFAULT_PRE_OT_BREAK_DURATION':
+      return { ...state, defaultPreOTBreakDuration: Math.max(10, action.payload) }; // Min 10 segundos
+    case 'SET_MAX_CONCURRENT_PENALTIES':
+      return { ...state, maxConcurrentPenalties: Math.max(1, action.payload) }; // Min 1
+    case 'TOGGLE_AUTO_START_BREAKS':
+      return { ...state, autoStartBreaks: !state.autoStartBreaks };
+    case 'TOGGLE_AUTO_START_PRE_OT_BREAKS':
+      return { ...state, autoStartPreOTBreaks: !state.autoStartPreOTBreaks };
     default:
       return state;
   }
@@ -194,17 +258,21 @@ export const formatTime = (totalSeconds: number): string => {
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
-// Returns the text to display for the period, considering override
-export const getActualPeriodText = (period: number, override: string | null): string => {
+export const getActualPeriodText = (period: number, override: "Break" | "Pre-OT Break" | null): string => {
   if (override) return override;
   return getPeriodText(period);
 };
 
-// Returns the standard text for a numeric period
 export const getPeriodText = (period: number): string => {
     if (period <= 0) return "---";
     if (period <= 3) return `${period}${period === 1 ? 'ST' : period === 2 ? 'ND' : 'RD'}`;
-    // For OT periods (4 = OT, 5 = OT2, 6 = OT3, etc.)
     if (period === 4) return 'OT'; 
     return `OT${period - 3}`; 
 };
+
+// Helper para convertir minutos a segundos para el estado
+export const minutesToSeconds = (minutes: number): number => minutes * 60;
+// Helper para convertir segundos a minutos para mostrar en inputs
+export const secondsToMinutes = (seconds: number): number => Math.floor(seconds / 60);
+
+    

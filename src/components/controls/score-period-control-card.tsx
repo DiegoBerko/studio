@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useGameState, getPeriodText, getActualPeriodText } from '@/contexts/game-state-context';
+import { useGameState, getPeriodText, getActualPeriodText, secondsToMinutes } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { ControlCardWrapper } from './control-card-wrapper';
 import { useToast } from '@/hooks/use-toast';
 import type { Team } from '@/types';
 
-const MAX_PERIOD_NUMBER = 7; // e.g., P1, P2, P3, OT1, OT2, OT3, OT4 (period 7)
+const MAX_PERIOD_NUMBER = 7; 
 
 export function ScorePeriodControlCard() {
   const { state, dispatch } = useGameState();
@@ -23,26 +23,35 @@ export function ScorePeriodControlCard() {
   };
 
   const handlePreviousPeriod = () => {
-    if (state.periodDisplayOverride === 'Break') {
-      // Coming from a break, go to the period number that was before the break
-      const numericPeriodBeforeBreak = state.currentPeriod;
-      dispatch({ type: 'SET_PERIOD', payload: numericPeriodBeforeBreak });
-      toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(numericPeriodBeforeBreak)}. Reloj reiniciado y pausado.` });
+    if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
+      // Viniendo de un break, ir al periodo numérico que estaba antes.
+      // currentPeriod ya está seteado al periodo antes del break.
+      dispatch({ type: 'SET_PERIOD', payload: state.currentPeriod });
+      toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(state.currentPeriod)}. Reloj reiniciado y pausado.` });
     } else {
-      // In a numeric period, try to go to a break *after* the (currentPeriod - 1)
+      // En un período numérico, intentar ir a un break DESPUÉS del (currentPeriod - 1)
       if (state.currentPeriod > 1) {
-        dispatch({ type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' });
-        toast({ title: "Descanso Iniciado", description: `Descanso iniciado después de ${getPeriodText(state.currentPeriod - 1)}. Reloj corriendo con ${state.configurableBreakMinutes} min.` });
+        const periodBeforeIntendedBreak = state.currentPeriod -1;
+        const isPreOT = periodBeforeIntendedBreak >= 3;
+        const breakType = isPreOT ? "Pre-OT Break" : "Break";
+        const duration = isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration;
+        const autoStart = isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks;
+
+        dispatch({ type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' }); // Esta acción ahora maneja la lógica de tipo de break
+        toast({ 
+            title: `${breakType} Iniciado`, 
+            description: `${breakType} iniciado después de ${getPeriodText(periodBeforeIntendedBreak)} (${secondsToMinutes(duration)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
+        });
+
       } else {
-        // Already at P1, cannot go further back or to a break before P1
         toast({ title: "Límite de Período Alcanzado", description: "No se puede retroceder más allá del 1er Período.", variant: "destructive" });
       }
     }
   };
 
   const handleNextPeriod = () => {
-    if (state.periodDisplayOverride === 'Break') {
-      // Coming from a break, go to the next numeric period
+    if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
+      // Viniendo de un break, ir al siguiente período numérico
       const nextNumericPeriod = state.currentPeriod + 1;
       if (nextNumericPeriod <= MAX_PERIOD_NUMBER) {
         dispatch({ type: 'SET_PERIOD', payload: nextNumericPeriod });
@@ -51,12 +60,23 @@ export function ScorePeriodControlCard() {
         toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod)}.`, variant: "destructive" });
       }
     } else {
-      // In a numeric period, try to go to a break *after* the currentPeriod
+      // En un período numérico, intentar ir a un break DESPUÉS del currentPeriod
       if (state.currentPeriod < MAX_PERIOD_NUMBER) {
-        dispatch({ type: 'START_BREAK' });
-        toast({ title: "Descanso Iniciado", description: `Descanso iniciado después de ${getPeriodText(state.currentPeriod)}. Reloj corriendo con ${state.configurableBreakMinutes} min.` });
+        const isPreOT = state.currentPeriod >= 3; // Break after P3 or any OT is a Pre-OT break
+        const breakType = isPreOT ? "Pre-OT Break" : "Break";
+        const duration = isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration;
+        const autoStart = isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks;
+
+        if (isPreOT) {
+            dispatch({ type: 'START_PRE_OT_BREAK' });
+        } else {
+            dispatch({ type: 'START_BREAK' });
+        }
+        toast({ 
+            title: `${breakType} Iniciado`, 
+            description: `${breakType} iniciado después de ${getPeriodText(state.currentPeriod)} (${secondsToMinutes(duration)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
+        });
       } else {
-        // Already at max period, cannot start a break after it
         toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod)}.`, variant: "destructive" });
       }
     }
@@ -70,14 +90,8 @@ export function ScorePeriodControlCard() {
     dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: e.target.value });
   };
 
-  // Disable "Previous" if:
-  // - In P1 and not in a break (cannot go before P1 or to a break before P1)
-  const isPreviousDisabled = state.periodDisplayOverride !== 'Break' && state.currentPeriod <= 1;
-
-  // Disable "Next" if:
-  // - In the MAX_PERIOD_NUMBER and not in a break (cannot go to a break after max period, or to a period beyond max)
-  const isNextDisabled = state.periodDisplayOverride !== 'Break' && state.currentPeriod >= MAX_PERIOD_NUMBER;
-
+  const isPreviousDisabled = state.periodDisplayOverride === null && state.currentPeriod <= 1;
+  const isNextDisabled = state.periodDisplayOverride === null && state.currentPeriod >= MAX_PERIOD_NUMBER;
 
   return (
     <ControlCardWrapper title="Puntuación, Período y Equipos">
@@ -140,7 +154,7 @@ export function ScorePeriodControlCard() {
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-2xl font-bold w-28 text-center text-accent">
+            <span className="text-2xl font-bold w-36 text-center text-accent truncate">
               {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride)}
             </span>
             <Button 
@@ -158,3 +172,5 @@ export function ScorePeriodControlCard() {
     </ControlCardWrapper>
   );
 }
+
+    
