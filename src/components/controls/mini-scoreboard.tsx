@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useGameState, formatTime, getPeriodText } from '@/contexts/game-state-context';
@@ -9,11 +10,11 @@ export function MiniScoreboard() {
   return (
     <Card className="mb-8 bg-card shadow-lg">
       <CardHeader>
-        <CardTitle className="text-center text-2xl text-primary-foreground">Game Status</CardTitle>
+        <CardTitle className="text-center text-2xl text-primary-foreground">Estado del Juego</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8">
         <div className="flex-1">
-          <p className="text-sm uppercase text-muted-foreground">Home</p>
+          <p className="text-sm uppercase text-muted-foreground">{state.homeTeamName} (Local)</p>
           <p className="text-4xl font-bold text-accent">{state.homeScore}</p>
         </div>
         <div className="flex-1">
@@ -21,7 +22,7 @@ export function MiniScoreboard() {
           <p className="text-lg text-primary-foreground">{getPeriodText(state.currentPeriod)}</p>
         </div>
         <div className="flex-1">
-          <p className="text-sm uppercase text-muted-foreground">Away</p>
+          <p className="text-sm uppercase text-muted-foreground">{state.awayTeamName} (Visitante)</p>
           <p className="text-4xl font-bold text-accent">{state.awayScore}</p>
         </div>
       </CardContent>

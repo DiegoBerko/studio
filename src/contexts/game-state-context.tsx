@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ReactNode } from 'react';
@@ -14,19 +15,23 @@ interface GameState {
   isClockRunning: boolean;
   homePenalties: Penalty[];
   awayPenalties: Penalty[];
+  homeTeamName: string;
+  awayTeamName: string;
 }
 
 type GameAction =
   | { type: 'TOGGLE_CLOCK' }
   | { type: 'SET_TIME'; payload: { minutes: number; seconds: number } }
-  | { type: 'ADJUST_TIME'; payload: number } // Adjust by X seconds (+ or -)
+  | { type: 'ADJUST_TIME'; payload: number }
   | { type: 'SET_PERIOD'; payload: number }
   | { type: 'RESET_PERIOD_CLOCK' }
   | { type: 'SET_SCORE'; payload: { team: 'home' | 'away'; score: number } }
   | { type: 'ADJUST_SCORE'; payload: { team: 'home' | 'away'; delta: number } }
   | { type: 'ADD_PENALTY'; payload: { team: 'home' | 'away'; penalty: Omit<Penalty, 'id'> } }
   | { type: 'REMOVE_PENALTY'; payload: { team: 'home' | 'away'; penaltyId: string } }
-  | { type: 'TICK' };
+  | { type: 'TICK' }
+  | { type: 'SET_HOME_TEAM_NAME'; payload: string }
+  | { type: 'SET_AWAY_TEAM_NAME'; payload: string };
 
 const initialState: GameState = {
   homeScore: 0,
@@ -36,6 +41,8 @@ const initialState: GameState = {
   isClockRunning: false,
   homePenalties: [],
   awayPenalties: [],
+  homeTeamName: 'Local',
+  awayTeamName: 'Visitante',
 };
 
 const GameStateContext = createContext<{
@@ -46,7 +53,7 @@ const GameStateContext = createContext<{
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
     case 'TOGGLE_CLOCK':
-      if (state.currentTime <= 0 && !state.isClockRunning) return state; // Don't start if time is 0
+      if (state.currentTime <= 0 && !state.isClockRunning) return state;
       return { ...state, isClockRunning: !state.isClockRunning };
     case 'SET_TIME': {
       const newTime = Math.max(0, action.payload.minutes * 60 + action.payload.seconds);
@@ -93,6 +100,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         isClockRunning: newTime > 0,
       };
     }
+    case 'SET_HOME_TEAM_NAME':
+      return { ...state, homeTeamName: action.payload || 'Local' };
+    case 'SET_AWAY_TEAM_NAME':
+      return { ...state, awayTeamName: action.payload || 'Visitante' };
     default:
       return state;
   }
@@ -135,5 +146,5 @@ export const formatTime = (totalSeconds: number): string => {
 export const getPeriodText = (period: number): string => {
   if (period <= 3) return `${period}${period === 1 ? 'ST' : period === 2 ? 'ND' : 'RD'}`;
   if (period === 4) return 'OT';
-  return `OT${period - 3}`; // For multiple OTs
+  return `OT${period - 3}`;
 };
