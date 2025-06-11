@@ -12,14 +12,14 @@ export default function ControlsPage() {
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-8">
-      {/* Controles de Tiempo y Descanso (sin Play/Pause) */}
-      <TimeControlCard />
+      {/* Controles de Tiempo y Descanso + Controles de Período en la misma fila en md+ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <TimeControlCard />
+        <ScorePeriodControlCard />
+      </div>
 
       {/* Mini Scoreboard (con Play/Pause integrado) */}
       <MiniScoreboard />
-
-      {/* Controles de Período */}
-      <ScorePeriodControlCard />
       
       {/* Penalidades */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
