@@ -70,6 +70,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                 <SelectValue placeholder="Seleccionar duración" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="5">0:05 (Prueba)</SelectItem>
                 <SelectItem value="120">2:00 (Menor)</SelectItem>
                 <SelectItem value="240">4:00 (Doble Menor)</SelectItem>
                 <SelectItem value="300">5:00 (Mayor)</SelectItem>
