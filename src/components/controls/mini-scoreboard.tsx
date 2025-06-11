@@ -19,7 +19,14 @@ export function MiniScoreboard() {
         </div>
         <div className="flex-1">
           <p className="text-3xl font-bold text-accent">{formatTime(state.currentTime)}</p>
-          <p className="text-lg text-primary-foreground">{getPeriodText(state.currentPeriod)}</p>
+          <div className="relative">
+            <p className="text-lg text-primary-foreground">{getPeriodText(state.currentPeriod)}</p>
+            {!state.isClockRunning && state.currentTime > 0 && (
+              <span className="absolute top-[-0.25rem] right-1 text-[0.6rem] font-normal text-muted-foreground normal-case px-1 rounded-sm bg-background/30">
+                Paused
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex-1">
           <p className="text-sm uppercase text-muted-foreground">{state.awayTeamName} (Visitante)</p>
@@ -29,3 +36,4 @@ export function MiniScoreboard() {
     </Card>
   );
 }
+

@@ -16,8 +16,7 @@ export function PenaltiesDisplay({ teamDisplayType, teamName, penalties }: Penal
     <Card className="bg-card shadow-lg flex-1 min-w-[300px]">
       <CardHeader>
         <CardTitle className="text-lg md:text-xl text-primary-foreground truncate">
-          Penalidades {teamName}
-          <span className="text-sm md:text-base opacity-80 ml-2">({teamDisplayType})</span>
+          Penalidades
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -35,3 +34,4 @@ export function PenaltiesDisplay({ teamDisplayType, teamName, penalties }: Penal
     </Card>
   );
 }
+

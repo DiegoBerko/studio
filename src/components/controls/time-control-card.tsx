@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -86,13 +87,14 @@ export function TimeControlCard() {
         <div>
           <Label>Adjust Time</Label>
           <div className="grid grid-cols-2 gap-2 mt-1">
-            <Button onClick={() => handleAdjustTime(60)} variant="outline"><Plus className="mr-1 h-4 w-4" />1 Min</Button>
-            <Button onClick={() => handleAdjustTime(-60)} variant="outline"><Minus className="mr-1 h-4 w-4" />1 Min</Button>
             <Button onClick={() => handleAdjustTime(10)} variant="outline"><Plus className="mr-1 h-4 w-4" />10 Sec</Button>
             <Button onClick={() => handleAdjustTime(-10)} variant="outline"><Minus className="mr-1 h-4 w-4" />10 Sec</Button>
+            <Button onClick={() => handleAdjustTime(1)} variant="outline"><Plus className="mr-1 h-4 w-4" />1 Sec</Button>
+            <Button onClick={() => handleAdjustTime(-1)} variant="outline"><Minus className="mr-1 h-4 w-4" />1 Sec</Button>
           </div>
         </div>
       </div>
     </ControlCardWrapper>
   );
 }
+
