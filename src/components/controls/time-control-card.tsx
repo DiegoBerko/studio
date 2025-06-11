@@ -6,7 +6,7 @@ import { useGameState } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Play, Pause, TimerReset, Plus, Minus, Coffee } from 'lucide-react';
+import { Play, Pause, Coffee } from 'lucide-react'; // TimerReset, Plus, Minus removed
 import { ControlCardWrapper } from './control-card-wrapper';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,15 +26,9 @@ export function TimeControlCard() {
     toast({ title: "Reloj Actualizado", description: `Tiempo establecido a ${String(displayMinutes).padStart(2, '0')}:${String(displaySeconds).padStart(2, '0')}` });
   };
   
-  const handleAdjustTime = (amount: number) => {
-    dispatch({ type: 'ADJUST_TIME', payload: amount });
-    toast({ title: "Reloj Ajustado", description: `Tiempo ajustado en ${amount > 0 ? '+' : ''}${amount}s` });
-  };
+  // handleAdjustTime function is no longer needed by UI elements in this card
 
-  const handleResetPeriodClock = () => {
-    dispatch({ type: 'RESET_PERIOD_CLOCK' });
-    toast({ title: "Reloj de Período Reiniciado", description: `Reloj reiniciado a la duración por defecto (${Math.floor(state.defaultPeriodDuration/60)} min) y pausado.` });
-  };
+  // handleResetPeriodClock function is no longer needed by UI elements in this card
 
   const handleStartRegularBreak = () => {
     dispatch({ type: 'START_BREAK' }); 
@@ -60,9 +54,7 @@ export function TimeControlCard() {
             {state.isClockRunning ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
             {state.isClockRunning ? 'Pausar' : 'Iniciar'} Reloj
           </Button>
-           <Button onClick={handleResetPeriodClock} variant="outline" aria-label="Reiniciar Reloj de Período">
-            <TimerReset className="mr-2 h-4 w-4" /> Reiniciar Período
-          </Button>
+           {/* Reset Period Clock button removed */}
         </div>
         
         <div className="space-y-2">
@@ -93,15 +85,7 @@ export function TimeControlCard() {
           </div>
         </div>
 
-        <div>
-          <Label>Ajustar Tiempo</Label>
-          <div className="grid grid-cols-2 gap-2 mt-1">
-            <Button onClick={() => handleAdjustTime(10)} variant="outline"><Plus className="mr-1 h-4 w-4" />10 Seg</Button>
-            <Button onClick={() => handleAdjustTime(1)} variant="outline"><Plus className="mr-1 h-4 w-4" />1 Seg</Button>
-            <Button onClick={() => handleAdjustTime(-10)} variant="outline"><Minus className="mr-1 h-4 w-4" />10 Seg</Button>
-            <Button onClick={() => handleAdjustTime(-1)} variant="outline"><Minus className="mr-1 h-4 w-4" />1 Seg</Button>
-          </div>
-        </div>
+        {/* Adjust Time buttons removed */}
 
         <div className="border-t border-border pt-4">
             <Button onClick={handleStartRegularBreak} variant="outline" className="w-full" aria-label="Iniciar Descanso Regular">
@@ -116,5 +100,3 @@ export function TimeControlCard() {
     </ControlCardWrapper>
   );
 }
-
-    
