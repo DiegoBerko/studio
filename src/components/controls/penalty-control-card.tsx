@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, UserPlus, Clock } from 'lucide-react';
+import { Trash2, UserPlus, Clock, Plus, Minus } from 'lucide-react';
 import { ControlCardWrapper } from './control-card-wrapper';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
@@ -17,6 +17,8 @@ interface PenaltyControlCardProps {
   team: Team; // 'home' or 'away' for reducer logic
   teamName: string; // Actual display name from state
 }
+
+const ADJUST_TIME_DELTA = 5; // Segundos para ajustar
 
 export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) {
   const { state, dispatch } = useGameState();
@@ -47,6 +49,14 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   const handleRemovePenalty = (penaltyId: string) => {
     dispatch({ type: 'REMOVE_PENALTY', payload: { team, penaltyId } });
     toast({ title: "Penalidad Removida", description: `Penalidad para ${teamName} removida.` });
+  };
+
+  const handleAdjustPenaltyTime = (penaltyId: string, delta: number) => {
+    dispatch({ type: 'ADJUST_PENALTY_TIME', payload: { team, penaltyId, delta } });
+    const penalty = penalties.find(p => p.id === penaltyId);
+    if (penalty) {
+        toast({ title: "Tiempo de Penalidad Ajustado", description: `Tiempo para Jugador ${penalty.playerNumber} (${teamName}) ajustado en ${delta > 0 ? '+' : ''}${delta}s.` });
+    }
   };
 
   return (
@@ -92,21 +102,42 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
           <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
             {penalties.map((p) => (
               <Card key={p.id} className="p-3 bg-muted/30 flex justify-between items-center">
-                <div className="text-sm">
+                <div className="flex-1">
                   <p className="font-semibold">Jugador {p.playerNumber}</p>
-                  <p className="text-xs text-muted-foreground flex items-center">
+                  <div className="flex items-center text-xs text-muted-foreground">
                     <Clock className="h-3 w-3 mr-1" />
-                    {formatTime(p.remainingTime)} / {formatTime(p.initialDuration)}
-                  </p>
+                    <span>{formatTime(p.remainingTime)} / {formatTime(p.initialDuration)}</span>
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleRemovePenalty(p.id)}
-                  aria-label={`Remover penalidad para jugador ${p.playerNumber}`}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
+                <div className="flex items-center gap-1 ml-2">
+                   <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleAdjustPenaltyTime(p.id, -ADJUST_TIME_DELTA)}
+                    aria-label={`Restar ${ADJUST_TIME_DELTA}s a penalidad de jugador ${p.playerNumber}`}
+                  >
+                    <Minus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleAdjustPenaltyTime(p.id, ADJUST_TIME_DELTA)}
+                    aria-label={`Sumar ${ADJUST_TIME_DELTA}s a penalidad de jugador ${p.playerNumber}`}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive hover:text-destructive"
+                    onClick={() => handleRemovePenalty(p.id)}
+                    aria-label={`Remover penalidad para jugador ${p.playerNumber}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>
