@@ -27,6 +27,14 @@ export function MiniScoreboard() {
     toast({ title: `Puntuación de ${teamName} Actualizada`, description: `Puntuación ${delta > 0 ? 'aumentada' : 'disminuida'} en ${Math.abs(delta)}.` });
   };
 
+  const handleTimeAdjust = (delta: number) => {
+    dispatch({ type: 'ADJUST_TIME', payload: delta });
+    toast({ 
+      title: "Reloj Ajustado", 
+      description: `Tiempo ajustado en ${delta > 0 ? '+' : ''}${delta} segundo${Math.abs(delta) === 1 ? '' : 's'}.` 
+    });
+  };
+
   return (
     <Card className="mb-8 bg-card shadow-lg">
       <CardHeader>
@@ -68,9 +76,29 @@ export function MiniScoreboard() {
         </div>
 
         {/* Clock Section */}
-        <div className="flex-1">
-          <p className="text-3xl font-bold text-accent">{formatTime(state.currentTime)}</p>
-          <div className="relative">
+        <div className="flex-1 space-y-1">
+          <div className="flex items-center justify-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-accent"
+              onClick={() => handleTimeAdjust(-1)}
+              aria-label="Restar 1 segundo al reloj"
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            <p className="text-5xl font-bold text-accent tabular-nums">{formatTime(state.currentTime)}</p>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-accent"
+              onClick={() => handleTimeAdjust(1)}
+              aria-label="Sumar 1 segundo al reloj"
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+          <div className="relative mt-1"> {/* Ajuste de margen si es necesario */}
             <p className="text-lg text-primary-foreground uppercase">
               {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride)}
             </p>
