@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useGameState } from '@/contexts/game-state-context';
@@ -27,10 +28,10 @@ const TeamScore: React.FC<TeamScoreProps> = ({ teamName, score, className }) => 
   
   return (
     <div className={cn("flex flex-col items-center", className)}>
-      <h2 className="text-3xl md:text-5xl font-bold text-foreground uppercase tracking-wide">{teamName}</h2>
+      <h2 className="text-2xl md:text-4xl font-bold text-foreground uppercase tracking-wide">{teamName}</h2>
       <div 
         className={cn(
-            "text-7xl md:text-9xl font-bold font-headline text-accent tabular-nums tracking-tighter",
+            "text-6xl md:text-8xl font-bold font-headline text-accent tabular-nums tracking-tighter",
             flash && "animate-score-flash"
           )}
       >
@@ -46,11 +47,12 @@ export function ScoreDisplay() {
 
   return (
     <Card className="bg-card shadow-xl">
-      <CardContent className="p-6 flex justify-around items-center">
+      <CardContent className="p-4 flex justify-around items-center">
         <TeamScore teamName="Home" score={state.homeScore} />
-        <div className="text-4xl md:text-6xl font-bold text-primary-foreground mx-4 md:mx-8 self-center relative top-6">VS</div>
+        <div className="text-3xl md:text-5xl font-bold text-primary-foreground mx-4 md:mx-8 self-center relative top-4 md:top-6">VS</div>
         <TeamScore teamName="Away" score={state.awayScore} />
       </CardContent>
     </Card>
   );
 }
+

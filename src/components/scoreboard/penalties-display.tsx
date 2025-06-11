@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Penalty } from '@/types';
@@ -13,7 +14,7 @@ export function PenaltiesDisplay({ teamName, penalties }: PenaltiesDisplayProps)
   return (
     <Card className="bg-card shadow-lg flex-1 min-w-[300px]">
       <CardHeader>
-        <CardTitle className="text-2xl text-primary-foreground">{teamName} Penalties</CardTitle>
+        <CardTitle className="text-xl text-primary-foreground">{teamName} Penalties</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {penalties.length === 0 ? (
@@ -30,3 +31,4 @@ export function PenaltiesDisplay({ teamName, penalties }: PenaltiesDisplayProps)
     </Card>
   );
 }
+

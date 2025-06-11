@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Penalty } from '@/types';
@@ -12,21 +13,22 @@ interface PenaltyCardProps {
 export function PenaltyCard({ penalty }: PenaltyCardProps) {
   return (
     <Card className="bg-muted/50 border-primary/30">
-      <CardContent className="p-3 text-sm">
+      <CardContent className="p-4 text-base">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-primary-foreground" />
+            <User className="h-5 w-5 text-primary-foreground" />
             <span className="font-semibold">P{penalty.playerNumber}</span>
           </div>
           <div className="flex items-center gap-1 text-accent font-mono">
-            <Clock className="h-4 w-4 text-accent" />
+            <Clock className="h-5 w-5 text-accent" />
             {formatTime(penalty.remainingTime)}
           </div>
         </div>
-        <div className="text-xs text-muted-foreground mt-1">
+        <div className="text-sm text-muted-foreground mt-1">
           ({formatTime(penalty.initialDuration)} Min)
         </div>
       </CardContent>
     </Card>
   );
 }
+
