@@ -6,7 +6,7 @@ import { useGameState } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Coffee } from 'lucide-react'; // Play, Pause removed
+import { Coffee } from 'lucide-react';
 import { ControlCardWrapper } from './control-card-wrapper';
 import { useToast } from '@/hooks/use-toast';
 
@@ -71,11 +71,9 @@ export function TimeControlCard() {
             <Button onClick={handleStartRegularBreak} variant="outline" className="w-full" aria-label="Iniciar Descanso Regular">
                 <Coffee className="mr-2 h-4 w-4" /> Iniciar Descanso Regular
             </Button>
-            <p className="text-xs text-muted-foreground mt-1 text-center">
-                Utilizará la duración y configuración de auto-inicio definidas en Configuración.
-            </p>
         </div>
       </div>
     </ControlCardWrapper>
   );
 }
+
