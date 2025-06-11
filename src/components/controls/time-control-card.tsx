@@ -6,7 +6,7 @@ import { useGameState } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Play, Pause, Coffee } from 'lucide-react'; // TimerReset, Plus, Minus removed
+import { Coffee } from 'lucide-react'; // Play, Pause removed
 import { ControlCardWrapper } from './control-card-wrapper';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,10 +26,6 @@ export function TimeControlCard() {
     toast({ title: "Reloj Actualizado", description: `Tiempo establecido a ${String(displayMinutes).padStart(2, '0')}:${String(displaySeconds).padStart(2, '0')}` });
   };
   
-  // handleAdjustTime function is no longer needed by UI elements in this card
-
-  // handleResetPeriodClock function is no longer needed by UI elements in this card
-
   const handleStartRegularBreak = () => {
     dispatch({ type: 'START_BREAK' }); 
     const breakType = "Descanso Regular";
@@ -41,24 +37,10 @@ export function TimeControlCard() {
   };
 
   return (
-    <ControlCardWrapper title="Controles de Reloj">
+    <ControlCardWrapper title="Ajustes de Tiempo y Descansos">
       <div className="space-y-4">
-        <div className="flex gap-2">
-          <Button
-            onClick={() => dispatch({ type: 'TOGGLE_CLOCK' })}
-            className="flex-1"
-            variant={state.isClockRunning ? "destructive" : "default"}
-            aria-label={state.isClockRunning ? "Pausar Reloj" : "Iniciar Reloj"}
-            disabled={state.currentTime <= 0 && !state.isClockRunning} // Disable start if time is 0
-          >
-            {state.isClockRunning ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
-            {state.isClockRunning ? 'Pausar' : 'Iniciar'} Reloj
-          </Button>
-           {/* Reset Period Clock button removed */}
-        </div>
-        
         <div className="space-y-2">
-          <Label htmlFor="minutes">Establecer Tiempo</Label>
+          <Label htmlFor="minutes">Establecer Tiempo Manualmente</Label>
           <div className="flex items-center gap-2">
             <Input
               id="minutes"
@@ -85,8 +67,6 @@ export function TimeControlCard() {
           </div>
         </div>
 
-        {/* Adjust Time buttons removed */}
-
         <div className="border-t border-border pt-4">
             <Button onClick={handleStartRegularBreak} variant="outline" className="w-full" aria-label="Iniciar Descanso Regular">
                 <Coffee className="mr-2 h-4 w-4" /> Iniciar Descanso Regular
@@ -95,7 +75,6 @@ export function TimeControlCard() {
                 Utilizará la duración y configuración de auto-inicio definidas en Configuración.
             </p>
         </div>
-
       </div>
     </ControlCardWrapper>
   );

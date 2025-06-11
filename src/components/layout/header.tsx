@@ -33,7 +33,7 @@ export function Header() {
               pathname === "/controls" ? "text-foreground" : "text-foreground/60"
             )}
           >
-            Controls
+            Controles
           </Link>
           <Link
             href="/config"

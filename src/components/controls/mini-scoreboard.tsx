@@ -3,10 +3,10 @@
 
 import { useGameState, formatTime, getActualPeriodText } from '@/contexts/game-state-context';
 import type { Team } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card'; // CardHeader, CardTitle removed
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Plus, Minus } from 'lucide-react';
+import { Plus, Minus, Play, Pause } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function MiniScoreboard() {
@@ -35,19 +35,21 @@ export function MiniScoreboard() {
     });
   };
 
+  const handleToggleClock = () => {
+    dispatch({ type: 'TOGGLE_CLOCK' });
+  };
+
   return (
     <Card className="mb-8 bg-card shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-center text-2xl text-primary-foreground">Estado del Juego</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8 py-4">
+      {/* CardHeader removed */}
+      <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8 py-6"> {/* Adjusted py */}
         {/* Home Team Section */}
         <div className="flex-1 space-y-1">
           <Input
             value={state.homeTeamName}
             onChange={(e) => handleNameChange('home', e.target.value)}
             onBlur={(e) => handleNameChange('home', e.target.value.trim() || 'Local')}
-            className="bg-transparent border-0 text-center p-0 text-sm uppercase text-muted-foreground focus:ring-0 focus:border-b focus:border-primary h-auto leading-tight"
+            className="bg-transparent border-0 text-center p-0 text-sm uppercase text-card-foreground placeholder:text-muted-foreground focus:ring-0 focus:border-b focus:border-primary h-auto leading-tight"
             placeholder="Nombre Local"
             aria-label="Nombre del equipo local"
           />
@@ -75,8 +77,19 @@ export function MiniScoreboard() {
           </div>
         </div>
 
-        {/* Clock Section */}
-        <div className="flex-1 space-y-1">
+        {/* Clock Section - Now includes Play/Pause button */}
+        <div className="flex-1 space-y-2 text-center"> {/* Added text-center and more space-y */}
+          <Button
+            onClick={handleToggleClock}
+            className="w-full max-w-[180px] mx-auto mb-2" // Centered button
+            variant={state.isClockRunning ? "destructive" : "default"}
+            aria-label={state.isClockRunning ? "Pausar Reloj" : "Iniciar Reloj"}
+            disabled={state.currentTime <= 0 && !state.isClockRunning}
+          >
+            {state.isClockRunning ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
+            {state.isClockRunning ? 'Pausar' : 'Iniciar'} Reloj
+          </Button>
+          
           <div className="flex items-center justify-center gap-1">
             <Button
               variant="ghost"
@@ -98,7 +111,7 @@ export function MiniScoreboard() {
               <Plus className="h-3 w-3" />
             </Button>
           </div>
-          <div className="relative mt-1"> {/* Ajuste de margen si es necesario */}
+          <div className="relative mt-1">
             <p className="text-lg text-primary-foreground uppercase">
               {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride)}
             </p>
@@ -116,7 +129,7 @@ export function MiniScoreboard() {
             value={state.awayTeamName}
             onChange={(e) => handleNameChange('away', e.target.value)}
             onBlur={(e) => handleNameChange('away', e.target.value.trim() || 'Visitante')}
-            className="bg-transparent border-0 text-center p-0 text-sm uppercase text-muted-foreground focus:ring-0 focus:border-b focus:border-primary h-auto leading-tight"
+            className="bg-transparent border-0 text-center p-0 text-sm uppercase text-card-foreground placeholder:text-muted-foreground focus:ring-0 focus:border-b focus:border-primary h-auto leading-tight"
             placeholder="Nombre Visitante"
             aria-label="Nombre del equipo visitante"
           />

@@ -12,16 +12,19 @@ export default function ControlsPage() {
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-8">
+      {/* Controles de Tiempo y Descanso (sin Play/Pause) */}
+      <TimeControlCard />
+
+      {/* Mini Scoreboard (con Play/Pause integrado) */}
       <MiniScoreboard />
+
+      {/* Controles de Período */}
+      <ScorePeriodControlCard />
+      
+      {/* Penalidades */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="space-y-6">
-          <TimeControlCard />
-          <ScorePeriodControlCard />
-        </div>
-        <div className="space-y-6">
-          <PenaltyControlCard team="home" teamName={state.homeTeamName} />
-          <PenaltyControlCard team="away" teamName={state.awayTeamName} />
-        </div>
+        <PenaltyControlCard team="home" teamName={state.homeTeamName} />
+        <PenaltyControlCard team="away" teamName={state.awayTeamName} />
       </div>
     </div>
   );
