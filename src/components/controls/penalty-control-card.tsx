@@ -12,19 +12,23 @@ import { Trash2, UserPlus, Clock, Plus, Minus } from 'lucide-react';
 import { ControlCardWrapper } from './control-card-wrapper';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface PenaltyControlCardProps {
   team: Team; // 'home' or 'away' for reducer logic
   teamName: string; // Actual display name from state
 }
 
-const ADJUST_TIME_DELTA = 5; // Segundos para ajustar
+const ADJUST_TIME_DELTA = 1; // Segundos para ajustar, cambiado a 1
 
 export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) {
   const { state, dispatch } = useGameState();
   const [playerNumber, setPlayerNumber] = useState('');
   const [penaltyDuration, setPenaltyDuration] = useState('120');
   const { toast } = useToast();
+
+  const [draggedPenaltyId, setDraggedPenaltyId] = useState<string | null>(null);
+  const [dragOverPenaltyId, setDragOverPenaltyId] = useState<string | null>(null);
 
   const penalties = team === 'home' ? state.homePenalties : state.awayPenalties;
 
@@ -58,6 +62,51 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
         toast({ title: "Tiempo de Penalidad Ajustado", description: `Tiempo para Jugador ${penalty.playerNumber} (${teamName}) ajustado en ${delta > 0 ? '+' : ''}${delta}s.` });
     }
   };
+
+  // Drag and Drop Handlers
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, penaltyId: string) => {
+    setDraggedPenaltyId(penaltyId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", penaltyId); // Necesario para Firefox
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, penaltyId: string) => {
+    e.preventDefault();
+    setDragOverPenaltyId(penaltyId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverPenaltyId(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault(); // Necesario para permitir el drop
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetPenaltyId: string) => {
+    e.preventDefault();
+    if (draggedPenaltyId && draggedPenaltyId !== targetPenaltyId) {
+      const currentTeamPenalties = team === 'home' ? state.homePenalties : state.awayPenalties;
+      const startIndex = currentTeamPenalties.findIndex(p => p.id === draggedPenaltyId);
+      const endIndex = currentTeamPenalties.findIndex(p => p.id === targetPenaltyId);
+
+      if (startIndex !== -1 && endIndex !== -1) {
+        dispatch({
+          type: 'REORDER_PENALTIES',
+          payload: { team, startIndex, endIndex },
+        });
+        toast({ title: "Penalidades Reordenadas", description: `Orden de penalidades para ${teamName} actualizado.` });
+      }
+    }
+    setDraggedPenaltyId(null);
+    setDragOverPenaltyId(null);
+  };
+  
+  const handleDragEnd = () => {
+    setDraggedPenaltyId(null);
+    setDragOverPenaltyId(null);
+  };
+
 
   return (
     <ControlCardWrapper title={`Penalidades ${teamName}`}>
@@ -99,9 +148,26 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
         {penalties.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sin penalidades activas.</p>
         ) : (
-          <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
+          <div 
+            className="max-h-60 overflow-y-auto space-y-2 pr-2"
+            onDragOver={handleDragOver} // Necesario si se permite dropear en el contenedor general (no usado aquí)
+          >
             {penalties.map((p) => (
-              <Card key={p.id} className="p-3 bg-muted/30 flex justify-between items-center">
+              <Card 
+                key={p.id} 
+                draggable
+                onDragStart={(e) => handleDragStart(e, p.id)}
+                onDragEnter={(e) => handleDragEnter(e, p.id)}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, p.id)}
+                onDragEnd={handleDragEnd}
+                className={cn(
+                  "p-3 bg-muted/30 flex justify-between items-center cursor-move transition-all",
+                  draggedPenaltyId === p.id && "opacity-50 scale-95 shadow-lg",
+                  dragOverPenaltyId === p.id && draggedPenaltyId !== p.id && "border-2 border-primary ring-2 ring-primary"
+                )}
+              >
                 <div className="flex-1">
                   <p className="font-semibold">Jugador {p.playerNumber}</p>
                   <div className="flex items-center text-xs text-muted-foreground">
@@ -113,25 +179,25 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                    <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className="h-6 w-6" // Botón más pequeño
                     onClick={() => handleAdjustPenaltyTime(p.id, -ADJUST_TIME_DELTA)}
                     aria-label={`Restar ${ADJUST_TIME_DELTA}s a penalidad de jugador ${p.playerNumber}`}
                   >
-                    <Minus className="h-4 w-4" />
+                    <Minus className="h-3 w-3" /> {/* Icono más pequeño */}
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className="h-6 w-6" // Botón más pequeño
                     onClick={() => handleAdjustPenaltyTime(p.id, ADJUST_TIME_DELTA)}
                     aria-label={`Sumar ${ADJUST_TIME_DELTA}s a penalidad de jugador ${p.playerNumber}`}
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="h-3 w-3" /> {/* Icono más pequeño */}
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-destructive hover:text-destructive"
+                    className="h-7 w-7 text-destructive hover:text-destructive" // Mantener tamaño original para el de borrar
                     onClick={() => handleRemovePenalty(p.id)}
                     aria-label={`Remover penalidad para jugador ${p.playerNumber}`}
                   >

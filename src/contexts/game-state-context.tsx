@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import type { Penalty } from '@/types';
+import type { Penalty, Team } from '@/types';
 
 // Duraciones por defecto iniciales, se guardarán en segundos
 const INITIAL_PERIOD_DURATION = 20 * 60;
@@ -41,11 +41,12 @@ type GameAction =
   | { type: 'ADJUST_TIME'; payload: number }
   | { type: 'SET_PERIOD'; payload: number }
   | { type: 'RESET_PERIOD_CLOCK' }
-  | { type: 'SET_SCORE'; payload: { team: 'home' | 'away'; score: number } }
-  | { type: 'ADJUST_SCORE'; payload: { team: 'home' | 'away'; delta: number } }
-  | { type: 'ADD_PENALTY'; payload: { team: 'home' | 'away'; penalty: Omit<Penalty, 'id'> } }
-  | { type: 'REMOVE_PENALTY'; payload: { team: 'home' | 'away'; penaltyId: string } }
-  | { type: 'ADJUST_PENALTY_TIME'; payload: { team: 'home' | 'away'; penaltyId: string; delta: number } }
+  | { type: 'SET_SCORE'; payload: { team: Team; score: number } }
+  | { type: 'ADJUST_SCORE'; payload: { team: Team; delta: number } }
+  | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id'> } }
+  | { type: 'REMOVE_PENALTY'; payload: { team: Team; penaltyId: string } }
+  | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } }
+  | { type: 'REORDER_PENALTIES'; payload: { team: Team; startIndex: number; endIndex: number } }
   | { type: 'TICK' }
   | { type: 'SET_HOME_TEAM_NAME'; payload: string }
   | { type: 'SET_AWAY_TEAM_NAME'; payload: string }
@@ -87,12 +88,11 @@ const GameStateContext = createContext<{
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
     case 'TOGGLE_CLOCK':
-      if (state.currentTime <= 0 && !state.isClockRunning) { // No iniciar si el tiempo es 0
-        // Si es un break y no auto-inicia, o un periodo terminado, no hacer nada.
-        if (state.periodDisplayOverride !== null) { // Estamos en un break
+      if (state.currentTime <= 0 && !state.isClockRunning) {
+        if (state.periodDisplayOverride !== null) {
           const autoStart = state.periodDisplayOverride === "Break" ? state.autoStartBreaks : state.autoStartPreOTBreaks;
           if (!autoStart && state.currentTime === 0) return state;
-        } else if (state.currentTime === 0) { // Periodo terminado
+        } else if (state.currentTime === 0) {
              return state;
         }
       }
@@ -140,15 +140,21 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const updatedPenalties = state[`${team}Penalties`].map(p => {
         if (p.id === penaltyId) {
           const newRemainingTime = Math.max(0, p.remainingTime + delta);
-          // Ensure remaining time does not exceed initial duration, though this might be desired in some edge cases
-          // For now, let's cap it at initialDuration if delta is positive, or 0 if negative.
-          // If delta is positive, cap at initialDuration. If negative, cap at 0.
           const cappedTime = delta > 0 ? Math.min(newRemainingTime, p.initialDuration) : newRemainingTime;
           return { ...p, remainingTime: cappedTime };
         }
         return p;
       });
       return { ...state, [`${team}Penalties`]: updatedPenalties };
+    }
+    case 'REORDER_PENALTIES': {
+      const { team, startIndex, endIndex } = action.payload;
+      const currentPenalties = [...state[`${team}Penalties`]];
+      const [removed] = currentPenalties.splice(startIndex, 1);
+      if (removed) {
+        currentPenalties.splice(endIndex, 0, removed);
+      }
+      return { ...state, [`${team}Penalties`]: currentPenalties };
     }
     case 'TICK': {
       if (!state.isClockRunning || state.currentTime <= 0) {
@@ -159,7 +165,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       let homePenalties = state.homePenalties;
       let awayPenalties = state.awayPenalties;
 
-      if (state.periodDisplayOverride === null) { // Penalties only run if not in any kind of break
+      if (state.periodDisplayOverride === null) {
         const updatePenalties = (penalties: Penalty[], maxConcurrent: number) => {
           let runningCount = 0;
           return penalties.map(p => {
@@ -175,8 +181,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
 
       let newIsClockRunning = state.isClockRunning;
-      if (newTime <= 0) { // Time reached zero
-        newIsClockRunning = false; // Stop the clock
+      if (newTime <= 0) {
+        newIsClockRunning = false;
       }
 
       return {
@@ -211,7 +217,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const periodBeforeBreak = state.periodDisplayOverride !== null ? state.currentPeriod : state.currentPeriod -1;
       if (periodBeforeBreak < 1) return state;
 
-      const isPreOT = periodBeforeBreak >= 3; // Break after P3 or any OT is considered Pre-OT for duration/auto-start
+      const isPreOT = periodBeforeBreak >= 3;
 
       return {
         ...state,
@@ -222,13 +228,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
     }
     case 'SET_DEFAULT_PERIOD_DURATION':
-      return { ...state, defaultPeriodDuration: Math.max(60, action.payload) }; // Min 1 minuto
+      return { ...state, defaultPeriodDuration: Math.max(60, action.payload) };
     case 'SET_DEFAULT_BREAK_DURATION':
-      return { ...state, defaultBreakDuration: Math.max(10, action.payload) }; // Min 10 segundos
+      return { ...state, defaultBreakDuration: Math.max(10, action.payload) };
     case 'SET_DEFAULT_PRE_OT_BREAK_DURATION':
-      return { ...state, defaultPreOTBreakDuration: Math.max(10, action.payload) }; // Min 10 segundos
+      return { ...state, defaultPreOTBreakDuration: Math.max(10, action.payload) };
     case 'SET_MAX_CONCURRENT_PENALTIES':
-      return { ...state, maxConcurrentPenalties: Math.max(1, action.payload) }; // Min 1
+      return { ...state, maxConcurrentPenalties: Math.max(1, action.payload) };
     case 'TOGGLE_AUTO_START_BREAKS':
       return { ...state, autoStartBreaks: !state.autoStartBreaks };
     case 'TOGGLE_AUTO_START_PRE_OT_BREAKS':
@@ -284,7 +290,5 @@ export const getPeriodText = (period: number): string => {
     return `OT${period - 3}`;
 };
 
-// Helper para convertir minutos a segundos para el estado
 export const minutesToSeconds = (minutes: number): number => minutes * 60;
-// Helper para convertir segundos a minutos para mostrar en inputs
 export const secondsToMinutes = (seconds: number): number => Math.floor(seconds / 60);
