@@ -11,13 +11,13 @@ interface GameState {
   homeScore: number;
   awayScore: number;
   currentTime: number; // in seconds
-  currentPeriod: number;
+  currentPeriod: number; // Represents the numeric period (1, 2, 3 for regular, 4 for OT1, 5 for OT2, etc.)
   isClockRunning: boolean;
   homePenalties: Penalty[];
   awayPenalties: Penalty[];
   homeTeamName: string;
   awayTeamName: string;
-  periodDisplayOverride: string | null;
+  periodDisplayOverride: string | null; // e.g., "Break", "Halftime"
   configurableBreakMinutes: number; // Duración del break configurable por el usuario
 }
 
@@ -25,8 +25,8 @@ type GameAction =
   | { type: 'TOGGLE_CLOCK' }
   | { type: 'SET_TIME'; payload: { minutes: number; seconds: number } }
   | { type: 'ADJUST_TIME'; payload: number }
-  | { type: 'SET_PERIOD'; payload: number }
-  | { type: 'RESET_PERIOD_CLOCK' }
+  | { type: 'SET_PERIOD'; payload: number } // Sets to a numeric period, clears override
+  | { type: 'RESET_PERIOD_CLOCK' } // Resets to PERIOD_DURATION, clears override
   | { type: 'SET_SCORE'; payload: { team: 'home' | 'away'; score: number } }
   | { type: 'ADJUST_SCORE'; payload: { team: 'home' | 'away'; delta: number } }
   | { type: 'ADD_PENALTY'; payload: { team: 'home' | 'away'; penalty: Omit<Penalty, 'id'> } }
@@ -34,8 +34,9 @@ type GameAction =
   | { type: 'TICK' }
   | { type: 'SET_HOME_TEAM_NAME'; payload: string }
   | { type: 'SET_AWAY_TEAM_NAME'; payload: string }
-  | { type: 'START_BREAK' } // No necesita payload, usará configurableBreakMinutes
-  | { type: 'SET_PERIOD_DISPLAY_OVERRIDE'; payload: string | null }
+  | { type: 'START_BREAK' } // Uses configurableBreakMinutes, sets override to "Break"
+  | { type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' } // Sets currentPeriod to prev, then starts break
+  | { type: 'SET_PERIOD_DISPLAY_OVERRIDE'; payload: string | null } // For custom overrides if needed
   | { type: 'SET_CONFIGURABLE_BREAK_MINUTES'; payload: number };
 
 const initialState: GameState = {
@@ -74,9 +75,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       return { 
         ...state, 
         currentPeriod: Math.max(1, action.payload), 
-        periodDisplayOverride: null, // Salir de modo Break si estaba activo
+        periodDisplayOverride: null, 
         isClockRunning: false,
-        currentTime: PERIOD_DURATION, // Resetear tiempo a duración estándar del período
+        currentTime: PERIOD_DURATION, 
       };
     case 'RESET_PERIOD_CLOCK':
       return { 
@@ -106,10 +107,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
       const newTime = state.currentTime - 1;
       
-      // Solo actualizar penalidades si no estamos en Break
       let homePenalties = state.homePenalties;
       let awayPenalties = state.awayPenalties;
-      if (state.periodDisplayOverride !== 'Break') {
+      if (state.periodDisplayOverride !== 'Break') { // Penalties only run if not in a "Break"
         const updatePenalties = (penalties: Penalty[]) =>
           penalties
             .map(p => ({ ...p, remainingTime: p.remainingTime - 1 }))
@@ -136,13 +136,25 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         currentTime: breakDurationSeconds,
         periodDisplayOverride: 'Break',
-        isClockRunning: true, // Iniciar el reloj automáticamente para el break
+        isClockRunning: true, 
+      };
+    }
+    case 'START_BREAK_AFTER_PREVIOUS_PERIOD': {
+      if (state.currentPeriod <= 1) return state; // Safety: cannot start break before P1
+      const basePeriodForBreak = state.currentPeriod - 1;
+      const breakDurationSeconds = Math.max(1, state.configurableBreakMinutes) * 60;
+      return {
+        ...state,
+        currentPeriod: basePeriodForBreak, // The break is "after" this period
+        currentTime: breakDurationSeconds,
+        periodDisplayOverride: 'Break',
+        isClockRunning: true,
       };
     }
     case 'SET_PERIOD_DISPLAY_OVERRIDE':
       return { ...state, periodDisplayOverride: action.payload };
     case 'SET_CONFIGURABLE_BREAK_MINUTES':
-      return { ...state, configurableBreakMinutes: Math.max(1, action.payload) }; // Mínimo 1 minuto
+      return { ...state, configurableBreakMinutes: Math.max(1, action.payload) }; 
     default:
       return state;
   }
@@ -182,17 +194,17 @@ export const formatTime = (totalSeconds: number): string => {
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
+// Returns the text to display for the period, considering override
 export const getActualPeriodText = (period: number, override: string | null): string => {
   if (override) return override;
-  if (period <= 0) return "---";
-  if (period <= 3) return `${period}${period === 1 ? 'ST' : period === 2 ? 'ND' : 'RD'}`;
-  if (period === 4) return 'OT';
-  return `OT${period - 3}`;
+  return getPeriodText(period);
 };
 
+// Returns the standard text for a numeric period
 export const getPeriodText = (period: number): string => {
     if (period <= 0) return "---";
     if (period <= 3) return `${period}${period === 1 ? 'ST' : period === 2 ? 'ND' : 'RD'}`;
-    if (period === 4) return 'OT';
-    return `OT${period - 3}`;
+    // For OT periods (4 = OT, 5 = OT2, 6 = OT3, etc.)
+    if (period === 4) return 'OT'; 
+    return `OT${period - 3}`; 
 };

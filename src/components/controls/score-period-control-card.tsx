@@ -10,6 +10,8 @@ import { ControlCardWrapper } from './control-card-wrapper';
 import { useToast } from '@/hooks/use-toast';
 import type { Team } from '@/types';
 
+const MAX_PERIOD_NUMBER = 7; // e.g., P1, P2, P3, OT1, OT2, OT3, OT4 (period 7)
+
 export function ScorePeriodControlCard() {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
@@ -22,38 +24,39 @@ export function ScorePeriodControlCard() {
 
   const handlePreviousPeriod = () => {
     if (state.periodDisplayOverride === 'Break') {
-      // Si estamos en Break, anterior es P3
-      dispatch({ type: 'SET_PERIOD', payload: 3 });
-      toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(3)}. Reloj reiniciado y pausado.` });
-    } else if (state.currentPeriod === 4) { // Estamos en OT1
-      // Anterior a OT1 es Break
-      dispatch({ type: 'START_BREAK' });
-      toast({ title: "Descanso Iniciado", description: `Período establecido a Descanso. Reloj iniciado con ${state.configurableBreakMinutes} minutos.` });
-    } else if (state.currentPeriod > 1) {
-      const newPeriod = state.currentPeriod - 1;
-      dispatch({ type: 'SET_PERIOD', payload: newPeriod });
-      // RESET_PERIOD_CLOCK is called implicitly by SET_PERIOD if not in break
-      toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(newPeriod)}. Reloj reiniciado y pausado.` });
+      // Coming from a break, go to the period number that was before the break
+      const numericPeriodBeforeBreak = state.currentPeriod;
+      dispatch({ type: 'SET_PERIOD', payload: numericPeriodBeforeBreak });
+      toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(numericPeriodBeforeBreak)}. Reloj reiniciado y pausado.` });
+    } else {
+      // In a numeric period, try to go to a break *after* the (currentPeriod - 1)
+      if (state.currentPeriod > 1) {
+        dispatch({ type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' });
+        toast({ title: "Descanso Iniciado", description: `Descanso iniciado después de ${getPeriodText(state.currentPeriod - 1)}. Reloj corriendo con ${state.configurableBreakMinutes} min.` });
+      } else {
+        // Already at P1, cannot go further back or to a break before P1
+        toast({ title: "Límite de Período Alcanzado", description: "No se puede retroceder más allá del 1er Período.", variant: "destructive" });
+      }
     }
   };
 
   const handleNextPeriod = () => {
     if (state.periodDisplayOverride === 'Break') {
-      // Si estamos en Break, siguiente es OT1 (periodo 4)
-      dispatch({ type: 'SET_PERIOD', payload: 4 });
-      toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(4)}. Reloj reiniciado y pausado.` });
-    } else if (state.currentPeriod === 3) { // Estamos en P3
-      // Siguiente a P3 es Break
-      dispatch({ type: 'START_BREAK' });
-      toast({ title: "Descanso Iniciado", description: `Período establecido a Descanso. Reloj iniciado con ${state.configurableBreakMinutes} minutos.` });
-    } else {
-      const newPeriod = state.currentPeriod + 1;
-      // Allow advancing up to OT5 for example (period 7)
-      if (newPeriod <= 7) { // Arbitrary limit, can be adjusted
-        dispatch({ type: 'SET_PERIOD', payload: newPeriod });
-        // RESET_PERIOD_CLOCK is called implicitly by SET_PERIOD if not in break
-        toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(newPeriod)}. Reloj reiniciado y pausado.` });
+      // Coming from a break, go to the next numeric period
+      const nextNumericPeriod = state.currentPeriod + 1;
+      if (nextNumericPeriod <= MAX_PERIOD_NUMBER) {
+        dispatch({ type: 'SET_PERIOD', payload: nextNumericPeriod });
+        toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(nextNumericPeriod)}. Reloj reiniciado y pausado.` });
       } else {
+        toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod)}.`, variant: "destructive" });
+      }
+    } else {
+      // In a numeric period, try to go to a break *after* the currentPeriod
+      if (state.currentPeriod < MAX_PERIOD_NUMBER) {
+        dispatch({ type: 'START_BREAK' });
+        toast({ title: "Descanso Iniciado", description: `Descanso iniciado después de ${getPeriodText(state.currentPeriod)}. Reloj corriendo con ${state.configurableBreakMinutes} min.` });
+      } else {
+        // Already at max period, cannot start a break after it
         toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod)}.`, variant: "destructive" });
       }
     }
@@ -67,8 +70,14 @@ export function ScorePeriodControlCard() {
     dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: e.target.value });
   };
 
-  const isPreviousDisabled = state.currentPeriod <= 1 && state.periodDisplayOverride !== 'Break';
-  const isNextDisabled = state.currentPeriod >= 7 && state.periodDisplayOverride !== 'Break'; // Assuming OT5 (period 7) is max.
+  // Disable "Previous" if:
+  // - In P1 and not in a break (cannot go before P1 or to a break before P1)
+  const isPreviousDisabled = state.periodDisplayOverride !== 'Break' && state.currentPeriod <= 1;
+
+  // Disable "Next" if:
+  // - In the MAX_PERIOD_NUMBER and not in a break (cannot go to a break after max period, or to a period beyond max)
+  const isNextDisabled = state.periodDisplayOverride !== 'Break' && state.currentPeriod >= MAX_PERIOD_NUMBER;
+
 
   return (
     <ControlCardWrapper title="Puntuación, Período y Equipos">
