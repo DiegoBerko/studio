@@ -23,20 +23,20 @@ export function PenaltyCard({ penalty }: PenaltyCardProps) {
       <CardContent className="p-3 md:p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <User className="h-5 w-5 md:h-6 md:w-6 text-primary-foreground" />
-            <span className="font-semibold text-base md:text-lg">P{penalty.playerNumber}</span>
+            <User className="h-6 w-6 md:h-8 md:w-8 text-primary-foreground" />
+            <span className="font-semibold text-2xl md:text-3xl">{penalty.playerNumber}</span>
           </div>
-          <div className="flex items-center gap-1 text-accent font-mono text-base md:text-lg">
-            <Clock className="h-5 w-5 md:h-6 md:w-6 text-accent" />
+          <div className="flex items-center gap-1 text-accent font-mono text-2xl md:text-3xl">
+            <Clock className="h-6 w-6 md:h-8 md:w-8 text-accent" />
             {formatTime(penalty.remainingTime)}
           </div>
         </div>
         <div className="flex justify-between items-center">
-          <div className="text-xs md:text-sm text-muted-foreground mt-1">
+          <div className="text-sm md:text-base text-muted-foreground mt-1">
             ({formatTime(penalty.initialDuration)} Min)
           </div>
           {isWaiting && (
-            <div className="text-xs text-muted-foreground/80 mt-1 italic">
+            <div className="text-sm text-muted-foreground/80 mt-1 italic">
               {penalty._status === 'pending_player' ? 'Esperando (jugador)' : 'Esperando (puesto)'}
             </div>
           )}
