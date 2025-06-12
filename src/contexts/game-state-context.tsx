@@ -130,36 +130,29 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
   const newState = ((): GameState => {
     switch (action.type) {
       case 'HYDRATE_FROM_STORAGE': {
-        // 1. Start with application defaults (initialGlobalState).
-        // 2. Override with any values from localStorage (action.payload).
-        //    This ensures that if localStorage has an older version of the state
-        //    without new config fields, those new fields get their defaults.
-        //    And if localStorage has values (like currentTime, scores), they are used.
         const hydratedBase = {
           ...initialGlobalState,
           ...action.payload,
         };
 
-        // 3. Apply specific hydration logic
         const hydratedState: GameState = {
           ...hydratedBase,
-          isClockRunning: false, // Always start with the clock paused
-          _lastActionOriginator: undefined, // Clear the originator
+          // isClockRunning is now taken from action.payload or initialGlobalState
+          _lastActionOriginator: undefined,
         };
 
-        // 4. Ensure penalties from storage don't have _status (it's a runtime field)
         hydratedState.homePenalties = (action.payload?.homePenalties || []).map(({ _status, ...p }: Penalty) => p);
         hydratedState.awayPenalties = (action.payload?.awayPenalties || []).map(({ _status, ...p }: Penalty) => p);
         return hydratedState;
       }
       case 'SET_STATE_FROM_LOCAL_BROADCAST':
-        if (JSON.stringify(state) === JSON.stringify(action.payload)) {
-          return state;
-        }
-        // Ensure penalties from broadcast don't have _status upon direct setting
-        const receivedState = { ...action.payload, _lastActionOriginator: undefined };
-        receivedState.homePenalties = (action.payload.homePenalties || []).map(({ _status, ...p }) => p);
-        receivedState.awayPenalties = (action.payload.awayPenalties || []).map(({ _status, ...p }) => p);
+        // El payload viene con _lastActionOriginator. Lo limpiamos para el estado interno de esta pestaña.
+        // Las penalidades en action.payload SÍ pueden tener _status (si el TICK las actualizó en la pestaña emisora).
+        // Es importante mantenerlos para que la UI receptora refleje ese estado inmediatamente.
+        const receivedState = {
+          ...action.payload,
+          _lastActionOriginator: undefined, // Limpiar para el estado interno de ESTA pestaña
+        };
         return receivedState;
 
       case 'TOGGLE_CLOCK':
@@ -250,7 +243,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
             for (const p of penalties) {
               if (p.remainingTime <= 0) {
-                continue;
+                // If a penalty was already at 0 but had a status (e.g. from broadcast),
+                // we keep it for one render cycle if it was 'running' to show 00:00.
+                // Otherwise, we filter it out if it's truly done or wasn't supposed to be running.
+                if (p._status === 'running' && p.remainingTime === 0) {
+                    // Keep it to display 00:00 then it will be gone in next processing.
+                } else {
+                    continue;
+                }
               }
 
               let status: Penalty['_status'] = undefined;
@@ -267,10 +267,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
                 status = 'pending_concurrent';
               }
               
-              if (newRemainingTime > 0) {
-                resultPenalties.push({ ...p, remainingTime: newRemainingTime, _status: status });
-              } else if (status === 'running') { 
-                resultPenalties.push({ ...p, remainingTime: 0, _status: status });
+              if (newRemainingTime > 0 || (status === 'running' && newRemainingTime === 0)) {
+                 resultPenalties.push({ ...p, remainingTime: newRemainingTime, _status: status });
               }
             }
             return resultPenalties;
@@ -379,16 +377,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return { ...state, autoStartTimeouts: action.payload };
       case 'RESET_GAME_STATE':
         return {
-          ...state,
+          ...state, // Conserva las configuraciones como defaultXDuration, maxPenalties, autoStart...
           homeScore: initialGlobalState.homeScore,
           awayScore: initialGlobalState.awayScore,
-          currentTime: state.defaultPeriodDuration,
+          currentTime: state.defaultPeriodDuration, // Usa la duración de período configurada
           currentPeriod: initialGlobalState.currentPeriod,
           isClockRunning: initialGlobalState.isClockRunning,
           homePenalties: initialGlobalState.homePenalties,
           awayPenalties: initialGlobalState.awayPenalties,
-          homeTeamName: initialGlobalState.homeTeamName,
-          awayTeamName: initialGlobalState.awayTeamName,
+          homeTeamName: initialGlobalState.homeTeamName, // Podría resetearse o mantenerse, aquí se resetea
+          awayTeamName: initialGlobalState.awayTeamName, // Podría resetearse o mantenerse, aquí se resetea
           periodDisplayOverride: initialGlobalState.periodDisplayOverride,
           preTimeoutState: initialGlobalState.preTimeoutState,
         };
@@ -420,21 +418,18 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
     }
 
     hasHydratedRef.current = true;
-    let payloadForHydration: Partial<GameState> = {}; // Default to empty object
+    let payloadForHydration: Partial<GameState> = {}; 
 
     try {
       const rawStoredState = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (rawStoredState) {
         const parsedState = JSON.parse(rawStoredState) as Partial<GameState>;
-        payloadForHydration = { ...parsedState }; // Use parsed state directly
+        payloadForHydration = { ...parsedState }; 
       }
     } catch (error) {
       console.error("Error reading state from localStorage for hydration:", error);
-      // payloadForHydration remains {}
     }
     
-    // The HYDRATE_FROM_STORAGE reducer will handle setting isClockRunning to false
-    // and stripping _status from penalties, and merging with initialGlobalState.
     dispatch({ type: 'HYDRATE_FROM_STORAGE', payload: payloadForHydration });
     setIsLoading(false);
 
@@ -472,25 +467,25 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    // Solo guardar y transmitir si ESTA pestaña originó el último cambio significativo.
     if (state._lastActionOriginator !== TAB_ID) {
       return;
     }
 
     if (typeof window !== 'undefined') {
       try {
-        const stateToSave = { ...state };
-        delete stateToSave._lastActionOriginator;
-        
-        stateToSave.homePenalties = stateToSave.homePenalties.map(({ _status, ...p }) => p);
-        stateToSave.awayPenalties = stateToSave.awayPenalties.map(({ _status, ...p }) => p);
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
+        // Guardar en localStorage SIN el originator y SIN _status de penalidades
+        const stateForStorage = { ...state };
+        delete stateForStorage._lastActionOriginator;
+        stateForStorage.homePenalties = (state.homePenalties || []).map(({ _status, ...p }) => p);
+        stateForStorage.awayPenalties = (state.awayPenalties || []).map(({ _status, ...p }) => p);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
 
+        // Transmitir por BroadcastChannel CON el originator y CON _status de penalidades
         if (channelRef.current) {
-          const finalStateToBroadcast = {...stateToSave};
-          channelRef.current.postMessage(finalStateToBroadcast);
+          channelRef.current.postMessage(state); 
         }
-      } catch (error)
-{
+      } catch (error) {
         console.error("Error saving state to localStorage or broadcasting:", error);
       }
     }
