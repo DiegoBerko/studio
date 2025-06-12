@@ -283,7 +283,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             ...state,
             currentPeriod: state.preTimeoutState.period,
             currentTime: state.preTimeoutState.time,
-            isClockRunning: state.preTimeoutState.isClockRunning, // Mantener el estado del reloj anterior
+            isClockRunning: false, // Always return to paused state
             periodDisplayOverride: state.preTimeoutState.override,
             preTimeoutState: null,
           };
@@ -328,13 +328,13 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         if (storedState) {
           const parsedState = JSON.parse(storedState);
            // Asegurarse de que todos los campos, incluidos los nuevos, estén presentes
-          return { ...initialGlobalState, ...parsedState, _lastActionOriginator: undefined, isLoading: false };
+          return { ...initialGlobalState, ...parsedState, _lastActionOriginator: undefined };
         }
       } catch (error) {
         console.error("Error reading state from localStorage:", error);
       }
     }
-    return {...initialGlobalState, _lastActionOriginator: undefined, isLoading: false};
+    return {...initialGlobalState, _lastActionOriginator: undefined};
   };
   
   const [state, dispatch] = useReducer(gameReducer, undefined, getInitialState);
@@ -382,9 +382,11 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         delete stateToSave._lastActionOriginator; 
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
 
-        const channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
-        channel.postMessage({ ...stateToSave, _lastActionOriginator: TAB_ID }); 
-        channel.close(); 
+        if ('BroadcastChannel' in window) {
+          const channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+          channel.postMessage({ ...stateToSave, _lastActionOriginator: TAB_ID }); 
+          channel.close(); 
+        }
       } catch (error) {
         console.error("Error saving state to localStorage or broadcasting:", error);
       }
