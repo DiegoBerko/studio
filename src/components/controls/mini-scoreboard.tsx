@@ -95,9 +95,12 @@ export function MiniScoreboard() {
           });
         };
         
+        const isCurrentPeriodOT = state.currentPeriod > state.numberOfRegularPeriods;
+        const currentPeriodExpectedDuration = isCurrentPeriodOT ? state.defaultOTPeriodDuration : state.defaultPeriodDuration;
+        
         const shouldConfirm = state.periodDisplayOverride === null &&
                               state.currentTime > 0 &&
-                              state.currentTime < state.defaultPeriodDuration;
+                              state.currentTime < currentPeriodExpectedDuration;
 
         checkAndConfirm(
           shouldConfirm,
@@ -149,9 +152,12 @@ export function MiniScoreboard() {
           });
         };
 
+        const isCurrentPeriodOT = state.currentPeriod > state.numberOfRegularPeriods;
+        const currentPeriodExpectedDuration = isCurrentPeriodOT ? state.defaultOTPeriodDuration : state.defaultPeriodDuration;
+
         const shouldConfirm = state.periodDisplayOverride === null &&
                               state.currentTime > 0 &&
-                              state.currentTime < state.defaultPeriodDuration;
+                              state.currentTime < currentPeriodExpectedDuration;
         
         checkAndConfirm(
           shouldConfirm,
