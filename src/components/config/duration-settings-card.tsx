@@ -22,12 +22,14 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
   const { state, dispatch } = useGameState();
 
   // Local state for inputs
+  const [localWarmUpDurationInput, setLocalWarmUpDurationInput] = useState(secondsToMinutes(state.defaultWarmUpDuration));
   const [localPeriodDurationInput, setLocalPeriodDurationInput] = useState(secondsToMinutes(state.defaultPeriodDuration));
-  const [localOTPeriodDurationInput, setLocalOTPeriodDurationInput] = useState(secondsToMinutes(state.defaultOTPeriodDuration)); // Nuevo estado local
+  const [localOTPeriodDurationInput, setLocalOTPeriodDurationInput] = useState(secondsToMinutes(state.defaultOTPeriodDuration));
   const [localBreakDurationInput, setLocalBreakDurationInput] = useState(String(state.defaultBreakDuration));
   const [localPreOTBreakDurationInput, setLocalPreOTBreakDurationInput] = useState(String(state.defaultPreOTBreakDuration));
   const [localTimeoutDurationInput, setLocalTimeoutDurationInput] = useState(String(state.defaultTimeoutDuration));
   
+  const [localAutoStartWarmUp, setLocalAutoStartWarmUp] = useState(state.autoStartWarmUp);
   const [localAutoStartBreaks, setLocalAutoStartBreaks] = useState(state.autoStartBreaks);
   const [localAutoStartPreOTBreaks, setLocalAutoStartPreOTBreaks] = useState(state.autoStartPreOTBreaks);
   const [localAutoStartTimeouts, setLocalAutoStartTimeouts] = useState(state.autoStartTimeouts);
@@ -40,11 +42,13 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
   // Effect to update local state if global state changes and form isn't dirty
   useEffect(() => {
     if (!isDirty) {
+      setLocalWarmUpDurationInput(secondsToMinutes(state.defaultWarmUpDuration));
       setLocalPeriodDurationInput(secondsToMinutes(state.defaultPeriodDuration));
-      setLocalOTPeriodDurationInput(secondsToMinutes(state.defaultOTPeriodDuration)); // Actualizar estado local
+      setLocalOTPeriodDurationInput(secondsToMinutes(state.defaultOTPeriodDuration));
       setLocalBreakDurationInput(String(state.defaultBreakDuration));
       setLocalPreOTBreakDurationInput(String(state.defaultPreOTBreakDuration));
       setLocalTimeoutDurationInput(String(state.defaultTimeoutDuration));
+      setLocalAutoStartWarmUp(state.autoStartWarmUp);
       setLocalAutoStartBreaks(state.autoStartBreaks);
       setLocalAutoStartPreOTBreaks(state.autoStartPreOTBreaks);
       setLocalAutoStartTimeouts(state.autoStartTimeouts);
@@ -52,11 +56,13 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       setLocalNumOTPeriodsInput(String(state.numberOfOvertimePeriods));
     }
   }, [
+    state.defaultWarmUpDuration,
     state.defaultPeriodDuration, 
-    state.defaultOTPeriodDuration, // Dependencia del nuevo estado
+    state.defaultOTPeriodDuration,
     state.defaultBreakDuration, 
     state.defaultPreOTBreakDuration, 
     state.defaultTimeoutDuration,
+    state.autoStartWarmUp,
     state.autoStartBreaks,
     state.autoStartPreOTBreaks,
     state.autoStartTimeouts,
@@ -77,11 +83,15 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
     handleSave: () => {
       if (!isDirty) return true;
 
+      const warmUpDurationNum = parseInt(localWarmUpDurationInput, 10);
+      const finalWarmUpDurationSeconds = (isNaN(warmUpDurationNum) || warmUpDurationNum < 1) ? 60 : warmUpDurationNum * 60;
+      dispatch({ type: "SET_DEFAULT_WARM_UP_DURATION", payload: finalWarmUpDurationSeconds });
+
       const periodDurationNum = parseInt(localPeriodDurationInput, 10);
       const finalPeriodDurationSeconds = (isNaN(periodDurationNum) || periodDurationNum < 1) ? 60 : periodDurationNum * 60;
       dispatch({ type: "SET_DEFAULT_PERIOD_DURATION", payload: finalPeriodDurationSeconds });
 
-      const otPeriodDurationNum = parseInt(localOTPeriodDurationInput, 10); // Procesar OT
+      const otPeriodDurationNum = parseInt(localOTPeriodDurationInput, 10);
       const finalOTPeriodDurationSeconds = (isNaN(otPeriodDurationNum) || otPeriodDurationNum < 1) ? 60 : otPeriodDurationNum * 60;
       dispatch({ type: "SET_DEFAULT_OT_PERIOD_DURATION", payload: finalOTPeriodDurationSeconds });
 
@@ -105,7 +115,9 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       const finalNumOTPeriods = (isNaN(numOTPeriods) || numOTPeriods < 0) ? 1 : numOTPeriods;
       dispatch({ type: "SET_NUMBER_OF_OVERTIME_PERIODS", payload: finalNumOTPeriods });
 
-
+      if (localAutoStartWarmUp !== state.autoStartWarmUp) {
+        dispatch({ type: "SET_AUTO_START_WARM_UP_VALUE", payload: localAutoStartWarmUp });
+      }
       if (localAutoStartBreaks !== state.autoStartBreaks) {
         dispatch({ type: "SET_AUTO_START_BREAKS_VALUE", payload: localAutoStartBreaks });
       }
@@ -120,11 +132,13 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       return true;
     },
     handleDiscard: () => {
+      setLocalWarmUpDurationInput(secondsToMinutes(state.defaultWarmUpDuration));
       setLocalPeriodDurationInput(secondsToMinutes(state.defaultPeriodDuration));
-      setLocalOTPeriodDurationInput(secondsToMinutes(state.defaultOTPeriodDuration)); // Reset OT
+      setLocalOTPeriodDurationInput(secondsToMinutes(state.defaultOTPeriodDuration));
       setLocalBreakDurationInput(String(state.defaultBreakDuration));
       setLocalPreOTBreakDurationInput(String(state.defaultPreOTBreakDuration));
       setLocalTimeoutDurationInput(String(state.defaultTimeoutDuration));
+      setLocalAutoStartWarmUp(state.autoStartWarmUp);
       setLocalAutoStartBreaks(state.autoStartBreaks);
       setLocalAutoStartPreOTBreaks(state.autoStartPreOTBreaks);
       setLocalAutoStartTimeouts(state.autoStartTimeouts);
@@ -162,6 +176,34 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
                 placeholder="ej. 1 (0 para ninguno)"
                 min="0"
                 />
+            </div>
+        </div>
+
+        <div className="space-y-3 p-4 border rounded-md bg-muted/20">
+            <div>
+              <Label htmlFor="warmUpDuration">Duración Entrada en Calor (minutos)</Label>
+              <Input
+                id="warmUpDuration"
+                type="number"
+                value={localWarmUpDurationInput}
+                onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
+                className="mt-1"
+                placeholder="ej. 5"
+                min="1"
+              />
+            </div>
+            <div className="flex items-center justify-between pt-2">
+              <Label htmlFor="autoStartWarmUp" className="flex flex-col space-y-1">
+                <span>Iniciar Automáticamente Entrada en Calor</span>
+                <span className="font-normal leading-snug text-muted-foreground text-xs">
+                  Si está activo, el reloj comenzará automáticamente al iniciar la entrada en calor.
+                </span>
+              </Label>
+              <Switch
+                id="autoStartWarmUp"
+                checked={localAutoStartWarmUp}
+                onCheckedChange={(checked) => { setLocalAutoStartWarmUp(checked); markDirty(); }}
+              />
             </div>
         </div>
 
@@ -282,5 +324,3 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
-
-    

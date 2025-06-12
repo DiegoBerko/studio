@@ -126,12 +126,14 @@ export default function ConfigPage() {
 
     const configToExport: ConfigFields = {
       configName: state.configName,
+      defaultWarmUpDuration: state.defaultWarmUpDuration,
       defaultPeriodDuration: state.defaultPeriodDuration,
       defaultOTPeriodDuration: state.defaultOTPeriodDuration,
       defaultBreakDuration: state.defaultBreakDuration,
       defaultPreOTBreakDuration: state.defaultPreOTBreakDuration,
       defaultTimeoutDuration: state.defaultTimeoutDuration,
       maxConcurrentPenalties: state.maxConcurrentPenalties,
+      autoStartWarmUp: state.autoStartWarmUp,
       autoStartBreaks: state.autoStartBreaks,
       autoStartPreOTBreaks: state.autoStartPreOTBreaks,
       autoStartTimeouts: state.autoStartTimeouts,
@@ -173,18 +175,21 @@ export default function ConfigPage() {
         if (typeof text !== 'string') throw new Error("Error al leer el archivo.");
         const importedConfig = JSON.parse(text) as Partial<ConfigFields>;
 
-        if (!importedConfig.configName && !importedConfig.defaultPeriodDuration) {
+        // Basic validation for a potentially valid config file
+        if (!importedConfig.configName && !importedConfig.defaultPeriodDuration && !importedConfig.defaultWarmUpDuration) {
           throw new Error("Archivo de configuración no válido o formato incorrecto.");
         }
         
         const newConfigFromFile: Partial<ConfigFields> = {
           configName: importedConfig.configName ?? state.configName,
+          defaultWarmUpDuration: importedConfig.defaultWarmUpDuration ?? state.defaultWarmUpDuration,
           defaultPeriodDuration: importedConfig.defaultPeriodDuration ?? state.defaultPeriodDuration,
           defaultOTPeriodDuration: importedConfig.defaultOTPeriodDuration ?? state.defaultOTPeriodDuration,
           defaultBreakDuration: importedConfig.defaultBreakDuration ?? state.defaultBreakDuration,
           defaultPreOTBreakDuration: importedConfig.defaultPreOTBreakDuration ?? state.defaultPreOTBreakDuration,
           defaultTimeoutDuration: importedConfig.defaultTimeoutDuration ?? state.defaultTimeoutDuration,
           maxConcurrentPenalties: importedConfig.maxConcurrentPenalties ?? state.maxConcurrentPenalties,
+          autoStartWarmUp: importedConfig.autoStartWarmUp ?? state.autoStartWarmUp,
           autoStartBreaks: importedConfig.autoStartBreaks ?? state.autoStartBreaks,
           autoStartPreOTBreaks: importedConfig.autoStartPreOTBreaks ?? state.autoStartPreOTBreaks,
           autoStartTimeouts: importedConfig.autoStartTimeouts ?? state.autoStartTimeouts,
@@ -223,7 +228,7 @@ export default function ConfigPage() {
     if (!isConfigNameDirty) { 
         setLocalConfigName(state.configName || ''); 
     }
-  }, [state.configName, state.defaultPeriodDuration, state.defaultOTPeriodDuration, state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration, state.maxConcurrentPenalties, state.autoStartBreaks, state.autoStartPreOTBreaks, state.autoStartTimeouts, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, isConfigNameDirty]);
+  }, [state.configName, state.defaultWarmUpDuration, state.defaultPeriodDuration, state.defaultOTPeriodDuration, state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration, state.maxConcurrentPenalties, state.autoStartWarmUp, state.autoStartBreaks, state.autoStartPreOTBreaks, state.autoStartTimeouts, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, isConfigNameDirty]);
 
 
   return (
@@ -321,4 +326,3 @@ export default function ConfigPage() {
     </div>
   );
 }
-
