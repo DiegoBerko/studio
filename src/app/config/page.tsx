@@ -9,8 +9,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Undo2, Upload, Download } from 'lucide-react';
-import { useGameState, type ConfigFields } from '@/contexts/game-state-context'; // Import ConfigFields
+import { useGameState, type ConfigFields } from '@/contexts/game-state-context';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function ConfigPage() {
   const { state, dispatch } = useGameState();
@@ -23,6 +33,9 @@ export default function ConfigPage() {
   const [isConfigNameDirty, setIsConfigNameDirty] = useState(false);
   const [isDurationDirty, setIsDurationDirty] = useState(false);
   const [isPenaltyDirty, setIsPenaltyDirty] = useState(false);
+
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [currentExportFilename, setCurrentExportFilename] = useState('');
 
   const pageIsDirty = isConfigNameDirty || isDurationDirty || isPenaltyDirty;
 
@@ -92,7 +105,25 @@ export default function ConfigPage() {
     });
   };
 
-  const handleExportConfig = () => {
+  const prepareExportConfig = () => {
+    const suggestedFilename = `icevision_config_${state.configName.trim().toLowerCase().replace(/\s+/g, '_') || 'default'}.json`;
+    setCurrentExportFilename(suggestedFilename);
+    setIsExportDialogOpen(true);
+  };
+
+  const performExport = (filename: string) => {
+    if (!filename.trim().endsWith('.json')) {
+        filename = filename.trim() + '.json';
+    }
+    if (filename.trim() === '.json'){
+        toast({
+            title: "Nombre de Archivo Inválido",
+            description: "El nombre del archivo no puede estar vacío.",
+            variant: "destructive",
+        });
+        return;
+    }
+
     const configToExport: ConfigFields = {
       configName: state.configName,
       defaultPeriodDuration: state.defaultPeriodDuration,
@@ -111,18 +142,21 @@ export default function ConfigPage() {
     const blob = new Blob([jsonString], { type: "application/json" });
     const href = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    const fileName = `icevision_config_${state.configName.trim().toLowerCase().replace(/\s+/g, '_') || 'default'}.json`;
+    
     link.href = href;
-    link.download = fileName;
+    link.download = filename.trim();
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(href);
+    
     toast({
       title: "Configuración Exportada",
-      description: `Archivo ${fileName} descargado.`,
+      description: `Archivo ${filename.trim()} descargado.`,
     });
+    setIsExportDialogOpen(false);
   };
+
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -139,12 +173,10 @@ export default function ConfigPage() {
         if (typeof text !== 'string') throw new Error("Error al leer el archivo.");
         const importedConfig = JSON.parse(text) as Partial<ConfigFields>;
 
-        // Basic validation: check for at least one known key
         if (!importedConfig.configName && !importedConfig.defaultPeriodDuration) {
           throw new Error("Archivo de configuración no válido o formato incorrecto.");
         }
         
-        // Ensure all config fields from the file are applied, defaulting to current state if a field is missing in the file
         const newConfigFromFile: Partial<ConfigFields> = {
           configName: importedConfig.configName ?? state.configName,
           defaultPeriodDuration: importedConfig.defaultPeriodDuration ?? state.defaultPeriodDuration,
@@ -162,11 +194,10 @@ export default function ConfigPage() {
 
         dispatch({ type: 'LOAD_CONFIG_FROM_FILE', payload: newConfigFromFile });
         
-        // Reset dirty states of child cards as their values are now directly from the new config
-        durationSettingsRef.current?.handleDiscard(); // This will reset its local state to new global state
-        penaltySettingsRef.current?.handleDiscard(); // This will reset its local state to new global state
-        setLocalConfigName((newConfigFromFile.configName || '')); // Update local config name directly and ensure string
-        setIsConfigNameDirty(false); // Config name is now "clean" as it matches new global state
+        durationSettingsRef.current?.handleDiscard(); 
+        penaltySettingsRef.current?.handleDiscard(); 
+        setLocalConfigName((newConfigFromFile.configName || '')); 
+        setIsConfigNameDirty(false); 
 
         toast({
           title: "Configuración Importada",
@@ -180,7 +211,6 @@ export default function ConfigPage() {
           variant: "destructive",
         });
       } finally {
-        // Reset file input to allow importing the same file again
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
@@ -190,13 +220,10 @@ export default function ConfigPage() {
   };
   
   useEffect(() => {
-    // This effect handles updates to localConfigName when state.configName changes due to import or other external factors
-    if (!isConfigNameDirty) { // Only update if not dirty, to preserve user input
-        setLocalConfigName(state.configName || ''); // Ensures string
+    if (!isConfigNameDirty) { 
+        setLocalConfigName(state.configName || ''); 
     }
-    // Also, ensure child cards are synced if their base values change externally (e.g., from import)
-    // This might involve triggering a 'reset' or 'sync' method on them if available, or relying on their internal useEffects
-  }, [state.configName, state.defaultPeriodDuration /* add other relevant state config fields here */, isConfigNameDirty]);
+  }, [state.configName, state.defaultPeriodDuration, state.defaultOTPeriodDuration, state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration, state.maxConcurrentPenalties, state.autoStartBreaks, state.autoStartPreOTBreaks, state.autoStartTimeouts, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, isConfigNameDirty]);
 
 
   return (
@@ -251,7 +278,7 @@ export default function ConfigPage() {
           Guarda tu configuración actual en un archivo o carga una configuración previamente guardada.
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
-          <Button onClick={handleExportConfig} variant="outline" className="flex-1">
+          <Button onClick={prepareExportConfig} variant="outline" className="flex-1">
             <Download className="mr-2 h-4 w-4" /> Exportar Configuración
           </Button>
           <Button onClick={handleImportClick} variant="outline" className="flex-1">
@@ -266,6 +293,31 @@ export default function ConfigPage() {
           />
         </div>
       </div>
+
+      {isExportDialogOpen && (
+        <AlertDialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Nombre del Archivo de Exportación</AlertDialogTitle>
+              <AlertDialogDescription>
+                Ingresa el nombre deseado para el archivo de configuración. Se añadirá la extensión ".json" automáticamente si no se incluye.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Input
+              value={currentExportFilename}
+              onChange={(e) => setCurrentExportFilename(e.target.value)}
+              placeholder="nombre_de_configuracion.json"
+              className="my-4"
+            />
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setIsExportDialogOpen(false)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => performExport(currentExportFilename)}>
+                Exportar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
