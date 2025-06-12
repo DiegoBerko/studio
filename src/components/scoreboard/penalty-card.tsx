@@ -27,7 +27,7 @@ export function PenaltyCard({ penalty }: PenaltyCardProps) {
             <span className="font-semibold text-3xl md:text-4xl">{penalty.playerNumber}</span>
           </div>
           <div className="flex items-center gap-1 text-accent font-mono text-3xl md:text-4xl">
-            <Clock className="h-6 w-6 md:h-8 md:w-8 text-accent" />
+            <Clock className="h-4 w-4 md:h-6 md:w-6 text-accent" />
             {formatTime(penalty.remainingTime)}
           </div>
         </div>
