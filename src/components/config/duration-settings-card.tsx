@@ -1,137 +1,141 @@
 
 "use client";
 
-import { useGameState, secondsToMinutes } from "@/contexts/game-state-context";
-import type { GameAction } from "@/contexts/game-state-context";
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
+import { useGameState, secondsToMinutes, minutesToSeconds } from "@/contexts/game-state-context";
 import { ControlCardWrapper } from "@/components/controls/control-card-wrapper";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
 
-export function DurationSettingsCard() {
+export interface DurationSettingsCardRef {
+  handleSave: () => boolean; // Returns true if save was successful (or no changes)
+  handleDiscard: () => void;
+  getIsDirty: () => boolean;
+}
+
+interface DurationSettingsCardProps {
+  onDirtyChange: (isDirty: boolean) => void;
+}
+
+export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, DurationSettingsCardProps>(({ onDirtyChange }, ref) => {
   const { state, dispatch } = useGameState();
-  const { toast } = useToast();
 
-  const handleDurationChange = (
-    type: "period" | "break" | "preOTBreak" | "timeout",
-    value: string // Value from input field
-  ) => {
-    let numericValue = parseInt(value, 10);
-    const isDeletion = value === ''; // Check if input was cleared by user
+  // Local state for inputs
+  const [localPeriodDurationInput, setLocalPeriodDurationInput] = useState(secondsToMinutes(state.defaultPeriodDuration));
+  const [localBreakDurationInput, setLocalBreakDurationInput] = useState(String(state.defaultBreakDuration));
+  const [localPreOTBreakDurationInput, setLocalPreOTBreakDurationInput] = useState(String(state.defaultPreOTBreakDuration));
+  const [localTimeoutDurationInput, setLocalTimeoutDurationInput] = useState(String(state.defaultTimeoutDuration));
+  
+  const [localAutoStartBreaks, setLocalAutoStartBreaks] = useState(state.autoStartBreaks);
+  const [localAutoStartPreOTBreaks, setLocalAutoStartPreOTBreaks] = useState(state.autoStartPreOTBreaks);
+  const [localAutoStartTimeouts, setLocalAutoStartTimeouts] = useState(state.autoStartTimeouts);
 
-    let descriptionForToast = "";
-    let minVal = 1; // Default minimum for seconds-based inputs
-    let actionType: GameAction['type'];
-    let successMessage = "";
-    let finalValueInSeconds: number;
+  const [isDirty, setIsDirty] = useState(false);
 
-    if (type === "period") {
-      descriptionForToast = "La duración del período debe ser al menos 1 minuto.";
-      minVal = 1; // minutes for period
-      if (isDeletion) {
-        numericValue = 1; // Default to 1 minute if cleared
-      } else if (isNaN(numericValue) || numericValue < minVal) {
-        toast({ title: "Valor Inválido", description: descriptionForToast, variant: "destructive"});
-        return;
-      }
-      finalValueInSeconds = numericValue * 60;
-      actionType = "SET_DEFAULT_PERIOD_DURATION";
-      successMessage = `Duración de período establecida a ${numericValue} min.`;
-
-    } else { // break, preOTBreak, timeout (all in seconds)
-      minVal = 1; // seconds
-      descriptionForToast = "La duración debe ser al menos 1 segundo.";
-
-      if (isDeletion) {
-        numericValue = 1; // Default to 1 second if cleared
-      } else if (isNaN(numericValue) || numericValue < minVal) {
-        toast({ title: "Valor Inválido", description: descriptionForToast, variant: "destructive"});
-        return;
-      }
-      finalValueInSeconds = numericValue;
-
-      switch (type) {
-        case "break":
-          actionType = "SET_DEFAULT_BREAK_DURATION";
-          successMessage = `Duración de descanso regular establecida a ${finalValueInSeconds} seg.`;
-          break;
-        case "preOTBreak":
-          actionType = "SET_DEFAULT_PRE_OT_BREAK_DURATION";
-          successMessage = `Duración de descanso Pre-OT establecida a ${finalValueInSeconds} seg.`;
-          break;
-        case "timeout":
-          actionType = "SET_DEFAULT_TIMEOUT_DURATION";
-          successMessage = `Duración de Time Out establecida a ${finalValueInSeconds} seg.`;
-          break;
-        default:
-          return; // Should not happen
-      }
+  // Effect to update local state if global state changes and form isn't dirty
+  useEffect(() => {
+    if (!isDirty) {
+      setLocalPeriodDurationInput(secondsToMinutes(state.defaultPeriodDuration));
+      setLocalBreakDurationInput(String(state.defaultBreakDuration));
+      setLocalPreOTBreakDurationInput(String(state.defaultPreOTBreakDuration));
+      setLocalTimeoutDurationInput(String(state.defaultTimeoutDuration));
+      setLocalAutoStartBreaks(state.autoStartBreaks);
+      setLocalAutoStartPreOTBreaks(state.autoStartPreOTBreaks);
+      setLocalAutoStartTimeouts(state.autoStartTimeouts);
     }
-    
-    dispatch({ type: actionType, payload: finalValueInSeconds });
-    toast({ title: "Configuración Actualizada", description: successMessage });
+  }, [
+    state.defaultPeriodDuration, 
+    state.defaultBreakDuration, 
+    state.defaultPreOTBreakDuration, 
+    state.defaultTimeoutDuration,
+    state.autoStartBreaks,
+    state.autoStartPreOTBreaks,
+    state.autoStartTimeouts,
+    isDirty // Re-evaluate if isDirty changes (e.g., after save/discard)
+  ]);
+
+  // Effect to report dirty status to parent
+  useEffect(() => {
+    onDirtyChange(isDirty);
+  }, [isDirty, onDirtyChange]);
+  
+  // Helper to mark dirty
+  const markDirty = () => {
+    if (!isDirty) setIsDirty(true);
   };
 
-  const handleToggle = (
-    type: "autoStartBreaks" | "autoStartPreOTBreaks" | "autoStartTimeouts"
-  ) => {
-    let actionType: GameAction['type'];
-    let messagePart = "";
-    let currentFlag: boolean;
+  useImperativeHandle(ref, () => ({
+    handleSave: () => {
+      if (!isDirty) return true;
 
-    switch (type) {
-      case "autoStartBreaks":
-        actionType = "TOGGLE_AUTO_START_BREAKS";
-        messagePart = "descansos regulares";
-        currentFlag = state.autoStartBreaks;
-        break;
-      case "autoStartPreOTBreaks":
-        actionType = "TOGGLE_AUTO_START_PRE_OT_BREAKS";
-        messagePart = "descansos Pre-OT";
-        currentFlag = state.autoStartPreOTBreaks;
-        break;
-      case "autoStartTimeouts":
-        actionType = "TOGGLE_AUTO_START_TIMEOUTS";
-        messagePart = "Time Outs";
-        currentFlag = state.autoStartTimeouts;
-        break;
-    }
-    dispatch({ type: actionType });
-    toast({
-      title: "Configuración Actualizada",
-      description: `Inicio automático de ${messagePart} ${currentFlag ? "desactivado" : "activado"}.`,
-    });
-  };
+      const periodDurationNum = parseInt(localPeriodDurationInput, 10);
+      const finalPeriodDurationSeconds = (isNaN(periodDurationNum) || periodDurationNum < 1) ? 60 : periodDurationNum * 60;
+      dispatch({ type: "SET_DEFAULT_PERIOD_DURATION", payload: finalPeriodDurationSeconds });
 
+      const breakDurationNum = parseInt(localBreakDurationInput, 10);
+      const finalBreakDurationSeconds = (isNaN(breakDurationNum) || breakDurationNum < 1) ? 1 : breakDurationNum;
+      dispatch({ type: "SET_DEFAULT_BREAK_DURATION", payload: finalBreakDurationSeconds });
+
+      const preOTBreakDurationNum = parseInt(localPreOTBreakDurationInput, 10);
+      const finalPreOTBreakDurationSeconds = (isNaN(preOTBreakDurationNum) || preOTBreakDurationNum < 1) ? 1 : preOTBreakDurationNum;
+      dispatch({ type: "SET_DEFAULT_PRE_OT_BREAK_DURATION", payload: finalPreOTBreakDurationSeconds });
+      
+      const timeoutDurationNum = parseInt(localTimeoutDurationInput, 10);
+      const finalTimeoutDurationSeconds = (isNaN(timeoutDurationNum) || timeoutDurationNum < 1) ? 1 : timeoutDurationNum;
+      dispatch({ type: "SET_DEFAULT_TIMEOUT_DURATION", payload: finalTimeoutDurationSeconds });
+
+      if (localAutoStartBreaks !== state.autoStartBreaks) {
+        dispatch({ type: "SET_AUTO_START_BREAKS_VALUE", payload: localAutoStartBreaks });
+      }
+      if (localAutoStartPreOTBreaks !== state.autoStartPreOTBreaks) {
+        dispatch({ type: "SET_AUTO_START_PRE_OT_BREAKS_VALUE", payload: localAutoStartPreOTBreaks });
+      }
+      if (localAutoStartTimeouts !== state.autoStartTimeouts) {
+        dispatch({ type: "SET_AUTO_START_TIMEOUTS_VALUE", payload: localAutoStartTimeouts });
+      }
+      
+      setIsDirty(false);
+      return true;
+    },
+    handleDiscard: () => {
+      setLocalPeriodDurationInput(secondsToMinutes(state.defaultPeriodDuration));
+      setLocalBreakDurationInput(String(state.defaultBreakDuration));
+      setLocalPreOTBreakDurationInput(String(state.defaultPreOTBreakDuration));
+      setLocalTimeoutDurationInput(String(state.defaultTimeoutDuration));
+      setLocalAutoStartBreaks(state.autoStartBreaks);
+      setLocalAutoStartPreOTBreaks(state.autoStartPreOTBreaks);
+      setLocalAutoStartTimeouts(state.autoStartTimeouts);
+      setIsDirty(false);
+    },
+    getIsDirty: () => isDirty,
+  }));
 
   return (
     <ControlCardWrapper title="Configuración de Tiempos y Arranque Automático">
       <div className="space-y-6">
-        {/* Period Duration */}
         <div>
           <Label htmlFor="periodDuration">Duración del Período (minutos)</Label>
           <Input
             id="periodDuration"
             type="number"
-            min="1"
-            value={secondsToMinutes(state.defaultPeriodDuration)}
-            onChange={(e) => handleDurationChange("period", e.target.value)}
+            value={localPeriodDurationInput}
+            onChange={(e) => { setLocalPeriodDurationInput(e.target.value); markDirty(); }}
             className="mt-1"
+            placeholder="ej. 20"
           />
         </div>
 
-        {/* Regular Break Duration & Auto-Start */}
         <div className="space-y-3 p-4 border rounded-md bg-muted/20">
           <div>
             <Label htmlFor="breakDuration">Duración Descanso Regular (segundos)</Label>
             <Input
               id="breakDuration"
               type="number"
-              min="1"
-              value={state.defaultBreakDuration}
-              onChange={(e) => handleDurationChange("break", e.target.value)}
+              value={localBreakDurationInput}
+              onChange={(e) => { setLocalBreakDurationInput(e.target.value); markDirty(); }}
               className="mt-1"
+              placeholder="ej. 120"
             />
           </div>
           <div className="flex items-center justify-between pt-2">
@@ -143,23 +147,22 @@ export function DurationSettingsCard() {
             </Label>
             <Switch
               id="autoStartBreaks"
-              checked={state.autoStartBreaks}
-              onCheckedChange={() => handleToggle("autoStartBreaks")}
+              checked={localAutoStartBreaks}
+              onCheckedChange={(checked) => { setLocalAutoStartBreaks(checked); markDirty(); }}
             />
           </div>
         </div>
 
-        {/* Pre-OT Break Duration & Auto-Start */}
         <div className="space-y-3 p-4 border rounded-md bg-muted/20">
           <div>
             <Label htmlFor="preOTBreakDuration">Duración Descanso Pre-OT / Entre OTs (segundos)</Label>
             <Input
               id="preOTBreakDuration"
               type="number"
-              min="1"
-              value={state.defaultPreOTBreakDuration}
-              onChange={(e) => handleDurationChange("preOTBreak", e.target.value)}
+              value={localPreOTBreakDurationInput}
+              onChange={(e) => { setLocalPreOTBreakDurationInput(e.target.value); markDirty(); }}
               className="mt-1"
+              placeholder="ej. 60"
             />
           </div>
           <div className="flex items-center justify-between pt-2">
@@ -171,23 +174,22 @@ export function DurationSettingsCard() {
             </Label>
             <Switch
               id="autoStartPreOTBreaks"
-              checked={state.autoStartPreOTBreaks}
-              onCheckedChange={() => handleToggle("autoStartPreOTBreaks")}
+              checked={localAutoStartPreOTBreaks}
+              onCheckedChange={(checked) => { setLocalAutoStartPreOTBreaks(checked); markDirty(); }}
             />
           </div>
         </div>
         
-        {/* Timeout Duration & Auto-Start */}
         <div className="space-y-3 p-4 border rounded-md bg-muted/20">
           <div>
             <Label htmlFor="timeoutDuration">Duración del Time Out (segundos)</Label>
             <Input
               id="timeoutDuration"
               type="number"
-              min="1" 
-              value={state.defaultTimeoutDuration}
-              onChange={(e) => handleDurationChange("timeout", e.target.value)}
+              value={localTimeoutDurationInput}
+              onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
               className="mt-1"
+              placeholder="ej. 30"
             />
           </div>
           <div className="flex items-center justify-between pt-2">
@@ -199,12 +201,16 @@ export function DurationSettingsCard() {
             </Label>
             <Switch
               id="autoStartTimeouts"
-              checked={state.autoStartTimeouts}
-              onCheckedChange={() => handleToggle("autoStartTimeouts")}
+              checked={localAutoStartTimeouts}
+              onCheckedChange={(checked) => { setLocalAutoStartTimeouts(checked); markDirty(); }}
             />
           </div>
         </div>
       </div>
     </ControlCardWrapper>
   );
-}
+});
+
+DurationSettingsCard.displayName = "DurationSettingsCard";
+
+    
