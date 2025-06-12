@@ -14,7 +14,7 @@ export function TimeControlCard() {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
 
-  // Local state for inputs, initialized from global state
+  // Local state for inputs
   const [localMinutes, setLocalMinutes] = useState(() => 
     String(Math.floor(state.currentTime / 60)).padStart(2, '0')
   );
@@ -23,17 +23,21 @@ export function TimeControlCard() {
   );
   const [isDirty, setIsDirty] = useState(false);
 
-  // Effect to update local inputs if global time changes AND inputs are not dirty
+  // Effect to update local inputs if global time changes
+  // OR if the inputs are not dirty (user hasn't started typing)
   useEffect(() => {
-    if (!isDirty) {
+    if (state.isClockRunning || !isDirty) {
       setLocalMinutes(String(Math.floor(state.currentTime / 60)).padStart(2, '0'));
       setLocalSeconds(String(state.currentTime % 60).padStart(2, '0'));
+      if (isDirty && state.isClockRunning) { // If clock starts running while dirty, reset dirty flag
+        setIsDirty(false);
+      }
     }
-  }, [state.currentTime, isDirty]);
+  }, [state.currentTime, state.isClockRunning, isDirty]);
 
   const handleMinutesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (/^\d*$/.test(value)) { // Allow only digits or empty string
+    if (/^\d*$/.test(value)) { 
       setLocalMinutes(value);
       if (!isDirty) setIsDirty(true);
     }
@@ -44,14 +48,14 @@ export function TimeControlCard() {
     if (localMinutes === '' || isNaN(minsVal)) {
       setLocalMinutes('00');
     } else {
-      minsVal = Math.max(0, minsVal); // Ensure minutes are not negative
+      minsVal = Math.max(0, minsVal); 
       setLocalMinutes(String(minsVal).padStart(2, '0'));
     }
   };
 
   const handleSecondsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (/^\d*$/.test(value)) { // Allow only digits or empty string
+    if (/^\d*$/.test(value)) { 
       setLocalSeconds(value);
       if (!isDirty) setIsDirty(true);
     }
@@ -62,7 +66,7 @@ export function TimeControlCard() {
     if (localSeconds === '' || isNaN(secsVal)) {
       setLocalSeconds('00');
     } else {
-      secsVal = Math.max(0, Math.min(59, secsVal)); // Ensure seconds are 0-59
+      secsVal = Math.max(0, Math.min(59, secsVal)); 
       setLocalSeconds(String(secsVal).padStart(2, '0'));
     }
   };
@@ -71,17 +75,15 @@ export function TimeControlCard() {
     const minutesNum = parseInt(localMinutes, 10) || 0;
     const secondsNum = parseInt(localSeconds, 10) || 0;
     
-    // Ensure seconds are capped at 59 even if somehow blur didn't catch it
     const finalSeconds = Math.min(secondsNum, 59);
     const finalMinutes = minutesNum;
-
 
     dispatch({ type: 'SET_TIME', payload: { minutes: finalMinutes, seconds: finalSeconds } });
     toast({ 
       title: "Reloj Actualizado", 
       description: `Tiempo establecido a ${String(finalMinutes).padStart(2, '0')}:${String(finalSeconds).padStart(2, '0')}` 
     });
-    setIsDirty(false); // After setting, inputs are no longer "dirty" and will re-sync
+    setIsDirty(false); 
   };
   
   const handleStartTimeOut = () => {
@@ -93,16 +95,22 @@ export function TimeControlCard() {
     });
   };
 
+  const isTimeOutButtonDisabled = 
+    state.periodDisplayOverride === "Break" ||
+    state.periodDisplayOverride === "Pre-OT Break" ||
+    state.periodDisplayOverride === "Time Out" ||
+    state.isClockRunning;
+
   return (
     <ControlCardWrapper title="Ajustes de Tiempo y Time Out">
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="minutes">Establecer Tiempo Manualmente</Label>
+          <Label htmlFor="minutes-manual">Establecer Tiempo Manualmente</Label>
           <div className="flex items-center gap-2">
             <Input
-              id="minutes-manual" // Changed ID to avoid conflict if old "minutes" ID is cached
-              type="text" // Use text to allow empty string and leading zeros typed by user
-              inputMode="numeric" // Hint for numeric keyboard on mobile
+              id="minutes-manual"
+              type="text"
+              inputMode="numeric"
               value={localMinutes}
               onChange={handleMinutesChange}
               onBlur={handleMinutesBlur}
@@ -112,7 +120,7 @@ export function TimeControlCard() {
             />
             <span className="font-bold text-primary-foreground">:</span>
             <Input
-              id="seconds-manual" // Changed ID
+              id="seconds-manual"
               type="text"
               inputMode="numeric"
               value={localSeconds}
@@ -129,7 +137,13 @@ export function TimeControlCard() {
         </div>
 
         <div className="border-t border-border pt-4">
-            <Button onClick={handleStartTimeOut} variant="outline" className="w-full" aria-label="Iniciar Time Out" disabled={state.periodDisplayOverride === "Time Out"}>
+            <Button 
+              onClick={handleStartTimeOut} 
+              variant="outline" 
+              className="w-full" 
+              aria-label="Iniciar Time Out" 
+              disabled={isTimeOutButtonDisabled}
+            >
                 <TimerOff className="mr-2 h-4 w-4" /> Iniciar Time Out
             </Button>
         </div>
