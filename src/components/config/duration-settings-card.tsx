@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useGameState, minutesToSeconds, secondsToMinutes } from "@/contexts/game-state-context";
+import { useGameState, secondsToMinutes } from "@/contexts/game-state-context"; // secondsToMinutes is still used for period
 import type { GameAction } from "@/contexts/game-state-context"; // Import GameAction type
 import { ControlCardWrapper } from "@/components/controls/control-card-wrapper";
 import { Label } from "@/components/ui/label";
@@ -18,14 +18,30 @@ export function DurationSettingsCard() {
     value: string
   ) => {
     const rawValue = parseInt(value, 10);
-    if (isNaN(rawValue) || rawValue < 1) {
-      toast({ title: "Valor Inválido", description: "La duración debe ser al menos 1.", variant: "destructive"});
+    
+    let descriptionForToast = "";
+    let minVal = 1;
+
+    if (type === "period") {
+      descriptionForToast = "La duración del período debe ser al menos 1 minuto.";
+      minVal = 1; // minutes
+    } else if (type === "break" || type === "preOTBreak") {
+      descriptionForToast = "La duración del descanso debe ser al menos 10 segundos.";
+      minVal = 10; // seconds
+    } else if (type === "timeout") {
+      descriptionForToast = "La duración del Time Out debe ser al menos 10 segundos.";
+      minVal = 10; // seconds
+    }
+
+    if (isNaN(rawValue) || rawValue < minVal) {
+      toast({ title: "Valor Inválido", description: descriptionForToast, variant: "destructive"});
       return;
     }
     
-    let seconds = type === "timeout" ? rawValue : minutesToSeconds(rawValue);
-    if (type !== "timeout" && seconds < 60) seconds = 60; // Min 1 minute for non-timeouts
-    if (type === "timeout" && seconds < 10) seconds = 10; // Min 10 seconds for timeouts
+    let seconds = rawValue;
+    if (type === "period") {
+        seconds = rawValue * 60; // Convert minutes to seconds only for period
+    }
 
 
     let actionType: GameAction['type'];
@@ -34,15 +50,15 @@ export function DurationSettingsCard() {
     switch (type) {
       case "period":
         actionType = "SET_DEFAULT_PERIOD_DURATION";
-        successMessage = `Duración de período establecida a ${secondsToMinutes(seconds)} min.`;
+        successMessage = `Duración de período establecida a ${rawValue} min.`;
         break;
       case "break":
         actionType = "SET_DEFAULT_BREAK_DURATION";
-        successMessage = `Duración de descanso regular establecida a ${secondsToMinutes(seconds)} min.`;
+        successMessage = `Duración de descanso regular establecida a ${seconds} seg.`;
         break;
       case "preOTBreak":
         actionType = "SET_DEFAULT_PRE_OT_BREAK_DURATION";
-        successMessage = `Duración de descanso Pre-OT establecida a ${secondsToMinutes(seconds)} min.`;
+        successMessage = `Duración de descanso Pre-OT establecida a ${seconds} seg.`;
         break;
       case "timeout":
         actionType = "SET_DEFAULT_TIMEOUT_DURATION";
@@ -104,12 +120,12 @@ export function DurationSettingsCard() {
         {/* Regular Break Duration & Auto-Start */}
         <div className="space-y-3 p-4 border rounded-md bg-muted/20">
           <div>
-            <Label htmlFor="breakDuration">Duración Descanso Regular (minutos)</Label>
+            <Label htmlFor="breakDuration">Duración Descanso Regular (segundos)</Label>
             <Input
               id="breakDuration"
               type="number"
-              min="1"
-              value={secondsToMinutes(state.defaultBreakDuration)}
+              min="10"
+              value={state.defaultBreakDuration}
               onChange={(e) => handleDurationChange("break", e.target.value)}
               className="mt-1"
             />
@@ -132,12 +148,12 @@ export function DurationSettingsCard() {
         {/* Pre-OT Break Duration & Auto-Start */}
         <div className="space-y-3 p-4 border rounded-md bg-muted/20">
           <div>
-            <Label htmlFor="preOTBreakDuration">Duración Descanso Pre-OT / Entre OTs (minutos)</Label>
+            <Label htmlFor="preOTBreakDuration">Duración Descanso Pre-OT / Entre OTs (segundos)</Label>
             <Input
               id="preOTBreakDuration"
               type="number"
-              min="1"
-              value={secondsToMinutes(state.defaultPreOTBreakDuration)}
+              min="10"
+              value={state.defaultPreOTBreakDuration}
               onChange={(e) => handleDurationChange("preOTBreak", e.target.value)}
               className="mt-1"
             />
@@ -164,7 +180,7 @@ export function DurationSettingsCard() {
             <Input
               id="timeoutDuration"
               type="number"
-              min="10" // Min 10 segundos como se definió en el reducer
+              min="10" 
               value={state.defaultTimeoutDuration}
               onChange={(e) => handleDurationChange("timeout", e.target.value)}
               className="mt-1"
