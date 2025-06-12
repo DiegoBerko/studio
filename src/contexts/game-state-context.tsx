@@ -69,7 +69,7 @@ interface GameState extends ConfigFields {
   periodDisplayOverride: PeriodDisplayOverrideType;
   preTimeoutState: PreTimeoutState | null;
   _lastActionOriginator?: string;
-  _lastUpdatedTimestamp?: number; 
+  _lastUpdatedTimestamp?: number;
 }
 
 export type GameAction =
@@ -154,13 +154,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
     case 'HYDRATE_FROM_STORAGE': {
        const hydratedBase: GameState = {
-        ...initialGlobalState, // Start with all defaults
-        ...(action.payload ?? {}), // Overlay stored values
+        ...initialGlobalState,
+        ...(action.payload ?? {}),
       };
-      // Ensure specific fields are correctly initialized if missing or need transformation
       hydratedBase.isClockRunning = action.payload?.isClockRunning ?? initialGlobalState.isClockRunning;
-      hydratedBase.homePenalties = (action.payload?.homePenalties || []).map(({ _status, ...p }: Penalty) => p);
-      hydratedBase.awayPenalties = (action.payload?.awayPenalties || []).map(({ _status, ...p }: Penalty) => p);
+      const cleanPenaltiesOnHydrate = (penalties?: Penalty[]) => (penalties || []).map(({ _status, ...p }) => p);
+      hydratedBase.homePenalties = cleanPenaltiesOnHydrate(action.payload?.homePenalties);
+      hydratedBase.awayPenalties = cleanPenaltiesOnHydrate(action.payload?.awayPenalties);
 
       const isHydratedOTPeriod = (hydratedBase.currentPeriod ?? initialGlobalState.currentPeriod) > (hydratedBase.numberOfRegularPeriods ?? initialGlobalState.numberOfRegularPeriods);
       const hydratedPeriodDuration = isHydratedOTPeriod ?
@@ -179,28 +179,25 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           hydratedBase.isClockRunning = false;
       }
       
-      // Preserve _lastUpdatedTimestamp from storage if it exists, otherwise it remains undefined
-      // _lastActionOriginator is always reset on hydration for this tab.
       const { _lastActionOriginator, _lastUpdatedTimestamp, ...restOfHydrated } = hydratedBase;
       newStateWithoutMeta = restOfHydrated;
-      // We specifically want to return here because meta fields are handled differently for hydration
       return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: action.payload?._lastUpdatedTimestamp };
     }
     case 'SET_STATE_FROM_LOCAL_BROADCAST': {
-      // Compare timestamps to prevent applying an older state
-      if (action.payload._lastUpdatedTimestamp && state._lastUpdatedTimestamp && action.payload._lastUpdatedTimestamp < state._lastUpdatedTimestamp) {
-        // Incoming state is older, ignore it but clear originator for this tab
+      const incomingTimestamp = action.payload._lastUpdatedTimestamp;
+      const currentTimestamp = state._lastUpdatedTimestamp;
+
+      if (incomingTimestamp && currentTimestamp && incomingTimestamp < currentTimestamp) {
         return { ...state, _lastActionOriginator: undefined };
       }
-      // Incoming state is newer or timestamps are inconclusive, apply it
+      if (!incomingTimestamp && currentTimestamp) {
+        return { ...state, _lastActionOriginator: undefined };
+      }
+
       const { _lastActionOriginator, ...restOfPayload } = action.payload;
       newStateWithoutMeta = restOfPayload;
-      // _lastActionOriginator is cleared for this tab as it's applying an external state
-      return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: action.payload._lastUpdatedTimestamp };
+      return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: incomingTimestamp };
     }
-    // Default handling for other actions:
-    // Calculate newStateWithoutMeta first, then append meta fields.
-    // This structure allows meta fields to be consistently applied based on action type.
     case 'TOGGLE_CLOCK':
       if (state.currentTime <= 0 && !state.isClockRunning) {
           if (state.periodDisplayOverride === "Break" && !state.autoStartBreaks) { newStateWithoutMeta = state; break; }
@@ -292,7 +289,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
     case 'TICK': {
       if (!state.isClockRunning || state.currentTime <= 0) {
-        newStateWithoutMeta = { ...state, isClockRunning: false };
+        newStateWithoutMeta = { ...state, isClockRunning: false }; // Ensure clock stops if it reaches 0 or isn't supposed to run
         break;
       }
       const newTime = state.currentTime - 1;
@@ -319,7 +316,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             } else if (concurrentRunningCount < maxConcurrent) {
               status = 'running';
               newRemainingTimeForPenalty = Math.max(0, p.remainingTime - 1);
-              if (newRemainingTimeForPenalty > 0) { // Only add to activePlayerTickets if it's still running after tick
+              if (newRemainingTimeForPenalty > 0) { 
                   activePlayerTickets.add(p.playerNumber);
               }
               concurrentRunningCount++;
@@ -492,7 +489,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           ? (state.defaultOTPeriodDuration ?? initialsToKeepConfig.defaultOTPeriodDuration)
           : (state.defaultPeriodDuration ?? initialsToKeepConfig.defaultPeriodDuration);
       newStateWithoutMeta = {
-        ...state, // Keep current config values
+        ...state, 
         homeScore: initialsToKeepConfig.homeScore,
         awayScore: initialsToKeepConfig.awayScore,
         currentTime: initialClockTime,
@@ -508,36 +505,28 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     default:
-      // Should not happen if all action types are covered
-      // For type safety, we can assign state to newStateWithoutMeta
       newStateWithoutMeta = state; 
       break;
   }
 
-  // Common logic for setting meta fields for most actions
   if (typeof window !== 'undefined') {
     const nonOriginatingActionTypes: GameAction['type'][] = ['HYDRATE_FROM_STORAGE', 'SET_STATE_FROM_LOCAL_BROADCAST'];
-
     if (nonOriginatingActionTypes.includes(action.type)) {
       // Meta fields are handled within these cases specifically.
-      // This return was already done for HYDRATE_FROM_STORAGE,
-      // and SET_STATE_FROM_LOCAL_BROADCAST will also return from its block.
-      // This path shouldn't be hit if those cases return.
-      // For safety, return newStateWithoutMeta with its current meta (which should be undefined for originator).
-      return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: state._lastUpdatedTimestamp }; 
+      return { ...newStateWithoutMeta, _lastActionOriginator: state._lastActionOriginator, _lastUpdatedTimestamp: state._lastUpdatedTimestamp };
     } else if (action.type === 'TICK') {
-      if (state.isClockRunning) { // Check the state *before* this tick
+      if (state.isClockRunning) {
         return { ...newStateWithoutMeta, _lastActionOriginator: TAB_ID, _lastUpdatedTimestamp: Date.now() };
       } else {
-        return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: state._lastUpdatedTimestamp }; // No new timestamp if tick is a no-op
+        // If tick is a no-op because clock wasn't running, don't update originator or timestamp
+        return { ...newStateWithoutMeta, _lastActionOriginator: state._lastActionOriginator, _lastUpdatedTimestamp: state._lastUpdatedTimestamp };
       }
     } else {
       // For all other user-initiated actions
       return { ...newStateWithoutMeta, _lastActionOriginator: TAB_ID, _lastUpdatedTimestamp: Date.now() };
     }
   }
-  // For server-side rendering or if window is not defined (should not happen for most actions post-hydration)
-  const { _lastActionOriginator, _lastUpdatedTimestamp, ...restOfState } = state; // preserve existing meta if no window
+  const { _lastActionOriginator, _lastUpdatedTimestamp, ...restOfState } = state;
   return { ...newStateWithoutMeta, _lastActionOriginator, _lastUpdatedTimestamp };
 };
 
@@ -545,7 +534,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(gameReducer, initialGlobalState);
   const [isLoading, setIsLoading] = useState(true);
-  const isProcessingBroadcastRef = useRef(false);
   const hasHydratedRef = useRef(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
 
@@ -578,7 +566,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       }
       const handleMessage = (event: MessageEvent) => {
          if (event.data && event.data._lastActionOriginator && event.data._lastActionOriginator !== TAB_ID) {
-            isProcessingBroadcastRef.current = true; 
             const receivedState = event.data as GameState;
             dispatch({ type: 'SET_STATE_FROM_LOCAL_BROADCAST', payload: receivedState });
         }
@@ -588,6 +575,8 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       return () => {
         if (channelRef.current) {
           channelRef.current.removeEventListener('message', handleMessage);
+          // channelRef.current.close(); // Consider closing channel on unmount, though spec says they are garbage collected.
+          // channelRef.current = null;
         }
       };
     } else {
@@ -599,28 +588,21 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (isLoading) return; 
 
-    if (isProcessingBroadcastRef.current) {
-        isProcessingBroadcastRef.current = false;
-        return;
+    if (state._lastActionOriginator !== TAB_ID) {
+      return;
     }
 
     if (typeof window !== 'undefined') {
-      if (state._lastActionOriginator && state._lastActionOriginator !== TAB_ID) {
-          return;
-      }
-
       try {
         const stateForStorage = { ...state };
-        // Do not persist _lastActionOriginator in localStorage
-        delete stateForStorage._lastActionOriginator; 
         
-        stateForStorage.homePenalties = (state.homePenalties || []).map(({ _status, ...p }) => p);
-        stateForStorage.awayPenalties = (state.awayPenalties || []).map(({ _status, ...p }) => p);
-
+        const cleanPenalties = (penalties: Penalty[]) => (penalties || []).map(({ _status, ...p }) => p);
+        stateForStorage.homePenalties = cleanPenalties(state.homePenalties);
+        stateForStorage.awayPenalties = cleanPenalties(state.awayPenalties);
+        
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
 
-        if (channelRef.current && state._lastActionOriginator === TAB_ID) {
-          // Transmit the full state including _lastActionOriginator and _lastUpdatedTimestamp
+        if (channelRef.current) {
           channelRef.current.postMessage(state); 
         }
       } catch (error) {
@@ -703,3 +685,6 @@ export const secondsToMinutes = (seconds: number): string => {
     
 
 
+
+
+    
