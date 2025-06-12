@@ -172,13 +172,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         } else {
             hydratedBase.currentTime = hydratedPeriodDuration; 
         }
+        // Ensure clock is not running if time is 0 after hydration
+        if (hydratedBase.currentTime <= 0) {
+            hydratedBase.isClockRunning = false;
+        }
 
         return hydratedBase;
       }
       case 'SET_STATE_FROM_LOCAL_BROADCAST':
-        if (JSON.stringify(state) === JSON.stringify(action.payload)) {
-            return state;
-        }
         const receivedState = {
           ...action.payload,
           _lastActionOriginator: undefined, 
@@ -265,7 +266,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
       case 'TICK': {
         if (!state.isClockRunning || state.currentTime <= 0) {
-          return { ...state, isClockRunning: state.currentTime > 0 && state.isClockRunning };
+          return { ...state, isClockRunning: false }; 
         }
         const newTime = state.currentTime - 1;
 
@@ -279,37 +280,27 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             let concurrentRunningCount = 0;
 
             for (const p of penalties) {
-              // If the penalty's time is already 0 or less upon entering this tick cycle,
-              // it means it has already finished (or was shown as 00:00 in the previous cycle).
-              // There's nothing more to process for it, so we skip it.
               if (p.remainingTime <= 0) {
                 continue;
               }
 
-              // From this point, p.remainingTime > 0
-
-              let status: Penalty['_status'] = undefined; // Status is recalculated each tick
+              let status: Penalty['_status'] = undefined; 
               let newRemainingTime = p.remainingTime;
 
               if (activePlayerTickets.has(p.playerNumber)) {
                 status = 'pending_player';
               } else if (concurrentRunningCount < maxConcurrent) {
                 status = 'running';
-                newRemainingTime = Math.max(0, p.remainingTime - 1); // Decrement time
+                newRemainingTime = Math.max(0, p.remainingTime - 1);
                 activePlayerTickets.add(p.playerNumber);
                 concurrentRunningCount++;
               } else {
                 status = 'pending_concurrent';
               }
               
-              // Decide if the penalty should be kept in the list:
-              // It is kept if:
-              // 1. The time calculated for AFTER this tick (newRemainingTime) is > 0
-              // 2. OR, the calculated time is 0, BUT its status is 'running' (meaning it JUST reached 0 in THIS tick)
               if (newRemainingTime > 0 || (status === 'running' && newRemainingTime === 0)) {
                  resultPenalties.push({ ...p, remainingTime: newRemainingTime, _status: status });
               }
-              // If newRemainingTime is 0 and status is not 'running' (e.g., pending_player), it's not added (effectively removed).
             }
             return resultPenalties;
           };
@@ -317,7 +308,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           homePenaltiesResult = updatePenaltiesForTick(state.homePenalties, state.maxConcurrentPenalties);
           awayPenaltiesResult = updatePenaltiesForTick(state.awayPenalties, state.maxConcurrentPenalties);
         }
-
 
         let newIsClockRunning = state.isClockRunning;
         if (newTime <= 0) {
@@ -442,14 +432,15 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         };
       }
       case 'RESET_GAME_STATE': {
-        // Retain current config, but reset game play values
+        const isOT = (initialGlobalState.currentPeriod) > (state.numberOfRegularPeriods ?? initialGlobalState.numberOfRegularPeriods);
+        const initialClockTime = isOT 
+            ? (state.defaultOTPeriodDuration ?? initialGlobalState.defaultOTPeriodDuration) 
+            : (state.defaultPeriodDuration ?? initialGlobalState.defaultPeriodDuration);
         return {
-          ...state, // This keeps all current config values
+          ...state, 
           homeScore: initialGlobalState.homeScore,
           awayScore: initialGlobalState.awayScore,
-          currentTime: (state.currentPeriod ?? initialGlobalState.currentPeriod) > (state.numberOfRegularPeriods ?? initialGlobalState.numberOfRegularPeriods) 
-            ? (state.defaultOTPeriodDuration ?? initialGlobalState.defaultOTPeriodDuration) 
-            : (state.defaultPeriodDuration ?? initialGlobalState.defaultPeriodDuration), 
+          currentTime: initialClockTime, 
           currentPeriod: initialGlobalState.currentPeriod,
           isClockRunning: initialGlobalState.isClockRunning,
           homePenalties: initialGlobalState.homePenalties,
@@ -520,8 +511,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       return () => {
         if (channelRef.current) {
           channelRef.current.removeEventListener('message', handleMessage);
-          // channelRef.current.close(); // Consider closing if appropriate for your app lifecycle
-          // channelRef.current = null;
         }
       };
     } else {
@@ -559,14 +548,18 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   }, [state, isLoading]);
 
   useEffect(() => {
-    let timerId: NodeJS.Timeout;
-    if (state.isClockRunning && state.currentTime > 0) {
+    let timerId: NodeJS.Timeout | undefined;
+    if (state.isClockRunning) { // Only depend on isClockRunning to start/stop
       timerId = setInterval(() => {
         dispatch({ type: 'TICK' });
       }, 1000);
     }
-    return () => clearInterval(timerId);
-  }, [state.isClockRunning, state.currentTime]);
+    return () => {
+      if (timerId) {
+        clearInterval(timerId);
+      }
+    };
+  }, [state.isClockRunning]); // Only depend on isClockRunning
 
 
   return (
@@ -593,7 +586,7 @@ export const formatTime = (totalSeconds: number): string => {
 
 export const getActualPeriodText = (period: number, override: PeriodDisplayOverrideType, numberOfRegularPeriods: number): string => {
   if (override === "Time Out") return "TIME OUT";
-  if (override) return override; // "Break" or "Pre-OT Break"
+  if (override) return override; 
   return getPeriodText(period, numberOfRegularPeriods);
 };
 
@@ -623,4 +616,6 @@ export const secondsToMinutes = (seconds: number): string => {
   if (isNaN(seconds) || seconds < 0) return "0";
   return Math.floor(seconds / 60).toString();
 };
+    
+
     
