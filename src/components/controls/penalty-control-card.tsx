@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, UserPlus, Clock, Plus, Minus, Hourglass } from 'lucide-react'; // Added Hourglass
+import { Trash2, UserPlus, Clock, Plus, Minus, Hourglass } from 'lucide-react';
 import { ControlCardWrapper } from './control-card-wrapper';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
@@ -110,8 +110,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   };
 
   const getStatusText = (status?: Penalty['_status']) => {
-    if (status === 'pending_player') return 'Esperando (jugador)';
-    if (status === 'pending_concurrent') return 'Esperando (puesto)';
+    if (status === 'pending_player' || status === 'pending_concurrent') return 'Esperando';
     return null;
   };
 
@@ -172,10 +171,10 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                   onDrop={(e) => handleDrop(e, p.id)}
                   onDragEnd={handleDragEnd}
                   className={cn(
-                    "p-3 bg-muted/30 flex flex-col cursor-move transition-all", // Changed to flex-col for status text
+                    "p-3 bg-muted/30 flex flex-col cursor-move transition-all", 
                     draggedPenaltyId === p.id && "opacity-50 scale-95 shadow-lg",
                     dragOverPenaltyId === p.id && draggedPenaltyId !== p.id && "border-2 border-primary ring-2 ring-primary",
-                    isWaiting && "opacity-60 bg-muted/10" // Style for waiting penalties
+                    isWaiting && "opacity-60 bg-muted/10" 
                   )}
                 >
                   <div className="flex justify-between items-center w-full">
@@ -231,3 +230,4 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     </ControlCardWrapper>
   );
 }
+
