@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useGameState, formatTime, getActualPeriodText } from '@/contexts/game-state-context';
+import { useGameState, formatTime, getActualPeriodText, getPeriodText } from '@/contexts/game-state-context';
 import { Card, CardContent } from '@/components/ui/card';
 
 export function ClockDisplay() {
@@ -21,6 +21,12 @@ export function ClockDisplay() {
             </span>
           )}
         </div>
+        {state.periodDisplayOverride === "Time Out" && state.preTimeoutState && (
+          <div className="mt-2 text-sm md:text-base text-muted-foreground normal-case tracking-normal">
+            Al finalizar, volviendo a: {getPeriodText(state.preTimeoutState.period)} - {formatTime(state.preTimeoutState.time)}
+            {state.preTimeoutState.override ? ` (${state.preTimeoutState.override})` : ''}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

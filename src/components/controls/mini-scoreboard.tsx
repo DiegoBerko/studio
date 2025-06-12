@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const MAX_PERIOD_NUMBER = 7;
+const MAX_PERIOD_NUMBER = 7; // Considerando 3 periodos + 4 OTs (OT, OT2, OT3, OT4)
 
 export function MiniScoreboard() {
   const { state, dispatch } = useGameState();
@@ -42,6 +42,11 @@ export function MiniScoreboard() {
   };
 
   const handlePreviousPeriod = () => {
+    if (state.periodDisplayOverride === "Time Out") {
+      // No permitir navegación durante un Time Out, se debe usar "Siguiente" para finalizar
+      toast({ title: "Time Out Activo", description: "Finaliza el Time Out para cambiar de período.", variant: "destructive" });
+      return;
+    }
     if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
       dispatch({ type: 'SET_PERIOD', payload: state.currentPeriod });
       toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(state.currentPeriod)}. Reloj reiniciado y pausado.` });
@@ -61,7 +66,18 @@ export function MiniScoreboard() {
     }
   };
 
-  const handleNextPeriod = () => {
+  const handleNextAction = () => { // Renombrado para claridad, maneja "Siguiente" y "Finalizar Time Out"
+    if (state.periodDisplayOverride === "Time Out") {
+      if (state.currentTime <= 0) {
+        dispatch({ type: 'END_TIMEOUT' });
+        toast({ title: "Time Out Finalizado", description: "Juego reanudado al estado anterior." });
+      } else {
+        toast({ title: "Time Out en Curso", description: "El tiempo de Time Out aún no ha finalizado." });
+      }
+      return;
+    }
+
+    // Lógica para avanzar período/break
     if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
       const nextNumericPeriod = state.currentPeriod + 1;
       if (nextNumericPeriod <= MAX_PERIOD_NUMBER) {
@@ -70,7 +86,7 @@ export function MiniScoreboard() {
       } else {
         toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod)}.`, variant: "destructive" });
       }
-    } else {
+    } else { // Estamos en un período normal
       if (state.currentPeriod < MAX_PERIOD_NUMBER) {
         const isPreOT = state.currentPeriod >= 3; 
         const breakType = isPreOT ? "Pre-OT Break" : "Break";
@@ -92,10 +108,13 @@ export function MiniScoreboard() {
     }
   };
   
-  const isPreviousPeriodDisabled = state.periodDisplayOverride === null && state.currentPeriod <= 1;
-  const isNextPeriodDisabled = state.periodDisplayOverride === null && state.currentPeriod >= MAX_PERIOD_NUMBER;
+  const isPreviousPeriodDisabled = (state.periodDisplayOverride === null && state.currentPeriod <= 1) || state.periodDisplayOverride === "Time Out";
+  const isNextPeriodDisabled = (state.periodDisplayOverride === null && state.currentPeriod >= MAX_PERIOD_NUMBER) || (state.periodDisplayOverride === "Time Out" && state.currentTime > 0) ;
 
-  const showNextPeriodButton = state.currentTime <= 0 && !state.isClockRunning;
+  // Botón principal cambia entre Play/Pause y "Siguiente" (o "Finalizar Time Out")
+  const showNextActionButton = state.currentTime <= 0 && !state.isClockRunning;
+  const nextActionButtonText = state.periodDisplayOverride === "Time Out" && state.currentTime <=0 ? "Finalizar Time Out" : "Siguiente";
+
 
   return (
     <Card className="mb-8 bg-card shadow-lg">
@@ -136,15 +155,15 @@ export function MiniScoreboard() {
 
         {/* Clock & Period Section */}
         <div className="flex-1 space-y-2 text-center">
-          {showNextPeriodButton ? (
+          {showNextActionButton ? (
             <Button
-              onClick={handleNextPeriod}
+              onClick={handleNextAction}
               className="w-full max-w-[200px] mx-auto mb-2"
               variant="default"
-              aria-label="Siguiente Período o Descanso"
+              aria-label={nextActionButtonText}
               disabled={isNextPeriodDisabled && state.periodDisplayOverride === null} 
             >
-              <ChevronsRight className="mr-2 h-5 w-5" /> Siguiente
+              <ChevronsRight className="mr-2 h-5 w-5" /> {nextActionButtonText}
             </Button>
           ) : (
             <Button
@@ -152,7 +171,7 @@ export function MiniScoreboard() {
               className="w-full max-w-[180px] mx-auto mb-2"
               variant={state.isClockRunning ? "destructive" : "default"}
               aria-label={state.isClockRunning ? "Pausar Reloj" : "Iniciar Reloj"}
-              disabled={state.currentTime <= 0 && !state.isClockRunning}
+              disabled={state.currentTime <= 0 && !state.isClockRunning && state.periodDisplayOverride !== "Time Out"}
             >
               {state.isClockRunning ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
               {state.isClockRunning ? 'Pausar' : 'Iniciar'} Reloj
@@ -195,21 +214,27 @@ export function MiniScoreboard() {
               {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride)}
             </p>
             <Button 
-              onClick={handleNextPeriod} 
+              onClick={handleNextAction} // Usar handleNextAction aquí también
               variant="ghost" 
               size="icon" 
               className="h-7 w-7 text-muted-foreground hover:text-primary-foreground"
               aria-label="Siguiente Período o Descanso"
-              disabled={isNextPeriodDisabled && state.periodDisplayOverride === null} // Ajuste para deshabilitar correctamente
+              disabled={isNextPeriodDisabled}
             >
               <ChevronRight className="h-5 w-5" />
             </Button>
-            {!state.isClockRunning && state.currentTime > 0 && !showNextPeriodButton && (
+            {!state.isClockRunning && state.currentTime > 0 && !showNextActionButton && (
               <span className="absolute top-[-0.25rem] right-1 text-[0.6rem] font-normal text-muted-foreground normal-case px-1 rounded-sm bg-background/30">
                 Paused
               </span>
             )}
           </div>
+          {state.periodDisplayOverride === "Time Out" && state.preTimeoutState && (
+            <div className="text-xs text-muted-foreground mt-1">
+              Retornando a: {getPeriodText(state.preTimeoutState.period)} - {formatTime(state.preTimeoutState.time)}
+              {state.preTimeoutState.override ? ` (${state.preTimeoutState.override})` : ''}
+            </div>
+          )}
         </div>
 
         {/* Away Team Section */}

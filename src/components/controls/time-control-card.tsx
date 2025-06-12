@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useGameState } from '@/contexts/game-state-context';
+import { useGameState, secondsToMinutes } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Coffee } from 'lucide-react';
+import { TimerOff } from 'lucide-react'; // Cambiado icono
 import { ControlCardWrapper } from './control-card-wrapper';
 import { useToast } from '@/hooks/use-toast';
 
@@ -26,18 +26,17 @@ export function TimeControlCard() {
     toast({ title: "Reloj Actualizado", description: `Tiempo establecido a ${String(displayMinutes).padStart(2, '0')}:${String(displaySeconds).padStart(2, '0')}` });
   };
   
-  const handleStartRegularBreak = () => {
-    dispatch({ type: 'START_BREAK' }); 
-    const breakType = "Descanso Regular";
-    const autoStart = state.autoStartBreaks;
+  const handleStartTimeOut = () => {
+    dispatch({ type: 'START_TIMEOUT' }); 
+    const autoStart = state.autoStartTimeouts;
     toast({ 
-        title: `${breakType} Iniciado`, 
-        description: `${breakType} de ${Math.floor(state.defaultBreakDuration/60)} minutos. Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
+        title: "Time Out Iniciado", 
+        description: `Time Out de ${state.defaultTimeoutDuration} segundos. Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
     });
   };
 
   return (
-    <ControlCardWrapper title="Ajustes de Tiempo y Descansos">
+    <ControlCardWrapper title="Ajustes de Tiempo y Time Out">
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="minutes">Establecer Tiempo Manualmente</Label>
@@ -68,12 +67,11 @@ export function TimeControlCard() {
         </div>
 
         <div className="border-t border-border pt-4">
-            <Button onClick={handleStartRegularBreak} variant="outline" className="w-full" aria-label="Iniciar Descanso Regular">
-                <Coffee className="mr-2 h-4 w-4" /> Iniciar Descanso Regular
+            <Button onClick={handleStartTimeOut} variant="outline" className="w-full" aria-label="Iniciar Time Out">
+                <TimerOff className="mr-2 h-4 w-4" /> Iniciar Time Out
             </Button>
         </div>
       </div>
     </ControlCardWrapper>
   );
 }
-
