@@ -24,9 +24,9 @@ export function PenaltyCard({ penalty }: PenaltyCardProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <User className="h-6 w-6 md:h-8 md:w-8 text-primary-foreground" />
-            <span className="font-semibold text-2xl md:text-3xl">{penalty.playerNumber}</span>
+            <span className="font-semibold text-3xl md:text-4xl">{penalty.playerNumber}</span>
           </div>
-          <div className="flex items-center gap-1 text-accent font-mono text-2xl md:text-3xl">
+          <div className="flex items-center gap-1 text-accent font-mono text-3xl md:text-4xl">
             <Clock className="h-6 w-6 md:h-8 md:w-8 text-accent" />
             {formatTime(penalty.remainingTime)}
           </div>
@@ -45,3 +45,4 @@ export function PenaltyCard({ penalty }: PenaltyCardProps) {
     </Card>
   );
 }
+
