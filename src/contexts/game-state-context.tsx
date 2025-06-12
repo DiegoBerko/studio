@@ -19,8 +19,9 @@ if (typeof window !== 'undefined') {
 
 
 // Duraciones por defecto iniciales, se guardarán en segundos
+const INITIAL_CONFIG_NAME = "Configuración Predeterminada";
 const INITIAL_PERIOD_DURATION = 20 * 60;
-const INITIAL_OT_PERIOD_DURATION = 5 * 60; // Nueva duración por defecto para OT
+const INITIAL_OT_PERIOD_DURATION = 5 * 60;
 const INITIAL_BREAK_DURATION = 120;
 const INITIAL_PRE_OT_BREAK_DURATION = 60;
 const INITIAL_TIMEOUT_DURATION = 30;
@@ -40,7 +41,22 @@ interface PreTimeoutState {
   override: PeriodDisplayOverrideType;
 }
 
-interface GameState {
+export interface ConfigFields {
+  configName: string;
+  defaultPeriodDuration: number;
+  defaultOTPeriodDuration: number;
+  defaultBreakDuration: number;
+  defaultPreOTBreakDuration: number;
+  defaultTimeoutDuration: number;
+  maxConcurrentPenalties: number;
+  autoStartBreaks: boolean;
+  autoStartPreOTBreaks: boolean;
+  autoStartTimeouts: boolean;
+  numberOfRegularPeriods: number;
+  numberOfOvertimePeriods: number;
+}
+
+interface GameState extends ConfigFields {
   homeScore: number;
   awayScore: number;
   currentTime: number; // in seconds
@@ -51,17 +67,6 @@ interface GameState {
   homeTeamName: string;
   awayTeamName: string;
   periodDisplayOverride: PeriodDisplayOverrideType;
-  defaultPeriodDuration: number;
-  defaultOTPeriodDuration: number; // Nuevo campo para duración de OT
-  defaultBreakDuration: number;
-  defaultPreOTBreakDuration: number;
-  defaultTimeoutDuration: number;
-  maxConcurrentPenalties: number;
-  autoStartBreaks: boolean;
-  autoStartPreOTBreaks: boolean;
-  autoStartTimeouts: boolean;
-  numberOfRegularPeriods: number;
-  numberOfOvertimePeriods: number;
   preTimeoutState: PreTimeoutState | null;
   _lastActionOriginator?: string;
 }
@@ -86,8 +91,9 @@ export type GameAction =
   | { type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' }
   | { type: 'START_TIMEOUT' }
   | { type: 'END_TIMEOUT' }
+  | { type: 'SET_CONFIG_NAME'; payload: string }
   | { type: 'SET_DEFAULT_PERIOD_DURATION'; payload: number }
-  | { type: 'SET_DEFAULT_OT_PERIOD_DURATION'; payload: number } // Nueva acción
+  | { type: 'SET_DEFAULT_OT_PERIOD_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_BREAK_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_PRE_OT_BREAK_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_TIMEOUT_DURATION'; payload: number }
@@ -100,6 +106,7 @@ export type GameAction =
   | { type: 'SET_AUTO_START_BREAKS_VALUE'; payload: boolean }
   | { type: 'SET_AUTO_START_PRE_OT_BREAKS_VALUE'; payload: boolean }
   | { type: 'SET_AUTO_START_TIMEOUTS_VALUE'; payload: boolean }
+  | { type: 'LOAD_CONFIG_FROM_FILE'; payload: Partial<ConfigFields> }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
   | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState }
   | { type: 'RESET_GAME_STATE' };
@@ -116,8 +123,9 @@ const initialGlobalState: GameState = {
   homeTeamName: 'Local',
   awayTeamName: 'Visitante',
   periodDisplayOverride: null,
+  configName: INITIAL_CONFIG_NAME,
   defaultPeriodDuration: INITIAL_PERIOD_DURATION,
-  defaultOTPeriodDuration: INITIAL_OT_PERIOD_DURATION, // Inicialización
+  defaultOTPeriodDuration: INITIAL_OT_PERIOD_DURATION,
   defaultBreakDuration: INITIAL_BREAK_DURATION,
   defaultPreOTBreakDuration: INITIAL_PRE_OT_BREAK_DURATION,
   defaultTimeoutDuration: INITIAL_TIMEOUT_DURATION,
@@ -142,18 +150,31 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
   const newState = ((): GameState => {
     switch (action.type) {
       case 'HYDRATE_FROM_STORAGE': {
-        const hydratedBase = {
-          ...initialGlobalState,
-          ...action.payload,
+         const hydratedBase: GameState = {
+          ...initialGlobalState, // Start with all initial defaults
+          ...action.payload,     // Override with whatever is in localStorage
         };
-        const hydratedState: GameState = {
-          ...hydratedBase,
-          isClockRunning: action.payload?.isClockRunning ?? initialGlobalState.isClockRunning,
-          _lastActionOriginator: undefined,
-        };
-        hydratedState.homePenalties = (action.payload?.homePenalties || []).map(({ _status, ...p }: Penalty) => p);
-        hydratedState.awayPenalties = (action.payload?.awayPenalties || []).map(({ _status, ...p }: Penalty) => p);
-        return hydratedState;
+        // Ensure transient fields are reset or correctly typed
+        hydratedBase.isClockRunning = action.payload?.isClockRunning ?? initialGlobalState.isClockRunning;
+        hydratedBase._lastActionOriginator = undefined;
+        hydratedBase.homePenalties = (action.payload?.homePenalties || []).map(({ _status, ...p }: Penalty) => p);
+        hydratedBase.awayPenalties = (action.payload?.awayPenalties || []).map(({ _status, ...p }: Penalty) => p);
+        
+        // Ensure currentTime is consistent with the (potentially hydrated) period and its duration type
+        const isHydratedOTPeriod = hydratedBase.currentPeriod > hydratedBase.numberOfRegularPeriods;
+        const hydratedPeriodDuration = isHydratedOTPeriod ? hydratedBase.defaultOTPeriodDuration : hydratedBase.defaultPeriodDuration;
+        
+        // If currentTime from storage is 0, or if it's greater than the period's duration, reset it.
+        // Otherwise, keep the currentTime from storage. This handles cases where the game was paused mid-period.
+        if (action.payload?.currentTime === 0 || (action.payload?.currentTime && action.payload.currentTime > hydratedPeriodDuration)) {
+            hydratedBase.currentTime = hydratedPeriodDuration;
+        } else if (action.payload?.currentTime !== undefined) {
+            hydratedBase.currentTime = action.payload.currentTime;
+        } else {
+            hydratedBase.currentTime = hydratedPeriodDuration; // Default if not in payload
+        }
+
+        return hydratedBase;
       }
       case 'SET_STATE_FROM_LOCAL_BROADCAST':
         const receivedState = {
@@ -364,9 +385,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           };
         }
         return state;
+      case 'SET_CONFIG_NAME':
+        return { ...state, configName: action.payload || initialGlobalState.configName };
       case 'SET_DEFAULT_PERIOD_DURATION':
         return { ...state, defaultPeriodDuration: Math.max(60, action.payload) }; 
-      case 'SET_DEFAULT_OT_PERIOD_DURATION': // Nuevo reducer
+      case 'SET_DEFAULT_OT_PERIOD_DURATION':
         return { ...state, defaultOTPeriodDuration: Math.max(60, action.payload) };
       case 'SET_DEFAULT_BREAK_DURATION':
         return { ...state, defaultBreakDuration: Math.max(1, action.payload) };
@@ -392,14 +415,31 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return { ...state, autoStartPreOTBreaks: action.payload };
       case 'SET_AUTO_START_TIMEOUTS_VALUE':
         return { ...state, autoStartTimeouts: action.payload };
-      case 'RESET_GAME_STATE': {
-        const isCurrentPeriodOT = initialGlobalState.currentPeriod > state.numberOfRegularPeriods;
-        const initialTimeForReset = isCurrentPeriodOT ? state.defaultOTPeriodDuration : state.defaultPeriodDuration;
+      case 'LOAD_CONFIG_FROM_FILE': {
+        const config = action.payload;
         return {
-          ...state, 
+          ...state,
+          configName: config.configName ?? state.configName,
+          defaultPeriodDuration: config.defaultPeriodDuration ?? state.defaultPeriodDuration,
+          defaultOTPeriodDuration: config.defaultOTPeriodDuration ?? state.defaultOTPeriodDuration,
+          defaultBreakDuration: config.defaultBreakDuration ?? state.defaultBreakDuration,
+          defaultPreOTBreakDuration: config.defaultPreOTBreakDuration ?? state.defaultPreOTBreakDuration,
+          defaultTimeoutDuration: config.defaultTimeoutDuration ?? state.defaultTimeoutDuration,
+          maxConcurrentPenalties: config.maxConcurrentPenalties ?? state.maxConcurrentPenalties,
+          autoStartBreaks: config.autoStartBreaks ?? state.autoStartBreaks,
+          autoStartPreOTBreaks: config.autoStartPreOTBreaks ?? state.autoStartPreOTBreaks,
+          autoStartTimeouts: config.autoStartTimeouts ?? state.autoStartTimeouts,
+          numberOfRegularPeriods: config.numberOfRegularPeriods ?? state.numberOfRegularPeriods,
+          numberOfOvertimePeriods: config.numberOfOvertimePeriods ?? state.numberOfOvertimePeriods,
+        };
+      }
+      case 'RESET_GAME_STATE': {
+        // Retain current config, but reset game play values
+        return {
+          ...state, // This keeps all current config values
           homeScore: initialGlobalState.homeScore,
           awayScore: initialGlobalState.awayScore,
-          currentTime: initialTimeForReset, 
+          currentTime: state.currentPeriod > state.numberOfRegularPeriods ? state.defaultOTPeriodDuration : state.defaultPeriodDuration, 
           currentPeriod: initialGlobalState.currentPeriod,
           isClockRunning: initialGlobalState.isClockRunning,
           homePenalties: initialGlobalState.homePenalties,
@@ -458,12 +498,11 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         channelRef.current = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
       }
       const handleMessage = (event: MessageEvent) => {
-        if (event.data && event.data._lastActionOriginator && event.data._lastActionOriginator !== TAB_ID) {
-          if (isProcessingBroadcastRef.current) return;
-
-          isProcessingBroadcastRef.current = true;
-          const receivedState = event.data as GameState;
-          dispatch({ type: 'SET_STATE_FROM_LOCAL_BROADCAST', payload: receivedState });
+         if (event.data && event.data._lastActionOriginator && event.data._lastActionOriginator !== TAB_ID) {
+            if (isProcessingBroadcastRef.current) return;
+            isProcessingBroadcastRef.current = true;
+            const receivedState = event.data as GameState;
+            dispatch({ type: 'SET_STATE_FROM_LOCAL_BROADCAST', payload: receivedState });
         }
       };
       channelRef.current.addEventListener('message', handleMessage);
@@ -480,10 +519,16 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    if (isLoading || isProcessingBroadcastRef.current || state._lastActionOriginator !== TAB_ID) {
-      if (isProcessingBroadcastRef.current) {
-          isProcessingBroadcastRef.current = false;
-      }
+    if (isLoading) return;
+
+    if (isProcessingBroadcastRef.current) {
+        isProcessingBroadcastRef.current = false; // Reset flag after processing a broadcast
+        return;
+    }
+    
+    if (state._lastActionOriginator !== TAB_ID && typeof window !== 'undefined') {
+      // This means the state change was likely due to a broadcast message or initial hydration.
+      // We don't want to immediately re-broadcast or re-save.
       return;
     }
 
@@ -495,7 +540,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         stateForStorage.awayPenalties = (state.awayPenalties || []).map(({ _status, ...p }) => p);
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
 
-        if (channelRef.current) {
+        if (channelRef.current && state._lastActionOriginator === TAB_ID) { // Only broadcast if this tab originated the action
           channelRef.current.postMessage(state); 
         }
       } catch (error) {
@@ -546,17 +591,14 @@ export const getActualPeriodText = (period: number, override: PeriodDisplayOverr
 export const getPeriodText = (period: number, numRegPeriods: number): string => {
     if (period <= 0) return "---";
     if (period <= numRegPeriods) {
-        // For regular periods, use 1ST, 2ND, 3RD, NTH
         if (period === 1) return "1ST";
         if (period === 2) return "2ND";
         if (period === 3) return "3RD";
-        // For 4th, 5th etc. regular periods (if numRegPeriods > 3)
         if (period % 10 === 1 && period % 100 !== 11) return `${period}ST`;
         if (period % 10 === 2 && period % 100 !== 12) return `${period}ND`;
         if (period % 10 === 3 && period % 100 !== 13) return `${period}RD`;
         return `${period}TH`;
     }
-    // Overtime periods
     const overtimeNumber = period - numRegPeriods;
     if (overtimeNumber === 1) return 'OT';
     return `OT${overtimeNumber}`;
