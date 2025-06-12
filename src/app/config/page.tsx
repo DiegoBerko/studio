@@ -3,17 +3,15 @@
 
 import { DurationSettingsCard } from "@/components/config/duration-settings-card";
 import { PenaltySettingsCard } from "@/components/config/penalty-settings-card";
-import { AutoStartSettingsCard } from "@/components/config/autostart-settings-card";
-import { TimeoutSettingsCard } from "@/components/config/timeout-settings-card"; // Importar nuevo componente
+// TimeoutSettingsCard y AutoStartSettingsCard ya no son necesarios
 
 export default function ConfigPage() {
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8">
       <h1 className="text-3xl font-bold text-primary-foreground mb-6">Configuración General</h1>
-      <DurationSettingsCard />
-      <TimeoutSettingsCard /> {/* Añadir nuevo componente */}
+      <DurationSettingsCard /> {/* Ahora consolida duraciones y auto-inicios */}
       <PenaltySettingsCard />
-      <AutoStartSettingsCard />
+      {/* AutoStartSettingsCard y TimeoutSettingsCard fueron removidos */}
     </div>
   );
 }
