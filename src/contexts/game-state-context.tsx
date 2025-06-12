@@ -9,15 +9,18 @@ import type { Penalty, Team } from '@/types';
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
 const LOCAL_STORAGE_KEY = 'icevision-game-state';
 
+// TAB_ID: Generado una vez por pestaña/contexto del navegador.
+const TAB_ID = typeof window !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+
 // Duraciones por defecto iniciales, se guardarán en segundos
 const INITIAL_PERIOD_DURATION = 20 * 60;
 const INITIAL_BREAK_DURATION = 2 * 60;
 const INITIAL_PRE_OT_BREAK_DURATION = 1 * 60;
-const INITIAL_TIMEOUT_DURATION = 60; // 1 minuto por defecto para Time Out
+const INITIAL_TIMEOUT_DURATION = 60;
 const INITIAL_MAX_CONCURRENT_PENALTIES = 2;
 const INITIAL_AUTO_START_BREAKS = true;
 const INITIAL_AUTO_START_PRE_OT_BREAKS = false;
-const INITIAL_AUTO_START_TIMEOUTS = true; // Timeouts suelen empezar automáticamente
+const INITIAL_AUTO_START_TIMEOUTS = true;
 
 type PeriodDisplayOverrideType = "Break" | "Pre-OT Break" | "Time Out" | null;
 
@@ -48,15 +51,15 @@ interface GameState {
   autoStartPreOTBreaks: boolean;
   autoStartTimeouts: boolean;
   preTimeoutState: PreTimeoutState | null;
-  _lastActionOriginator?: string; 
+  _lastActionOriginator?: string;
 }
 
 type GameAction =
   | { type: 'TOGGLE_CLOCK' }
   | { type: 'SET_TIME'; payload: { minutes: number; seconds: number } }
   | { type: 'ADJUST_TIME'; payload: number }
-  | { type: 'SET_PERIOD'; payload: number } // Usado para iniciar un período específico
-  | { type: 'RESET_PERIOD_CLOCK' } // No usado actualmente, pero podría ser útil
+  | { type: 'SET_PERIOD'; payload: number }
+  | { type: 'RESET_PERIOD_CLOCK' }
   | { type: 'SET_SCORE'; payload: { team: Team; score: number } }
   | { type: 'ADJUST_SCORE'; payload: { team: Team; delta: number } }
   | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id'> } }
@@ -68,7 +71,7 @@ type GameAction =
   | { type: 'SET_AWAY_TEAM_NAME'; payload: string }
   | { type: 'START_BREAK' }
   | { type: 'START_PRE_OT_BREAK' }
-  | { type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' } // Inicia break DESPUÉS del período anterior al actual
+  | { type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' }
   | { type: 'START_TIMEOUT' }
   | { type: 'END_TIMEOUT' }
   | { type: 'SET_DEFAULT_PERIOD_DURATION'; payload: number }
@@ -79,6 +82,7 @@ type GameAction =
   | { type: 'TOGGLE_AUTO_START_BREAKS' }
   | { type: 'TOGGLE_AUTO_START_PRE_OT_BREAKS' }
   | { type: 'TOGGLE_AUTO_START_TIMEOUTS' }
+  | { type: 'HYDRATE_FROM_STORAGE'; payload: GameState } // For initial client-side load
   | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState };
 
 
@@ -102,27 +106,27 @@ const initialGlobalState: GameState = {
   autoStartPreOTBreaks: INITIAL_AUTO_START_PRE_OT_BREAKS,
   autoStartTimeouts: INITIAL_AUTO_START_TIMEOUTS,
   preTimeoutState: null,
+  _lastActionOriginator: undefined, // Important for server-safe initial state
 };
 
 const GameStateContext = createContext<{
   state: GameState;
   dispatch: React.Dispatch<GameAction>;
-  isLoading: boolean; 
+  isLoading: boolean;
 } | undefined>(undefined);
 
-const TAB_ID = typeof window !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   const newState = ((): GameState => {
     switch (action.type) {
+      case 'HYDRATE_FROM_STORAGE':
+        return action.payload; // Directly set the state from localStorage
       case 'SET_STATE_FROM_LOCAL_BROADCAST':
-        if (action.payload._lastActionOriginator && action.payload._lastActionOriginator !== TAB_ID) {
-          return { ...action.payload, _lastActionOriginator: undefined }; 
-        }
-        return state; 
+        // Ensure we don't process messages from the same tab, though BroadcastChannel usually handles this.
+        // The main check is done in the message handler.
+        return { ...action.payload, _lastActionOriginator: undefined };
       case 'TOGGLE_CLOCK':
         if (state.currentTime <= 0 && !state.isClockRunning) {
-          // Prevenir inicio si el tiempo es 0, a menos que sea un break/timeout y auto-start esté desactivado
           if (state.periodDisplayOverride === "Break" && !state.autoStartBreaks) return state;
           if (state.periodDisplayOverride === "Pre-OT Break" && !state.autoStartPreOTBreaks) return state;
           if (state.periodDisplayOverride === "Time Out" && !state.autoStartTimeouts) return state;
@@ -137,16 +141,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         const newTime = Math.max(0, state.currentTime + action.payload);
         return { ...state, currentTime: newTime, isClockRunning: newTime > 0 ? state.isClockRunning : false };
       }
-      case 'SET_PERIOD': // Usado para avanzar a un período normal desde un break/timeout o directamente
+      case 'SET_PERIOD':
         return {
           ...state,
           currentPeriod: Math.max(1, action.payload),
           periodDisplayOverride: null,
           isClockRunning: false,
           currentTime: state.defaultPeriodDuration,
-          preTimeoutState: null, // Limpiar estado de timeout si se salta a un período
+          preTimeoutState: null,
         };
-      case 'RESET_PERIOD_CLOCK': // No usado actualmente, pero limpia el reloj del período actual
+      case 'RESET_PERIOD_CLOCK':
         return {
           ...state,
           currentTime: state.defaultPeriodDuration,
@@ -160,8 +164,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return { ...state, [`${action.payload.team}Score`]: Math.max(0, currentScore + action.payload.delta) };
       }
       case 'ADD_PENALTY': {
-        const newPenalty: Penalty = { 
-          ...action.payload.penalty, 
+        const newPenalty: Penalty = {
+          ...action.payload.penalty,
           id: (typeof window !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random().toString(36).slice(2))
         };
         const penalties = [...state[`${action.payload.team}Penalties`], newPenalty];
@@ -192,7 +196,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         }
         return { ...state, [`${team}Penalties`]: currentPenalties };
       }
-      case 'TICK': { 
+      case 'TICK': {
         if (!state.isClockRunning || state.currentTime <= 0) {
           return { ...state, isClockRunning: false };
         }
@@ -201,7 +205,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         let homePenalties = state.homePenalties;
         let awayPenalties = state.awayPenalties;
 
-        // Penalties only run during normal periods, not breaks or timeouts
         if (state.periodDisplayOverride === null) {
           const updatePenalties = (penalties: Penalty[], maxConcurrent: number) => {
             let runningCount = 0;
@@ -240,19 +243,19 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           currentTime: state.defaultBreakDuration,
           periodDisplayOverride: 'Break',
           isClockRunning: state.autoStartBreaks,
-          preTimeoutState: null, // Clear preTimeoutState if starting a regular break
+          preTimeoutState: null,
         };
       case 'START_PRE_OT_BREAK':
-          return {
-            ...state,
-            currentTime: state.defaultPreOTBreakDuration,
-            periodDisplayOverride: 'Pre-OT Break',
-            isClockRunning: state.autoStartPreOTBreaks,
-            preTimeoutState: null, // Clear preTimeoutState
-          };
+        return {
+          ...state,
+          currentTime: state.defaultPreOTBreakDuration,
+          periodDisplayOverride: 'Pre-OT Break',
+          isClockRunning: state.autoStartPreOTBreaks,
+          preTimeoutState: null,
+        };
       case 'START_BREAK_AFTER_PREVIOUS_PERIOD': {
         if (state.currentPeriod <= 1 && state.periodDisplayOverride === null) return state;
-        const periodBeforeBreak = state.periodDisplayOverride !== null ? state.currentPeriod : state.currentPeriod -1;
+        const periodBeforeBreak = state.periodDisplayOverride !== null ? state.currentPeriod : state.currentPeriod - 1;
         if (periodBeforeBreak < 1) return state;
         const isPreOT = periodBeforeBreak >= 3;
         return {
@@ -261,7 +264,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           currentTime: isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration,
           periodDisplayOverride: isPreOT ? 'Pre-OT Break' : 'Break',
           isClockRunning: isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks,
-          preTimeoutState: null, // Clear preTimeoutState
+          preTimeoutState: null,
         };
       }
       case 'START_TIMEOUT':
@@ -288,7 +291,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             preTimeoutState: null,
           };
         }
-        return state; // No hacer nada si no hay preTimeoutState
+        return state;
       case 'SET_DEFAULT_PERIOD_DURATION':
         return { ...state, defaultPeriodDuration: Math.max(60, action.payload) };
       case 'SET_DEFAULT_BREAK_DURATION':
@@ -310,7 +313,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
   })();
 
-  if (action.type !== 'TICK' && action.type !== 'SET_STATE_FROM_LOCAL_BROADCAST') {
+  // For user-initiated actions, mark them with the current TAB_ID
+  // This excludes TICK, HYDRATE_FROM_STORAGE, and SET_STATE_FROM_LOCAL_BROADCAST
+  const nonOriginatorActions: GameAction['type'][] = ['TICK', 'HYDRATE_FROM_STORAGE', 'SET_STATE_FROM_LOCAL_BROADCAST'];
+  if (!nonOriginatorActions.includes(action.type)) {
     return { ...newState, _lastActionOriginator: TAB_ID };
   }
   return newState;
@@ -318,47 +324,48 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
 
 export const GameStateProvider = ({ children }: { children: ReactNode }) => {
-  const [isLoading, setIsLoading] = React.useState(true); 
+  const [state, dispatch] = useReducer(gameReducer, initialGlobalState);
+  const [isLoading, setIsLoading] = React.useState(true);
   const isProcessingBroadcastRef = useRef(false);
+  const hasHydratedRef = useRef(false);
 
-  const getInitialState = (): GameState => {
-    if (typeof window !== 'undefined') {
-      try {
-        const storedState = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (storedState) {
-          const parsedState = JSON.parse(storedState);
-           // Asegurarse de que todos los campos, incluidos los nuevos, estén presentes
-          return { ...initialGlobalState, ...parsedState, _lastActionOriginator: undefined };
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || hasHydratedRef.current) {
+        // Ensure this runs only on the client and only once
+        if (typeof window !== 'undefined' && !hasHydratedRef.current && !isLoading) {
+            // If it already finished loading but didn't hydrate (e.g. no localStorage), mark as hydrated.
+             hasHydratedRef.current = true;
         }
-      } catch (error) {
-        console.error("Error reading state from localStorage:", error);
-      }
+        return;
     }
-    return {...initialGlobalState, _lastActionOriginator: undefined};
-  };
-  
-  const [state, dispatch] = useReducer(gameReducer, undefined, getInitialState);
-  
-  useEffect(() => {
-    setIsLoading(false); // Marcar como cargado después del primer renderizado del estado
-  }, []);
+    hasHydratedRef.current = true;
 
+    // Load from localStorage
+    try {
+      const storedState = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (storedState) {
+        const parsedState = JSON.parse(storedState) as GameState;
+         // Ensure all fields, including new ones, are present from initialGlobalState
+        dispatch({ type: 'HYDRATE_FROM_STORAGE', payload: { ...initialGlobalState, ...parsedState, _lastActionOriginator: undefined } });
+      }
+    } catch (error) {
+      console.error("Error reading state from localStorage for hydration:", error);
+    }
+    setIsLoading(false); // Done with initial loading/hydration attempt
 
-  useEffect(() => {
+    // BroadcastChannel setup
     let channel: BroadcastChannel | null = null;
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+    if ('BroadcastChannel' in window) {
       channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
-      
       const handleMessage = (event: MessageEvent) => {
         if (event.data && event.data._lastActionOriginator && event.data._lastActionOriginator !== TAB_ID) {
           isProcessingBroadcastRef.current = true;
           dispatch({ type: 'SET_STATE_FROM_LOCAL_BROADCAST', payload: event.data });
-          isProcessingBroadcastRef.current = false;
         }
       };
-      
       channel.addEventListener('message', handleMessage);
-      
+
       return () => {
         if (channel) {
           channel.removeEventListener('message', handleMessage);
@@ -368,30 +375,42 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
     } else {
       console.warn('BroadcastChannel API not available. Multi-tab sync will not work.');
     }
-  }, []);
+  }, [isLoading]); // Dependency on isLoading to re-evaluate if it becomes true, though it shouldn't once false.
 
 
   useEffect(() => {
-    if (isProcessingBroadcastRef.current || !state._lastActionOriginator || state._lastActionOriginator !== TAB_ID) {
+    // Prevent saving/broadcasting if state hasn't hydrated yet, or if it's a broadcast processing
+    if (isLoading || isProcessingBroadcastRef.current) {
+      if (isProcessingBroadcastRef.current) {
+          isProcessingBroadcastRef.current = false; // Reset flag after processing the incoming broadcast
+      }
       return;
     }
-    
+
+    // Only save/broadcast if the last action was from THIS tab
+    // This means state._lastActionOriginator is TAB_ID
+    if (state._lastActionOriginator !== TAB_ID) {
+      return;
+    }
+
     if (typeof window !== 'undefined') {
       try {
+        // Don't save _lastActionOriginator to localStorage
         const stateToSave = { ...state };
-        delete stateToSave._lastActionOriginator; 
+        delete stateToSave._lastActionOriginator;
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
 
         if ('BroadcastChannel' in window) {
           const channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
-          channel.postMessage({ ...stateToSave, _lastActionOriginator: TAB_ID }); 
-          channel.close(); 
+          // Send the state WITH _lastActionOriginator for other tabs to identify sender
+          channel.postMessage(state);
+          channel.close();
         }
       } catch (error) {
         console.error("Error saving state to localStorage or broadcasting:", error);
       }
     }
-  }, [state]); 
+  }, [state, isLoading]);
 
   useEffect(() => {
     let timerId: NodeJS.Timeout;
@@ -415,6 +434,8 @@ export const useGameState = () => {
   if (context === undefined) {
     throw new Error('useGameState must be used within a GameStateProvider');
   }
+  // If still loading, could return a modified context or let components decide.
+  // For now, components will get the initial server-safe state until isLoading is false.
   return context;
 };
 
@@ -427,17 +448,16 @@ export const formatTime = (totalSeconds: number): string => {
 
 export const getActualPeriodText = (period: number, override: PeriodDisplayOverrideType): string => {
   if (override === "Time Out") return "TIME OUT";
-  if (override) return override; // For "Break" or "Pre-OT Break"
+  if (override) return override;
   return getPeriodText(period);
 };
 
 export const getPeriodText = (period: number): string => {
     if (period <= 0) return "---";
     if (period <= 3) return `${period}${period === 1 ? 'ST' : period === 2 ? 'ND' : 'RD'}`;
-    if (period === 4) return 'OT'; // Primer OT
-    return `OT${period - 3}`; // Siguientes OTs: OT2, OT3, etc. (ej. period 5 es OT2)
+    if (period === 4) return 'OT';
+    return `OT${period - 3}`;
 };
 
 export const minutesToSeconds = (minutes: number): number => minutes * 60;
 export const secondsToMinutes = (seconds: number): number => Math.floor(seconds / 60);
-    
