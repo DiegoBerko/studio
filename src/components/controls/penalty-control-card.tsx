@@ -34,7 +34,9 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
 
   const handleAddPenalty = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!playerNumber || !penaltyDuration) {
+    const trimmedPlayerNumber = playerNumber.trim();
+
+    if (!trimmedPlayerNumber || !penaltyDuration) {
       toast({ title: "Error", description: "Número de jugador y duración son requeridos.", variant: "destructive" });
       return;
     }
@@ -43,10 +45,10 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
       type: 'ADD_PENALTY',
       payload: {
         team,
-        penalty: { playerNumber, initialDuration: durationSec, remainingTime: durationSec },
+        penalty: { playerNumber: trimmedPlayerNumber, initialDuration: durationSec, remainingTime: durationSec },
       },
     });
-    toast({ title: "Penalidad Agregada", description: `Jugador ${playerNumber} de ${teamName} recibió una penalidad de ${formatTime(durationSec)}.` });
+    toast({ title: "Penalidad Agregada", description: `Jugador ${trimmedPlayerNumber} de ${teamName} recibió una penalidad de ${formatTime(durationSec)}.` });
     setPlayerNumber('');
   };
 
@@ -212,3 +214,4 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     </ControlCardWrapper>
   );
 }
+
