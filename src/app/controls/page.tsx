@@ -12,7 +12,6 @@ import { useToast } from '@/hooks/use-toast';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 
 const CONTROLS_LOCK_KEY = 'icevision-controls-lock-id';
-let pageInstanceId: string | null = null; // Module-level to persist across fast re-renders
 
 export default function ControlsPage() {
   const { state, dispatch } = useGameState();
@@ -25,11 +24,17 @@ export default function ControlsPage() {
 
 
   useEffect(() => {
-    // Initialize instanceIdRef only once
-    if (!instanceIdRef.current) {
-      instanceIdRef.current = crypto.randomUUID();
-    }
+    // Initialize instanceIdRef for this specific mount of the component
+    // This will generate a new ID if the component is re-mounted (e.g., navigating away and back)
+    instanceIdRef.current = crypto.randomUUID();
     const myId = instanceIdRef.current;
+
+    const releaseLock = () => {
+      // Only release the lock if this specific instance (myId) holds it
+      if (localStorage.getItem(CONTROLS_LOCK_KEY) === myId) {
+        localStorage.removeItem(CONTROLS_LOCK_KEY);
+      }
+    };
 
     const checkAndSetLock = () => {
       const lockId = localStorage.getItem(CONTROLS_LOCK_KEY);
@@ -39,7 +44,7 @@ export default function ControlsPage() {
         setIsPrimaryControlsInstance(true);
         setCurrentLockHolderId(myId);
       } else if (lockId === myId) {
-        // We already hold the lock
+        // We already hold the lock (e.g., after a hot reload where this instance was already primary)
         setIsPrimaryControlsInstance(true);
         setCurrentLockHolderId(myId);
       } else {
@@ -51,7 +56,6 @@ export default function ControlsPage() {
 
     checkAndSetLock(); // Initial check
 
-    // Listen for storage changes from other tabs
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === CONTROLS_LOCK_KEY) {
         checkAndSetLock(); // Re-evaluate who holds the lock
@@ -59,25 +63,16 @@ export default function ControlsPage() {
     };
     window.addEventListener('storage', handleStorageChange);
 
-    // Attempt to release lock on unload IF this instance holds it
-    const handleBeforeUnload = () => {
-      if (localStorage.getItem(CONTROLS_LOCK_KEY) === myId) {
-        localStorage.removeItem(CONTROLS_LOCK_KEY);
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    // `beforeunload` is for tab/browser close events
+    window.addEventListener('beforeunload', releaseLock);
 
+    // Cleanup function for when the component unmounts (e.g., navigating to another page in the app)
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Conditional release: only if this tab still thinks it's the primary.
-      // This helps prevent a tab that lost the lock from clearing it.
-      if (localStorage.getItem(CONTROLS_LOCK_KEY) === myId) {
-         // Consider if a short delay before removing might be safer in some race conditions,
-         // but for now, direct removal is fine.
-      }
+      window.removeEventListener('beforeunload', releaseLock);
+      releaseLock(); // Attempt to release the lock when navigating away from this page.
     };
-  }, []); // Empty dependency array ensures this runs once on mount and unmount.
+  }, []); // Empty dependency array ensures this runs once on mount and cleans up on unmount.
 
   const handleResetGame = () => {
     dispatch({ type: 'RESET_GAME_STATE' });
@@ -104,10 +99,10 @@ export default function ControlsPage() {
         <AlertTriangle className="h-16 w-16 text-destructive mb-6" />
         <h1 className="text-2xl font-bold text-destructive-foreground mb-3">Múltiples Pestañas de Controles</h1>
         <p className="text-lg text-card-foreground mb-2">
-          Ya existe otra pestaña de Controles activa.
+          Ya existe otra pestaña o instancia de Controles activa.
         </p>
         <p className="text-card-foreground mb-6">
-          Para evitar problemas de sincronización y asegurar un correcto funcionamiento, por favor cierra esta pestaña o la otra instancia de Controles.
+          Para evitar problemas de sincronización y asegurar un correcto funcionamiento, por favor cierra esta pestaña o la otra instancia de Controles. Solo una pestaña de Controles puede estar activa a la vez.
         </p>
         <Button variant="outline" onClick={() => window.close()}>Cerrar esta Pestaña</Button>
         <p className="text-xs text-muted-foreground mt-6">
