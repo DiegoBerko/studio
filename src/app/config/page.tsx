@@ -19,7 +19,7 @@ export default function ConfigPage() {
   const penaltySettingsRef = useRef<PenaltySettingsCardRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [localConfigName, setLocalConfigName] = useState(state.configName);
+  const [localConfigName, setLocalConfigName] = useState(state.configName || '');
   const [isConfigNameDirty, setIsConfigNameDirty] = useState(false);
   const [isDurationDirty, setIsDurationDirty] = useState(false);
   const [isPenaltyDirty, setIsPenaltyDirty] = useState(false);
@@ -28,7 +28,7 @@ export default function ConfigPage() {
 
   useEffect(() => {
     if (!isConfigNameDirty) {
-      setLocalConfigName(state.configName);
+      setLocalConfigName(state.configName || '');
     }
   }, [state.configName, isConfigNameDirty]);
 
@@ -77,7 +77,7 @@ export default function ConfigPage() {
 
   const handleDiscardAll = () => {
     if (isConfigNameDirty) {
-      setLocalConfigName(state.configName);
+      setLocalConfigName(state.configName || '');
       setIsConfigNameDirty(false);
     }
     if (durationSettingsRef.current?.getIsDirty()) {
@@ -165,12 +165,12 @@ export default function ConfigPage() {
         // Reset dirty states of child cards as their values are now directly from the new config
         durationSettingsRef.current?.handleDiscard(); // This will reset its local state to new global state
         penaltySettingsRef.current?.handleDiscard(); // This will reset its local state to new global state
-        setLocalConfigName(newConfigFromFile.configName!); // Update local config name directly
+        setLocalConfigName((newConfigFromFile.configName || '')); // Update local config name directly and ensure string
         setIsConfigNameDirty(false); // Config name is now "clean" as it matches new global state
 
         toast({
           title: "Configuración Importada",
-          description: `Configuración "${newConfigFromFile.configName}" cargada exitosamente.`,
+          description: `Configuración "${newConfigFromFile.configName || ''}" cargada exitosamente.`,
         });
       } catch (error) {
         console.error("Error importing config:", error);
@@ -192,7 +192,7 @@ export default function ConfigPage() {
   useEffect(() => {
     // This effect handles updates to localConfigName when state.configName changes due to import or other external factors
     if (!isConfigNameDirty) { // Only update if not dirty, to preserve user input
-        setLocalConfigName(state.configName);
+        setLocalConfigName(state.configName || ''); // Ensures string
     }
     // Also, ensure child cards are synced if their base values change externally (e.g., from import)
     // This might involve triggering a 'reset' or 'sync' method on them if available, or relying on their internal useEffects
@@ -269,3 +269,4 @@ export default function ConfigPage() {
     </div>
   );
 }
+
