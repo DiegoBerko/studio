@@ -13,7 +13,7 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
   const { state } = useGameState();
 
   return (
-    <div className={cn("text-center flex-grow", className)}>
+    <div className={cn("text-center", className)}>
       <div className="text-7xl md:text-9xl font-bold font-headline text-accent tabular-nums tracking-tighter">
         {formatTime(state.currentTime)}
       </div>

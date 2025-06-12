@@ -11,19 +11,17 @@ export function CompactHeaderScoreboard() {
 
   return (
     <Card className="bg-card shadow-xl">
-      <CardContent className="p-4 md:p-6 flex justify-between items-center">
+      <CardContent className="p-4 md:p-6 grid grid-cols-[auto_1fr_auto] items-center gap-x-2 md:gap-x-4">
         <TeamScoreDisplay 
           teamActualName={state.homeTeamName} 
           teamDisplayName="Local" 
           score={state.homeScore}
-          className="w-[30%] md:w-[35%]" 
         />
-        <ClockDisplay className="w-[40%] md:w-[30%]" />
+        <ClockDisplay />
         <TeamScoreDisplay 
           teamActualName={state.awayTeamName} 
           teamDisplayName="Visitante" 
           score={state.awayScore} 
-          className="w-[30%] md:w-[35%]"
         />
       </CardContent>
     </Card>

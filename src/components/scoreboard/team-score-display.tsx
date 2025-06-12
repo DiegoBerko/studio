@@ -25,7 +25,7 @@ export function TeamScoreDisplay({ teamActualName, teamDisplayName, score, class
   }, [score, prevScore]);
   
   return (
-    <div className={cn("flex flex-col items-center text-center w-[30%] md:w-[25%]", className)}>
+    <div className={cn("flex flex-col items-center text-center", className)}>
       <h2 className="text-xl md:text-3xl font-bold text-foreground uppercase tracking-wide truncate w-full px-1">{teamActualName}</h2>
       <p className="text-xs md:text-sm text-muted-foreground -mt-0.5 md:-mt-1 mb-1 md:mb-1.5">({teamDisplayName})</p>
       <div 
