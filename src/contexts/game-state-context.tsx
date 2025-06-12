@@ -123,10 +123,10 @@ export type GameAction =
 const initialGlobalState: GameState = {
   homeScore: 0,
   awayScore: 0,
-  currentPeriod: 0, // Start with Warm-up
+  currentPeriod: 0, 
   currentTime: INITIAL_WARM_UP_DURATION,
-  isClockRunning: false, // Initial state from hydration will set this based on autoStartWarmUp
-  periodDisplayOverride: 'Warm-up', // Display "Warm-up" initially
+  isClockRunning: false, 
+  periodDisplayOverride: 'Warm-up', 
   homePenalties: [],
   awayPenalties: [],
   homeTeamName: 'Local',
@@ -159,6 +159,127 @@ const GameStateContext = createContext<{
 } | undefined>(undefined);
 
 
+// Helper function for automatic transitions, placed outside the reducer
+const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastActionOriginator' | '_lastUpdatedTimestamp'> => {
+  const {
+    currentPeriod,
+    periodDisplayOverride,
+    numberOfRegularPeriods,
+    numberOfOvertimePeriods,
+    defaultPeriodDuration,
+    defaultOTPeriodDuration,
+    defaultBreakDuration,
+    defaultPreOTBreakDuration,
+    autoStartBreaks,
+    autoStartPreOTBreaks,
+    preTimeoutState,
+    homePenalties, 
+    awayPenalties, 
+  } = currentState;
+
+  let newPartialState: Partial<GameState> = {};
+  const numRegPeriods = numberOfRegularPeriods;
+  const totalGamePeriods = numRegPeriods + numberOfOvertimePeriods;
+
+  if (periodDisplayOverride === 'Warm-up') {
+    newPartialState = {
+      currentPeriod: 1,
+      currentTime: defaultPeriodDuration,
+      isClockRunning: false, // Periods start paused
+      periodDisplayOverride: null,
+    };
+  } else if (periodDisplayOverride === 'Break') {
+    const nextPeriod = currentPeriod + 1;
+    const nextPeriodDuration = nextPeriod > numRegPeriods ? defaultOTPeriodDuration : defaultPeriodDuration;
+    newPartialState = {
+      currentPeriod: nextPeriod,
+      currentTime: nextPeriodDuration,
+      isClockRunning: false, // Periods start paused
+      periodDisplayOverride: null,
+    };
+  } else if (periodDisplayOverride === 'Pre-OT Break') {
+    const nextPeriod = currentPeriod + 1;
+    newPartialState = {
+      currentPeriod: nextPeriod,
+      currentTime: defaultOTPeriodDuration, // Assumes Pre-OT break always leads to OT
+      isClockRunning: false, // Periods start paused
+      periodDisplayOverride: null,
+    };
+  } else if (periodDisplayOverride === 'Time Out') {
+    if (preTimeoutState) {
+      const { period, time, isClockRunning: preTimeoutIsRunning, override: preTimeoutOverride } = preTimeoutState;
+      const shouldResumeClock = preTimeoutIsRunning && time > 0;
+      newPartialState = {
+        currentPeriod: period,
+        currentTime: time,
+        isClockRunning: shouldResumeClock,
+        periodDisplayOverride: preTimeoutOverride,
+        clockStartTimeMs: shouldResumeClock ? Date.now() : null,
+        remainingTimeAtStartSec: shouldResumeClock ? time : null,
+        preTimeoutState: null,
+      };
+    } else {
+      // Fallback if preTimeoutState is missing (should ideally not happen)
+      // Keep current period, just stop clock
+      newPartialState = { currentTime: 0, isClockRunning: false, periodDisplayOverride: currentState.periodDisplayOverride };
+    }
+  } else if (periodDisplayOverride === null) { // Game Period Ended
+    if (currentPeriod < numRegPeriods) {
+      // End of a regular period, not the last one -> Go to Break
+      newPartialState = {
+        // currentPeriod remains the same (break is for this period that just ended)
+        currentTime: defaultBreakDuration,
+        isClockRunning: autoStartBreaks && defaultBreakDuration > 0,
+        periodDisplayOverride: 'Break',
+        clockStartTimeMs: (autoStartBreaks && defaultBreakDuration > 0) ? Date.now() : null,
+        remainingTimeAtStartSec: (autoStartBreaks && defaultBreakDuration > 0) ? defaultBreakDuration : null,
+      };
+    } else if (currentPeriod === numRegPeriods && numberOfOvertimePeriods > 0) {
+      // End of last regular period, OT exists -> Go to Pre-OT Break
+      newPartialState = {
+        // currentPeriod remains the same
+        currentTime: defaultPreOTBreakDuration,
+        isClockRunning: autoStartPreOTBreaks && defaultPreOTBreakDuration > 0,
+        periodDisplayOverride: 'Pre-OT Break',
+        clockStartTimeMs: (autoStartPreOTBreaks && defaultPreOTBreakDuration > 0) ? Date.now() : null,
+        remainingTimeAtStartSec: (autoStartPreOTBreaks && defaultPreOTBreakDuration > 0) ? defaultPreOTBreakDuration : null,
+      };
+    } else if (currentPeriod > numRegPeriods && currentPeriod < totalGamePeriods) {
+      // End of an OT period, but not the last OT period -> Go to Pre-OT Break (between OTs)
+      newPartialState = {
+        // currentPeriod remains the same
+        currentTime: defaultPreOTBreakDuration,
+        isClockRunning: autoStartPreOTBreaks && defaultPreOTBreakDuration > 0,
+        periodDisplayOverride: 'Pre-OT Break',
+        clockStartTimeMs: (autoStartPreOTBreaks && defaultPreOTBreakDuration > 0) ? Date.now() : null,
+        remainingTimeAtStartSec: (autoStartPreOTBreaks && defaultPreOTBreakDuration > 0) ? defaultPreOTBreakDuration : null,
+      };
+    } else {
+      // End of Game (last regular period with no OT, or last OT period)
+      newPartialState = { currentTime: 0, isClockRunning: false };
+    }
+  } else {
+     // Fallback for any unhandled override type when countdown finishes
+    newPartialState = { currentTime: 0, isClockRunning: false };
+  }
+
+  // Ensure clockStartTimeMs and remainingTimeAtStartSec are null if clock is not running in the new state
+  if (!newPartialState.isClockRunning) {
+    newPartialState.clockStartTimeMs = null;
+    newPartialState.remainingTimeAtStartSec = null;
+  }
+
+  // Combine with the base state that had currentTime = 0 and clock stopped
+  // and carry over updated penalties
+  return {
+    ...currentState, // Spreads all properties of currentState
+    ...newPartialState, // Overrides specific properties based on transition logic
+    homePenalties, 
+    awayPenalties,
+  };
+};
+
+
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   let newStateWithoutMeta: Omit<GameState, '_lastActionOriginator' | '_lastUpdatedTimestamp'>;
   let newTimestamp = Date.now();
@@ -178,46 +299,37 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       hydratedBase.homePenalties = cleanPenaltiesOnHydrate(action.payload?.homePenalties);
       hydratedBase.awayPenalties = cleanPenaltiesOnHydrate(action.payload?.awayPenalties);
 
-      // Determine correct initial time based on hydrated period
       let initialHydratedTime: number;
       const hydratedPeriod = hydratedBase.currentPeriod ?? initialGlobalState.currentPeriod;
-      if (hydratedPeriod === 0) { // Warm-up
+      
+      if (hydratedBase.periodDisplayOverride === 'Warm-up' || (hydratedPeriod === 0 && hydratedBase.periodDisplayOverride === null) ) {
         initialHydratedTime = hydratedBase.defaultWarmUpDuration ?? initialGlobalState.defaultWarmUpDuration;
-        hydratedBase.periodDisplayOverride = 'Warm-up'; // Ensure override is set for warm-up
-        hydratedBase.isClockRunning = (hydratedBase.autoStartWarmUp ?? initialGlobalState.autoStartWarmUp) && initialHydratedTime > 0;
+        hydratedBase.periodDisplayOverride = 'Warm-up';
+      } else if (hydratedBase.periodDisplayOverride === 'Break') {
+        initialHydratedTime = hydratedBase.defaultBreakDuration ?? initialGlobalState.defaultBreakDuration;
+      } else if (hydratedBase.periodDisplayOverride === 'Pre-OT Break') {
+         initialHydratedTime = hydratedBase.defaultPreOTBreakDuration ?? initialGlobalState.defaultPreOTBreakDuration;
+      } else if (hydratedBase.periodDisplayOverride === 'Time Out') {
+         initialHydratedTime = hydratedBase.defaultTimeoutDuration ?? initialGlobalState.defaultTimeoutDuration;
+         // For timeout, we might also need to restore preTimeoutState, but HYDRATE should simplify.
+         // Let's assume timeout ends and hydration restores to the period it was in.
+         // If hydration happens *during* a timeout, preTimeoutState should be hydrated too.
       } else if (hydratedPeriod > (hydratedBase.numberOfRegularPeriods ?? initialGlobalState.numberOfRegularPeriods)) { // OT Period
         initialHydratedTime = hydratedBase.defaultOTPeriodDuration ?? initialGlobalState.defaultOTPeriodDuration;
-        hydratedBase.periodDisplayOverride = null; // No override for normal periods
+        hydratedBase.periodDisplayOverride = null; 
       } else { // Regular Period
         initialHydratedTime = hydratedBase.defaultPeriodDuration ?? initialGlobalState.defaultPeriodDuration;
         hydratedBase.periodDisplayOverride = null;
       }
       
-      if (hydratedBase.periodDisplayOverride === 'Break') {
-        initialHydratedTime = hydratedBase.defaultBreakDuration ?? initialGlobalState.defaultBreakDuration;
-        hydratedBase.isClockRunning = (hydratedBase.autoStartBreaks ?? initialGlobalState.autoStartBreaks) && initialHydratedTime > 0;
-      } else if (hydratedBase.periodDisplayOverride === 'Pre-OT Break') {
-         initialHydratedTime = hydratedBase.defaultPreOTBreakDuration ?? initialGlobalState.defaultPreOTBreakDuration;
-         hydratedBase.isClockRunning = (hydratedBase.autoStartPreOTBreaks ?? initialGlobalState.autoStartPreOTBreaks) && initialHydratedTime > 0;
-      } else if (hydratedBase.periodDisplayOverride === 'Time Out') {
-         initialHydratedTime = hydratedBase.defaultTimeoutDuration ?? initialGlobalState.defaultTimeoutDuration;
-         hydratedBase.isClockRunning = (hydratedBase.autoStartTimeouts ?? initialGlobalState.autoStartTimeouts) && initialHydratedTime > 0;
-      }
-
-
+      // Validate currentTime from storage, or set to determined initialHydratedTime
       if (action.payload?.currentTime === undefined || action.payload.currentTime === null || action.payload.currentTime < 0 || action.payload.currentTime > initialHydratedTime ) {
           hydratedBase.currentTime = initialHydratedTime;
       } else {
           hydratedBase.currentTime = action.payload.currentTime;
       }
-      
-      if (hydratedBase.isClockRunning && hydratedBase.currentTime > 0) {
-        hydratedBase.clockStartTimeMs = Date.now();
-        hydratedBase.remainingTimeAtStartSec = hydratedBase.currentTime;
-      } else {
-        hydratedBase.isClockRunning = false; // Ensure clock is off if time is zero or not auto-starting
-        hydratedBase.clockStartTimeMs = null;
-        hydratedBase.remainingTimeAtStartSec = null;
+      if(hydratedBase.currentTime <=0) {
+        hydratedBase.isClockRunning = false;
       }
       
       const { _lastActionOriginator, _lastUpdatedTimestamp, ...restOfHydrated } = hydratedBase;
@@ -259,7 +371,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           newIsClockRunning = true;
           newClockStartTimeMs = Date.now();
           newRemainingTimeAtStartSec = state.currentTime;
-        } else { // Cannot start if time is 0
+        } else { 
           newIsClockRunning = false;
           newClockStartTimeMs = null;
           newRemainingTimeAtStartSec = null;
@@ -276,7 +388,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
     case 'SET_TIME': {
       const newTime = Math.max(0, action.payload.minutes * 60 + action.payload.seconds);
-      const newIsClockRunning = newTime > 0 ? state.isClockRunning : false;
+      const newIsClockRunning = newTime > 0 ? state.isClockRunning : false; // Keep running state if time set > 0, otherwise stop.
       newStateWithoutMeta = { 
         ...state, 
         currentTime: newTime,
@@ -284,28 +396,28 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         clockStartTimeMs: newIsClockRunning ? Date.now() : null,
         remainingTimeAtStartSec: newIsClockRunning ? newTime : null,
        };
-      if (!newIsClockRunning) {
+      if (!newIsClockRunning) { // Ensure these are null if clock is stopped
         newStateWithoutMeta.clockStartTimeMs = null;
         newStateWithoutMeta.remainingTimeAtStartSec = null;
       }
       break;
     }
     case 'ADJUST_TIME': {
-      let newTime = state.currentTime;
+      let currentTimeSnapshot = state.currentTime;
       if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartSec !== null) {
         const elapsedMs = Date.now() - state.clockStartTimeMs;
         const elapsedSec = Math.floor(elapsedMs / 1000);
-        newTime = Math.max(0, state.remainingTimeAtStartSec - elapsedSec);
+        currentTimeSnapshot = Math.max(0, state.remainingTimeAtStartSec - elapsedSec);
       }
-      newTime = Math.max(0, newTime + action.payload);
+      const newAdjustedTime = Math.max(0, currentTimeSnapshot + action.payload);
       
-      const newIsClockRunning = newTime > 0 ? state.isClockRunning : false;
+      const newIsClockRunning = newAdjustedTime > 0 ? state.isClockRunning : false;
       newStateWithoutMeta = { 
         ...state, 
-        currentTime: newTime,
+        currentTime: newAdjustedTime,
         isClockRunning: newIsClockRunning,
-        clockStartTimeMs: newIsClockRunning ? Date.now() : null, // Recalculate start if clock is running
-        remainingTimeAtStartSec: newIsClockRunning ? newTime : null,
+        clockStartTimeMs: newIsClockRunning ? Date.now() : null, 
+        remainingTimeAtStartSec: newIsClockRunning ? newAdjustedTime : null,
       };
        if (!newIsClockRunning) {
         newStateWithoutMeta.clockStartTimeMs = null;
@@ -314,23 +426,23 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     case 'SET_PERIOD': {
-      const newPeriod = Math.max(0, action.payload); // Period 0 is Warm-up
+      const newPeriod = Math.max(0, action.payload); 
       let periodDuration: number;
       let displayOverride: PeriodDisplayOverrideType;
       let autoStartClock: boolean;
 
-      if (newPeriod === 0) { // Warm-up
+      if (newPeriod === 0) { 
         periodDuration = state.defaultWarmUpDuration;
         displayOverride = 'Warm-up';
         autoStartClock = state.autoStartWarmUp && periodDuration > 0;
-      } else if (newPeriod > state.numberOfRegularPeriods) { // OT Period
+      } else if (newPeriod > state.numberOfRegularPeriods) { 
         periodDuration = state.defaultOTPeriodDuration;
         displayOverride = null;
-        autoStartClock = false; // OT periods usually start paused
-      } else { // Regular Period
+        autoStartClock = false; 
+      } else { 
         periodDuration = state.defaultPeriodDuration;
         displayOverride = null;
-        autoStartClock = false; // Regular periods start paused
+        autoStartClock = false; 
       }
 
       newStateWithoutMeta = {
@@ -362,10 +474,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         autoStart = state.autoStartTimeouts && newTime > 0;
       } else if (state.currentPeriod > state.numberOfRegularPeriods) { // OT
         newTime = state.defaultOTPeriodDuration;
-        // autoStart typically false for periods
       } else { // Regular Period
         newTime = state.defaultPeriodDuration;
-        // autoStart typically false for periods
       }
       newStateWithoutMeta = {
         ...state,
@@ -424,33 +534,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'TICK': {
       let newCurrentTime = state.currentTime;
       let newIsClockRunning = state.isClockRunning;
-      let newClockStartTimeMs = state.clockStartTimeMs;
-      let newRemainingTimeAtStartSec = state.remainingTimeAtStartSec;
-
-      if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartSec !== null) {
-        const elapsedMs = Date.now() - state.clockStartTimeMs;
-        const elapsedSec = Math.floor(elapsedMs / 1000);
-        const calculatedTime = state.remainingTimeAtStartSec - elapsedSec;
-
-        if (calculatedTime <= 0) {
-          newCurrentTime = 0;
-          newIsClockRunning = false;
-          newClockStartTimeMs = null;
-          newRemainingTimeAtStartSec = null;
-        } else {
-          newCurrentTime = calculatedTime;
-        }
-      } else if (state.isClockRunning && state.currentTime <= 0) {
-        newIsClockRunning = false;
-        newClockStartTimeMs = null;
-        newRemainingTimeAtStartSec = null;
-      }
 
       let homePenaltiesResult = state.homePenalties;
       let awayPenaltiesResult = state.awayPenalties;
 
-      // Penalties only tick if game clock is running, it's not a break/timeout/warmup, and time is positive
-      if (state.isClockRunning && state.periodDisplayOverride === null && newCurrentTime > 0 && state.currentPeriod > 0) {
+      // Penalties tick if game clock *was* running for a game period and had time
+      if (state.isClockRunning && state.periodDisplayOverride === null && state.currentPeriod > 0 && state.currentTime > 0) {
         const updatePenaltiesForTick = (penalties: Penalty[], maxConcurrent: number): Penalty[] => {
           const resultPenalties: Penalty[] = [];
           const activePlayerTickets: Set<string> = new Set();
@@ -486,15 +575,51 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         awayPenaltiesResult = updatePenaltiesForTick(state.awayPenalties, state.maxConcurrentPenalties);
       }
 
-      newStateWithoutMeta = {
-        ...state,
-        currentTime: newCurrentTime,
-        isClockRunning: newIsClockRunning,
-        clockStartTimeMs: newClockStartTimeMs,
-        remainingTimeAtStartSec: newRemainingTimeAtStartSec,
-        homePenalties: homePenaltiesResult,
-        awayPenalties: awayPenaltiesResult,
-      };
+      if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartSec !== null) {
+        const elapsedMs = Date.now() - state.clockStartTimeMs;
+        const elapsedSec = Math.floor(elapsedMs / 1000);
+        const calculatedTime = state.remainingTimeAtStartSec - elapsedSec;
+
+        if (calculatedTime <= 0) {
+          // Countdown finished!
+          const baseStateForTransition = {
+            ...state,
+            currentTime: 0, // Explicitly set to 0 before transition
+            isClockRunning: false,
+            clockStartTimeMs: null,
+            remainingTimeAtStartSec: null,
+            homePenalties: homePenaltiesResult, 
+            awayPenalties: awayPenaltiesResult,
+          };
+          newStateWithoutMeta = handleAutoTransition(baseStateForTransition);
+        } else { // Clock is still running, time > 0
+          newCurrentTime = calculatedTime;
+           newStateWithoutMeta = {
+            ...state,
+            currentTime: newCurrentTime,
+            // isClockRunning, clockStartTimeMs, remainingTimeAtStartSec remain from state
+            homePenalties: homePenaltiesResult,
+            awayPenalties: awayPenaltiesResult,
+          };
+        }
+      } else if (state.isClockRunning && state.currentTime <= 0) { 
+        // Clock was running but time was already 0 (e.g. manually set to 0 then TICK)
+        // Or, clock was running, but clockStartTimeMs/remainingTimeAtStartSec was null
+        newStateWithoutMeta = { 
+            ...state,
+            isClockRunning: false, // Ensure clock is stopped
+            clockStartTimeMs: null,
+            remainingTimeAtStartSec: null,
+            homePenalties: homePenaltiesResult,
+            awayPenalties: awayPenaltiesResult,
+          };
+      } else { // Clock was not running.
+          newStateWithoutMeta = {
+            ...state, 
+            homePenalties: homePenaltiesResult, // Still update penalties if they were changed (e.g. manually)
+            awayPenalties: awayPenaltiesResult,
+          };
+      }
       break;
     }
     case 'SET_HOME_TEAM_NAME':
@@ -503,56 +628,46 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_AWAY_TEAM_NAME':
       newStateWithoutMeta = { ...state, awayTeamName: action.payload || 'Visitante' };
       break;
-    case 'START_BREAK':
+    case 'START_BREAK': {
+      const autoStart = state.autoStartBreaks && state.defaultBreakDuration > 0;
       newStateWithoutMeta = {
         ...state,
         currentTime: state.defaultBreakDuration,
         periodDisplayOverride: 'Break',
-        isClockRunning: state.autoStartBreaks && state.defaultBreakDuration > 0,
+        isClockRunning: autoStart,
         preTimeoutState: null,
-        clockStartTimeMs: state.autoStartBreaks && state.defaultBreakDuration > 0 ? Date.now() : null,
-        remainingTimeAtStartSec: state.autoStartBreaks && state.defaultBreakDuration > 0 ? state.defaultBreakDuration : null,
+        clockStartTimeMs: autoStart ? Date.now() : null,
+        remainingTimeAtStartSec: autoStart ? state.defaultBreakDuration : null,
       };
       break;
-    case 'START_PRE_OT_BREAK':
+    }
+    case 'START_PRE_OT_BREAK': {
+      const autoStart = state.autoStartPreOTBreaks && state.defaultPreOTBreakDuration > 0;
       newStateWithoutMeta = {
         ...state,
         currentTime: state.defaultPreOTBreakDuration,
         periodDisplayOverride: 'Pre-OT Break',
-        isClockRunning: state.autoStartPreOTBreaks && state.defaultPreOTBreakDuration > 0,
+        isClockRunning: autoStart,
         preTimeoutState: null,
-        clockStartTimeMs: state.autoStartPreOTBreaks && state.defaultPreOTBreakDuration > 0 ? Date.now() : null,
-        remainingTimeAtStartSec: state.autoStartPreOTBreaks && state.defaultPreOTBreakDuration > 0 ? state.defaultPreOTBreakDuration : null,
+        clockStartTimeMs: autoStart ? Date.now() : null,
+        remainingTimeAtStartSec: autoStart ? state.defaultPreOTBreakDuration : null,
       };
       break;
+    }
     case 'START_BREAK_AFTER_PREVIOUS_PERIOD': {
-      // This action logic seems to be intended to go to the break *before* the current period if current is Period X, or if current is Break, go to Period X.
-      // Given the Warm-up addition, let's clarify its intent.
-      // Assuming it means "go to the break that *would have followed* the period numerically before the current game period"
-      // Or if in a break, go back to the game period of that break.
-      // This logic needs to be careful with Warm-up (period 0).
-      // For now, let's assume it's about initiating a break based on the period *before* the one displayed, used by "Previous Period" button when in a game period.
-      
-      if (state.currentPeriod <= 0 && state.periodDisplayOverride !== 'Break' && state.periodDisplayOverride !== 'Pre-OT Break') { // Cannot go to break before warm-up
+      if (state.currentPeriod <= 0 && state.periodDisplayOverride !== 'Break' && state.periodDisplayOverride !== 'Pre-OT Break') { 
           newStateWithoutMeta = state; break; 
       }
 
       const periodBeforeBreak = (state.periodDisplayOverride === 'Break' || state.periodDisplayOverride === 'Pre-OT Break') 
-                                ? state.currentPeriod // If already in a break, use currentPeriod
-                                : state.currentPeriod -1; // If in a game period, use period before
+                                ? state.currentPeriod 
+                                : state.currentPeriod -1; 
 
-      if (periodBeforeBreak < 1 && periodBeforeBreak !== 0) { // Should not happen if guard above works
+      if (periodBeforeBreak < 1 && periodBeforeBreak !== 0) { 
           newStateWithoutMeta = state; break;
       }
       
-      // Warm-up (0) doesn't have a "break after previous", it is the start.
-      // If periodBeforeBreak is 0 (meaning currentPeriod was 1), there's no break *before* period 1 this way.
-      // This action is likely for periods > 1 moving to their preceding break.
-      // Let's assume this action is for moving from Period N to Break N-1.
-      // If currentPeriod is 1, this shouldn't trigger a break. Transition to Warm-up is handled by SET_PERIOD(0).
-
-      if (periodBeforeBreak === 0) { // Trying to go to break before Period 1 (i.e., after Warm-up)
-        // This doesn't make sense as a "break". Player should use "Set Period" to go to Warm-up (0) or Period 1.
+      if (periodBeforeBreak === 0) { 
         newStateWithoutMeta = state; break;
       }
 
@@ -562,7 +677,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       newStateWithoutMeta = {
         ...state,
-        currentPeriod: periodBeforeBreak, // Associate break with the period it follows
+        currentPeriod: periodBeforeBreak, 
         currentTime: breakDuration,
         periodDisplayOverride: isPreOT ? 'Pre-OT Break' : 'Break',
         isClockRunning: autoStart && breakDuration > 0,
@@ -572,62 +687,53 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
       break;
     }
-    case 'START_TIMEOUT':
-      if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartSec !== null) { // If clock is running, capture its precise state
+    case 'START_TIMEOUT': {
+      let preciseCurrentTime = state.currentTime;
+      let preTimeoutIsRunning = state.isClockRunning;
+      let preTimeoutClockStart = state.clockStartTimeMs;
+      let preTimeoutRemaining = state.remainingTimeAtStartSec;
+
+      if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartSec !== null) { 
         const elapsedMs = Date.now() - state.clockStartTimeMs;
         const elapsedSec = Math.floor(elapsedMs / 1000);
-        const preciseCurrentTime = Math.max(0, state.remainingTimeAtStartSec - elapsedSec);
-        
-        newStateWithoutMeta = {
-          ...state,
-          preTimeoutState: {
-            period: state.currentPeriod,
-            time: preciseCurrentTime,
-            isClockRunning: state.isClockRunning,
-            override: state.periodDisplayOverride,
-            clockStartTimeMs: state.clockStartTimeMs, 
-            remainingTimeAtStartSec: state.remainingTimeAtStartSec,
-          },
-          currentTime: state.defaultTimeoutDuration,
-          periodDisplayOverride: 'Time Out',
-          isClockRunning: state.autoStartTimeouts && state.defaultTimeoutDuration > 0,
-          clockStartTimeMs: state.autoStartTimeouts && state.defaultTimeoutDuration > 0 ? Date.now() : null,
-          remainingTimeAtStartSec: state.autoStartTimeouts && state.defaultTimeoutDuration > 0 ? state.defaultTimeoutDuration : null,
-        };
-      } else { // Clock was paused or not properly set up
-         newStateWithoutMeta = {
-          ...state,
-          preTimeoutState: {
-            period: state.currentPeriod,
-            time: state.currentTime, // Use current time as is
-            isClockRunning: false, // Assume false if clock was not running
-            override: state.periodDisplayOverride,
-            clockStartTimeMs: null, 
-            remainingTimeAtStartSec: null,
-          },
-          currentTime: state.defaultTimeoutDuration,
-          periodDisplayOverride: 'Time Out',
-          isClockRunning: state.autoStartTimeouts && state.defaultTimeoutDuration > 0,
-          clockStartTimeMs: state.autoStartTimeouts && state.defaultTimeoutDuration > 0 ? Date.now() : null,
-          remainingTimeAtStartSec: state.autoStartTimeouts && state.defaultTimeoutDuration > 0 ? state.defaultTimeoutDuration : null,
-        };
+        preciseCurrentTime = Math.max(0, state.remainingTimeAtStartSec - elapsedSec);
       }
+      
+      const autoStart = state.autoStartTimeouts && state.defaultTimeoutDuration > 0;
+      newStateWithoutMeta = {
+        ...state,
+        preTimeoutState: {
+          period: state.currentPeriod,
+          time: preciseCurrentTime,
+          isClockRunning: preTimeoutIsRunning,
+          override: state.periodDisplayOverride,
+          clockStartTimeMs: preTimeoutClockStart, 
+          remainingTimeAtStartSec: preTimeoutRemaining,
+        },
+        currentTime: state.defaultTimeoutDuration,
+        periodDisplayOverride: 'Time Out',
+        isClockRunning: autoStart,
+        clockStartTimeMs: autoStart ? Date.now() : null,
+        remainingTimeAtStartSec: autoStart ? state.defaultTimeoutDuration : null,
+      };
       break;
+    }
     case 'END_TIMEOUT':
       if (state.preTimeoutState) {
-        const shouldResumeClock = state.preTimeoutState.isClockRunning && state.preTimeoutState.time > 0;
+        const { period, time, isClockRunning: preTimeoutIsRunning, override: preTimeoutOverride, clockStartTimeMs: preTimeoutClockStart, remainingTimeAtStartSec: preTimeoutRemaining } = state.preTimeoutState;
+        const shouldResumeClock = preTimeoutIsRunning && time > 0;
         newStateWithoutMeta = {
           ...state,
-          currentPeriod: state.preTimeoutState.period,
-          currentTime: state.preTimeoutState.time,
+          currentPeriod: period,
+          currentTime: time,
           isClockRunning: shouldResumeClock,
-          periodDisplayOverride: state.preTimeoutState.override,
-          clockStartTimeMs: shouldResumeClock ? Date.now() : null,
-          remainingTimeAtStartSec: shouldResumeClock ? state.preTimeoutState.time : null,
+          periodDisplayOverride: preTimeoutOverride,
+          clockStartTimeMs: shouldResumeClock ? Date.now() : null, // Recalculate actual start if resuming
+          remainingTimeAtStartSec: shouldResumeClock ? time : null,
           preTimeoutState: null,
         };
       } else {
-        newStateWithoutMeta = state;
+        newStateWithoutMeta = state; // Should not happen if timeout was started correctly
       }
       break;
     case 'SET_CONFIG_NAME':
@@ -700,10 +806,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const autoStart = state.autoStartWarmUp ?? initialsToKeepConfig.autoStartWarmUp;
 
       newStateWithoutMeta = {
-        ...state, // Keep current config values (durations, autoStart settings etc.)
+        ...state, 
         homeScore: initialsToKeepConfig.homeScore,
         awayScore: initialsToKeepConfig.awayScore,
-        currentPeriod: 0, // Reset to Warm-up
+        currentPeriod: 0, 
         currentTime: initialClockTime,
         isClockRunning: autoStart && initialClockTime > 0, 
         homePenalties: initialsToKeepConfig.homePenalties,
@@ -727,7 +833,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
   if (nonOriginatingActionTypes.includes(action.type)) {
     return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: (newStateWithoutMeta as GameState)._lastUpdatedTimestamp };
   } else if (action.type === 'TICK' && !state.isClockRunning && !newStateWithoutMeta.isClockRunning) {
-    return { ...newStateWithoutMeta, _lastActionOriginator: state._lastActionOriginator, _lastUpdatedTimestamp: state._lastUpdatedTimestamp };
+    // If TICK was called but clock wasn't running and still isn't, don't update originator/timestamp
+    // unless the TICK action *itself* caused a state change (e.g. auto-transition from 0)
+    // The auto-transition logic within TICK should result in newStateWithoutMeta being different from state.
+    if (JSON.stringify(state) === JSON.stringify(newStateWithoutMeta)) { // Simple check for no actual state change
+        return { ...newStateWithoutMeta, _lastActionOriginator: state._lastActionOriginator, _lastUpdatedTimestamp: state._lastUpdatedTimestamp };
+    }
   }
   
   return { ...newStateWithoutMeta, _lastActionOriginator: TAB_ID, _lastUpdatedTimestamp: newTimestamp };
@@ -797,6 +908,8 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       return () => {
         if (channelRef.current) {
           channelRef.current.removeEventListener('message', handleMessage);
+          // Consider closing the channel if this is the last provider instance, though tricky to determine.
+          // For now, just remove listener.
         }
       };
     } else {
@@ -838,7 +951,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         clearInterval(timerId);
       }
     };
-  }, [state.isClockRunning, isPageVisible]); 
+  }, [state.isClockRunning, state.clockStartTimeMs, state.remainingTimeAtStartSec, isPageVisible]); // Added clockStartTimeMs and remainingTimeAtStartSec to ensure timer restarts if these change while running.
 
 
   return (
@@ -865,13 +978,13 @@ export const formatTime = (totalSeconds: number): string => {
 
 export const getActualPeriodText = (period: number, override: PeriodDisplayOverrideType, numberOfRegularPeriods: number): string => {
   if (override === "Time Out") return "TIME OUT";
-  if (override) return override; // Catches "Warm-up", "Break", "Pre-OT Break"
+  if (override) return override; 
   return getPeriodText(period, numberOfRegularPeriods);
 };
 
 export const getPeriodText = (period: number, numRegPeriods: number): string => {
     if (period === 0) return "WARM-UP";
-    if (period < 0) return "---"; // Should not happen
+    if (period < 0) return "---"; 
     if (period <= numRegPeriods) {
         if (period === 1) return "1ST";
         if (period === 2) return "2ND";
@@ -896,3 +1009,4 @@ export const secondsToMinutes = (seconds: number): string => {
   if (isNaN(seconds) || seconds < 0) return "0";
   return Math.floor(seconds / 60).toString();
 };
+
