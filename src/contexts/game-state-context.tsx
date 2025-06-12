@@ -61,8 +61,8 @@ type GameAction =
   | { type: 'SET_MAX_CONCURRENT_PENALTIES'; payload: number }
   | { type: 'TOGGLE_AUTO_START_BREAKS' }
   | { type: 'TOGGLE_AUTO_START_PRE_OT_BREAKS' }
-  | { type: 'SET_STATE_FROM_FIRESTORE'; payload: GameState } // New action
-  | { type: '_INITIAL_LOAD_COMPLETE'; payload: GameState }; // Internal action
+  | { type: 'SET_STATE_FROM_FIRESTORE'; payload: GameState }
+  | { type: '_INITIAL_LOAD_COMPLETE'; payload: GameState };
 
 
 const initialState: GameState = {
@@ -94,7 +94,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
     case '_INITIAL_LOAD_COMPLETE':
     case 'SET_STATE_FROM_FIRESTORE':
-      return { ...action.payload }; // Replace entire state
+      return { ...state, ...action.payload }; // Merge Firestore state with local, Firestore takes precedence
     case 'TOGGLE_CLOCK':
       if (state.currentTime <= 0 && !state.isClockRunning) {
         if (state.periodDisplayOverride !== null) {
@@ -255,80 +255,80 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(gameReducer, initialState);
   const [isLoading, setIsLoading] = React.useState(true);
-  
-  // Ref to track if the current client initiated the Firestore write, to prevent echo.
-  const isWritingToFirestoreRef = useRef(false);
-  // Ref to hold the current state for writing to Firestore if doc doesn't exist on initial load
   const stateRef = useRef(state); 
-  stateRef.current = state; // Keep stateRef updated
+  stateRef.current = state;
 
-  // Effect for Firestore interaction (loading and saving)
+  // Ref to track if the last state update was from Firestore, to prevent immediate write-back.
+  const lastUpdateFromFirestoreRef = useRef(false);
+
+  // Effect for Firestore interaction (loading and listening for remote changes)
   useEffect(() => {
     const gameDocRef = doc(db, 'game', GAME_DOC_ID);
 
-    // Subscribe to real-time updates
     const unsubscribe = onSnapshot(gameDocRef, (docSnapshot) => {
       if (docSnapshot.metadata.hasPendingWrites) {
         // This change originated from the local client, Firestore is just confirming.
-        // We don't need to re-dispatch, as the local state is already up-to-date.
+        // The local state is already up-to-date. We don't need to re-dispatch.
         return;
       }
       if (docSnapshot.exists()) {
         const remoteState = docSnapshot.data() as GameState;
-        // Convert Firestore Timestamps back to numbers if necessary (not currently used in GameState directly)
-        // For example, if you had a lastUpdated: Timestamp field:
-        // if (remoteState.lastUpdated && remoteState.lastUpdated.toDate) {
-        //   remoteState.lastUpdated = remoteState.lastUpdated.toDate().getTime();
-        // }
+        lastUpdateFromFirestoreRef.current = true; // Mark that this update is from Firestore
         dispatch({ type: 'SET_STATE_FROM_FIRESTORE', payload: remoteState });
       } else {
-        // Document doesn't exist, create it with the current (initial) state
+        // Document doesn't exist, create it with the current initial state
         // Use stateRef.current to ensure we're writing the most up-to-date version of initialState
         // if any synchronous dispatches happened before this effect ran.
-        setDoc(gameDocRef, stateRef.current).catch(console.error);
+        setDoc(gameDocRef, stateRef.current).catch(error => {
+          console.error("Error creating initial document in Firestore:", error);
+        });
       }
       setIsLoading(false);
     }, (error) => {
       console.error("Error subscribing to Firestore:", error);
-      setIsLoading(false); // Stop loading on error too
+      setIsLoading(false); 
     });
 
-    return () => unsubscribe(); // Cleanup subscription on unmount
-  }, []); // Empty dependency array: runs once on mount
+    return () => unsubscribe(); 
+  }, []); 
 
-  // Effect to write to Firestore when local state changes (and it wasn't due to a Firestore update)
+  // Effect to write local state changes to Firestore
   useEffect(() => {
-    // Don't write during initial loading or if the change came from Firestore itself
-    if (isLoading || isWritingToFirestoreRef.current) {
+    if (isLoading) {
+      return; // Don't write during initial loading
+    }
+
+    if (lastUpdateFromFirestoreRef.current) {
+      // This state change came from Firestore, so don't write it back immediately.
+      // Reset the flag for the next user-initiated change.
+      lastUpdateFromFirestoreRef.current = false;
       return;
     }
-
-    // Check if this is the very first render after initialState and before Firestore load
-    // This check might be too simplistic if initialState could be "valid" for writing
-    if (state === initialState && !doc(db, 'game', GAME_DOC_ID)) { // This check for doc existence is async, not ideal here.
-        // A better check might be based on whether the first onSnapshot has completed.
-        // For now, we rely on isLoading to prevent initial writes.
+    
+    // This check helps prevent writing the default initialState if Firestore hasn't loaded yet
+    // and the state hasn't been changed by user interaction.
+    if (state === initialState && isLoading) { // isLoading check is redundant here due to guard above but safe
+        return;
     }
 
-
     const gameDocRef = doc(db, 'game', GAME_DOC_ID);
-    // Create a clean state object for Firestore (e.g. without client-only flags if any)
     const stateToSave = { ...state }; 
-    // stateToSave.lastUpdated = Timestamp.now(); // Optionally add a server timestamp
 
-    setDoc(gameDocRef, stateToSave, { merge: true }) // Use merge if you only want to update fields
-                                                  // For full state sync, direct setDoc is fine.
+    setDoc(gameDocRef, stateToSave) 
       .catch(error => {
         console.error("Error writing to Firestore:", error);
       });
 
-  }, [state, isLoading]); // Run whenever state changes, guard with isLoading
+  }, [state, isLoading]);
 
   // Effect for the 1-second tick
   useEffect(() => {
     let timerId: NodeJS.Timeout;
     if (state.isClockRunning && state.currentTime > 0) {
       timerId = setInterval(() => {
+        // The TICK action itself does not directly cause a Firestore write in this setup,
+        // but the resulting state change will trigger the useEffect above.
+        // This needs optimization if TICK writes become too frequent.
         dispatch({ type: 'TICK' });
       }, 1000);
     }
@@ -350,7 +350,6 @@ export const useGameState = () => {
   return context;
 };
 
-// Helper functions (formatTime, getActualPeriodText, etc.) remain the same
 export const formatTime = (totalSeconds: number): string => {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -366,8 +365,10 @@ export const getPeriodText = (period: number): string => {
     if (period <= 0) return "---";
     if (period <= 3) return `${period}${period === 1 ? 'ST' : period === 2 ? 'ND' : 'RD'}`;
     if (period === 4) return 'OT';
-    return `OT${period - 3}`; // OT2, OT3, etc. for periods 5, 6
+    return `OT${period - 3}`; 
 };
 
 export const minutesToSeconds = (minutes: number): number => minutes * 60;
 export const secondsToMinutes = (seconds: number): number => Math.floor(seconds / 60);
+
+    
