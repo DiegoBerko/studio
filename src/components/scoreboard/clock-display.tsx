@@ -33,7 +33,7 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
         </div>
       </div>
       {state.periodDisplayOverride === "Time Out" && state.preTimeoutState && (
-        <div className="mt-2 text-sm md:text-base text-muted-foreground normal-case tracking-normal">
+        <div className="mt-2 text-base md:text-lg text-muted-foreground normal-case tracking-normal">
           {getPeriodText(state.preTimeoutState.period)} - {formatTime(state.preTimeoutState.time)}
           {state.preTimeoutState.override ? ` (${state.preTimeoutState.override})` : ''}
         </div>
