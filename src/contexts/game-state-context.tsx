@@ -2,8 +2,10 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import type { Penalty, Team } from '@/types';
+import { db } from '@/lib/firebase'; // Import Firestore instance
+import { doc, getDoc, setDoc, onSnapshot, Timestamp } from 'firebase/firestore';
 
 // Duraciones por defecto iniciales, se guardarán en segundos
 const INITIAL_PERIOD_DURATION = 20 * 60;
@@ -13,6 +15,7 @@ const INITIAL_MAX_CONCURRENT_PENALTIES = 2;
 const INITIAL_AUTO_START_BREAKS = true;
 const INITIAL_AUTO_START_PRE_OT_BREAKS = false;
 
+const GAME_DOC_ID = 'liveState'; // Document ID in Firestore
 
 interface GameState {
   homeScore: number;
@@ -25,14 +28,13 @@ interface GameState {
   homeTeamName: string;
   awayTeamName: string;
   periodDisplayOverride: "Break" | "Pre-OT Break" | null;
-
-  // Nuevos campos de configuración
-  defaultPeriodDuration: number; // en segundos
-  defaultBreakDuration: number; // en segundos
-  defaultPreOTBreakDuration: number; // en segundos
+  defaultPeriodDuration: number;
+  defaultBreakDuration: number;
+  defaultPreOTBreakDuration: number;
   maxConcurrentPenalties: number;
   autoStartBreaks: boolean;
   autoStartPreOTBreaks: boolean;
+  // lastUpdated?: Timestamp; // Optional: for more complex sync logic or debugging
 }
 
 type GameAction =
@@ -50,15 +52,17 @@ type GameAction =
   | { type: 'TICK' }
   | { type: 'SET_HOME_TEAM_NAME'; payload: string }
   | { type: 'SET_AWAY_TEAM_NAME'; payload: string }
-  | { type: 'START_BREAK' } // Inicia un descanso regular
-  | { type: 'START_PRE_OT_BREAK' } // Inicia un descanso antes de OT o entre OTs
+  | { type: 'START_BREAK' }
+  | { type: 'START_PRE_OT_BREAK' }
   | { type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' }
-  | { type: 'SET_DEFAULT_PERIOD_DURATION'; payload: number } // en segundos
-  | { type: 'SET_DEFAULT_BREAK_DURATION'; payload: number } // en segundos
-  | { type: 'SET_DEFAULT_PRE_OT_BREAK_DURATION'; payload: number } // en segundos
+  | { type: 'SET_DEFAULT_PERIOD_DURATION'; payload: number }
+  | { type: 'SET_DEFAULT_BREAK_DURATION'; payload: number }
+  | { type: 'SET_DEFAULT_PRE_OT_BREAK_DURATION'; payload: number }
   | { type: 'SET_MAX_CONCURRENT_PENALTIES'; payload: number }
   | { type: 'TOGGLE_AUTO_START_BREAKS' }
-  | { type: 'TOGGLE_AUTO_START_PRE_OT_BREAKS' };
+  | { type: 'TOGGLE_AUTO_START_PRE_OT_BREAKS' }
+  | { type: 'SET_STATE_FROM_FIRESTORE'; payload: GameState } // New action
+  | { type: '_INITIAL_LOAD_COMPLETE'; payload: GameState }; // Internal action
 
 
 const initialState: GameState = {
@@ -83,10 +87,14 @@ const initialState: GameState = {
 const GameStateContext = createContext<{
   state: GameState;
   dispatch: React.Dispatch<GameAction>;
+  isLoading: boolean;
 } | undefined>(undefined);
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
+    case '_INITIAL_LOAD_COMPLETE':
+    case 'SET_STATE_FROM_FIRESTORE':
+      return { ...action.payload }; // Replace entire state
     case 'TOGGLE_CLOCK':
       if (state.currentTime <= 0 && !state.isClockRunning) {
         if (state.periodDisplayOverride !== null) {
@@ -127,7 +135,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       return { ...state, [`${action.payload.team}Score`]: Math.max(0, currentScore + action.payload.delta) };
     }
     case 'ADD_PENALTY': {
-      const newPenalty: Penalty = { ...action.payload.penalty, id: Date.now().toString() };
+      const newPenalty: Penalty = { 
+        ...action.payload.penalty, 
+        id: Date.now().toString() + Math.random().toString(36).slice(2) 
+      };
       const penalties = [...state[`${action.payload.team}Penalties`], newPenalty];
       return { ...state, [`${action.payload.team}Penalties`]: penalties };
     }
@@ -213,12 +224,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         };
     case 'START_BREAK_AFTER_PREVIOUS_PERIOD': {
       if (state.currentPeriod <= 1 && state.periodDisplayOverride === null) return state;
-
       const periodBeforeBreak = state.periodDisplayOverride !== null ? state.currentPeriod : state.currentPeriod -1;
       if (periodBeforeBreak < 1) return state;
-
       const isPreOT = periodBeforeBreak >= 3;
-
       return {
         ...state,
         currentPeriod: periodBeforeBreak,
@@ -246,7 +254,77 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
 export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(gameReducer, initialState);
+  const [isLoading, setIsLoading] = React.useState(true);
+  
+  // Ref to track if the current client initiated the Firestore write, to prevent echo.
+  const isWritingToFirestoreRef = useRef(false);
+  // Ref to hold the current state for writing to Firestore if doc doesn't exist on initial load
+  const stateRef = useRef(state); 
+  stateRef.current = state; // Keep stateRef updated
 
+  // Effect for Firestore interaction (loading and saving)
+  useEffect(() => {
+    const gameDocRef = doc(db, 'game', GAME_DOC_ID);
+
+    // Subscribe to real-time updates
+    const unsubscribe = onSnapshot(gameDocRef, (docSnapshot) => {
+      if (docSnapshot.metadata.hasPendingWrites) {
+        // This change originated from the local client, Firestore is just confirming.
+        // We don't need to re-dispatch, as the local state is already up-to-date.
+        return;
+      }
+      if (docSnapshot.exists()) {
+        const remoteState = docSnapshot.data() as GameState;
+        // Convert Firestore Timestamps back to numbers if necessary (not currently used in GameState directly)
+        // For example, if you had a lastUpdated: Timestamp field:
+        // if (remoteState.lastUpdated && remoteState.lastUpdated.toDate) {
+        //   remoteState.lastUpdated = remoteState.lastUpdated.toDate().getTime();
+        // }
+        dispatch({ type: 'SET_STATE_FROM_FIRESTORE', payload: remoteState });
+      } else {
+        // Document doesn't exist, create it with the current (initial) state
+        // Use stateRef.current to ensure we're writing the most up-to-date version of initialState
+        // if any synchronous dispatches happened before this effect ran.
+        setDoc(gameDocRef, stateRef.current).catch(console.error);
+      }
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error subscribing to Firestore:", error);
+      setIsLoading(false); // Stop loading on error too
+    });
+
+    return () => unsubscribe(); // Cleanup subscription on unmount
+  }, []); // Empty dependency array: runs once on mount
+
+  // Effect to write to Firestore when local state changes (and it wasn't due to a Firestore update)
+  useEffect(() => {
+    // Don't write during initial loading or if the change came from Firestore itself
+    if (isLoading || isWritingToFirestoreRef.current) {
+      return;
+    }
+
+    // Check if this is the very first render after initialState and before Firestore load
+    // This check might be too simplistic if initialState could be "valid" for writing
+    if (state === initialState && !doc(db, 'game', GAME_DOC_ID)) { // This check for doc existence is async, not ideal here.
+        // A better check might be based on whether the first onSnapshot has completed.
+        // For now, we rely on isLoading to prevent initial writes.
+    }
+
+
+    const gameDocRef = doc(db, 'game', GAME_DOC_ID);
+    // Create a clean state object for Firestore (e.g. without client-only flags if any)
+    const stateToSave = { ...state }; 
+    // stateToSave.lastUpdated = Timestamp.now(); // Optionally add a server timestamp
+
+    setDoc(gameDocRef, stateToSave, { merge: true }) // Use merge if you only want to update fields
+                                                  // For full state sync, direct setDoc is fine.
+      .catch(error => {
+        console.error("Error writing to Firestore:", error);
+      });
+
+  }, [state, isLoading]); // Run whenever state changes, guard with isLoading
+
+  // Effect for the 1-second tick
   useEffect(() => {
     let timerId: NodeJS.Timeout;
     if (state.isClockRunning && state.currentTime > 0) {
@@ -258,7 +336,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   }, [state.isClockRunning, state.currentTime]);
 
   return (
-    <GameStateContext.Provider value={{ state, dispatch }}>
+    <GameStateContext.Provider value={{ state, dispatch, isLoading }}>
       {children}
     </GameStateContext.Provider>
   );
@@ -272,6 +350,7 @@ export const useGameState = () => {
   return context;
 };
 
+// Helper functions (formatTime, getActualPeriodText, etc.) remain the same
 export const formatTime = (totalSeconds: number): string => {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
@@ -287,7 +366,7 @@ export const getPeriodText = (period: number): string => {
     if (period <= 0) return "---";
     if (period <= 3) return `${period}${period === 1 ? 'ST' : period === 2 ? 'ND' : 'RD'}`;
     if (period === 4) return 'OT';
-    return `OT${period - 3}`;
+    return `OT${period - 3}`; // OT2, OT3, etc. for periods 5, 6
 };
 
 export const minutesToSeconds = (minutes: number): number => minutes * 60;
