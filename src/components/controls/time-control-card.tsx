@@ -104,7 +104,7 @@ export function TimeControlCard() {
   return (
     <ControlCardWrapper title="Ajustes de Tiempo y Time Out">
       <div className="space-y-4">
-        <div className="space-y-2">
+        <fieldset disabled={state.isClockRunning} className="space-y-2">
           <Label htmlFor="minutes-manual">Establecer Tiempo Manualmente</Label>
           <div className="flex items-center gap-2">
             <Input
@@ -117,6 +117,7 @@ export function TimeControlCard() {
               placeholder="MM"
               className="w-1/3"
               aria-label="Establecer minutos"
+              disabled={state.isClockRunning}
             />
             <span className="font-bold text-primary-foreground">:</span>
             <Input
@@ -129,12 +130,19 @@ export function TimeControlCard() {
               placeholder="SS"
               className="w-1/3"
               aria-label="Establecer segundos"
+              disabled={state.isClockRunning}
             />
-            <Button onClick={handleSetTime} variant="secondary" className="flex-1" aria-label="Aplicar Cambio de Tiempo">
+            <Button 
+              onClick={handleSetTime} 
+              variant="secondary" 
+              className="flex-1" 
+              aria-label="Aplicar Cambio de Tiempo"
+              disabled={state.isClockRunning || !isDirty}
+            >
               Establecer
             </Button>
           </div>
-        </div>
+        </fieldset>
 
         <div className="border-t border-border pt-4">
             <Button 
@@ -151,3 +159,4 @@ export function TimeControlCard() {
     </ControlCardWrapper>
   );
 }
+

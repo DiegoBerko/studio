@@ -75,7 +75,7 @@ export function MiniScoreboard() {
   };
 
   const checkAndConfirm = (
-    condition: boolean, // This parameter can be removed if the calling logic already checks the condition
+    condition: boolean, 
     title: string,
     description: string,
     action: () => void
@@ -261,25 +261,29 @@ export function MiniScoreboard() {
             )}
             
             <div className="flex items-center justify-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-accent"
-                onClick={() => handleTimeAdjust(-1)}
-                aria-label="Restar 1 segundo al reloj"
-              >
-                <Minus className="h-3 w-3" />
-              </Button>
+              {!state.isClockRunning && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-accent"
+                  onClick={() => handleTimeAdjust(-1)}
+                  aria-label="Restar 1 segundo al reloj"
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+              )}
               <p className="text-5xl font-bold text-accent tabular-nums">{formatTime(state.currentTime)}</p>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-accent"
-                onClick={() => handleTimeAdjust(1)}
-                aria-label="Sumar 1 segundo al reloj"
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
+              {!state.isClockRunning && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-accent"
+                  onClick={() => handleTimeAdjust(1)}
+                  aria-label="Sumar 1 segundo al reloj"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              )}
             </div>
             <div className="relative mt-1 flex items-center justify-center gap-2">
                <Button 
