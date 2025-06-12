@@ -46,7 +46,23 @@ export function MiniScoreboard() {
   };
 
   const handleToggleClock = () => {
-    dispatch({ type: 'TOGGLE_CLOCK' });
+    // Condition for showing the default team name confirmation
+    const isFirstPeriodStart = state.currentPeriod === 1 && 
+                               state.periodDisplayOverride === null && 
+                               state.currentTime === state.defaultPeriodDuration;
+    const hasDefaultTeamNames = state.homeTeamName.trim().toUpperCase() === 'LOCAL' || 
+                                state.awayTeamName.trim().toUpperCase() === 'VISITANTE';
+
+    if (!state.isClockRunning && isFirstPeriodStart && hasDefaultTeamNames) {
+      checkAndConfirm(
+        true, // Always show if conditions met
+        "Nombres de Equipo por Defecto",
+        "Uno o ambos equipos aún tienen los nombres predeterminados ('Local', 'Visitante'). ¿Deseas iniciar el partido de todas formas o prefieres actualizar los nombres primero?",
+        () => dispatch({ type: 'TOGGLE_CLOCK' })
+      );
+    } else {
+      dispatch({ type: 'TOGGLE_CLOCK' });
+    }
   };
 
   const executeConfirmedAction = (actionFn: () => void) => {
@@ -59,7 +75,7 @@ export function MiniScoreboard() {
   };
 
   const checkAndConfirm = (
-    condition: boolean,
+    condition: boolean, // This parameter can be removed if the calling logic already checks the condition
     title: string,
     description: string,
     action: () => void
