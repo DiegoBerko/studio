@@ -20,6 +20,7 @@ if (typeof window !== 'undefined') {
 
 // Duraciones por defecto iniciales, se guardarán en segundos
 const INITIAL_PERIOD_DURATION = 20 * 60;
+const INITIAL_OT_PERIOD_DURATION = 5 * 60; // Nueva duración por defecto para OT
 const INITIAL_BREAK_DURATION = 120;
 const INITIAL_PRE_OT_BREAK_DURATION = 60;
 const INITIAL_TIMEOUT_DURATION = 30;
@@ -51,6 +52,7 @@ interface GameState {
   awayTeamName: string;
   periodDisplayOverride: PeriodDisplayOverrideType;
   defaultPeriodDuration: number;
+  defaultOTPeriodDuration: number; // Nuevo campo para duración de OT
   defaultBreakDuration: number;
   defaultPreOTBreakDuration: number;
   defaultTimeoutDuration: number;
@@ -85,6 +87,7 @@ export type GameAction =
   | { type: 'START_TIMEOUT' }
   | { type: 'END_TIMEOUT' }
   | { type: 'SET_DEFAULT_PERIOD_DURATION'; payload: number }
+  | { type: 'SET_DEFAULT_OT_PERIOD_DURATION'; payload: number } // Nueva acción
   | { type: 'SET_DEFAULT_BREAK_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_PRE_OT_BREAK_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_TIMEOUT_DURATION'; payload: number }
@@ -114,6 +117,7 @@ const initialGlobalState: GameState = {
   awayTeamName: 'Visitante',
   periodDisplayOverride: null,
   defaultPeriodDuration: INITIAL_PERIOD_DURATION,
+  defaultOTPeriodDuration: INITIAL_OT_PERIOD_DURATION, // Inicialización
   defaultBreakDuration: INITIAL_BREAK_DURATION,
   defaultPreOTBreakDuration: INITIAL_PRE_OT_BREAK_DURATION,
   defaultTimeoutDuration: INITIAL_TIMEOUT_DURATION,
@@ -139,19 +143,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     switch (action.type) {
       case 'HYDRATE_FROM_STORAGE': {
         const hydratedBase = {
-          ...initialGlobalState, // Start with current app defaults
-          ...action.payload,     // Override with anything from localStorage
+          ...initialGlobalState,
+          ...action.payload,
         };
-
-        // Ensure isClockRunning is correctly set (from payload or default)
-        // and _lastActionOriginator is cleared for the current tab
         const hydratedState: GameState = {
           ...hydratedBase,
           isClockRunning: action.payload?.isClockRunning ?? initialGlobalState.isClockRunning,
           _lastActionOriginator: undefined,
         };
-
-        // Clean _status from penalties
         hydratedState.homePenalties = (action.payload?.homePenalties || []).map(({ _status, ...p }: Penalty) => p);
         hydratedState.awayPenalties = (action.payload?.awayPenalties || []).map(({ _status, ...p }: Penalty) => p);
         return hydratedState;
@@ -179,22 +178,29 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         const newTime = Math.max(0, state.currentTime + action.payload);
         return { ...state, currentTime: newTime, isClockRunning: newTime > 0 ? state.isClockRunning : false };
       }
-      case 'SET_PERIOD':
+      case 'SET_PERIOD': {
+        const newPeriod = Math.max(1, action.payload);
+        const isOTPeriod = newPeriod > state.numberOfRegularPeriods;
+        const periodDuration = isOTPeriod ? state.defaultOTPeriodDuration : state.defaultPeriodDuration;
         return {
           ...state,
-          currentPeriod: Math.max(1, action.payload),
+          currentPeriod: newPeriod,
           periodDisplayOverride: null,
           isClockRunning: false,
-          currentTime: state.defaultPeriodDuration,
+          currentTime: periodDuration,
           preTimeoutState: null,
         };
-      case 'RESET_PERIOD_CLOCK':
+      }
+      case 'RESET_PERIOD_CLOCK': {
+        const isOTPeriod = state.currentPeriod > state.numberOfRegularPeriods;
+        const periodDuration = isOTPeriod ? state.defaultOTPeriodDuration : state.defaultPeriodDuration;
         return {
           ...state,
-          currentTime: state.defaultPeriodDuration,
+          currentTime: periodDuration,
           isClockRunning: false,
           periodDisplayOverride: null
         };
+      }
       case 'SET_SCORE':
         return { ...state, [`${action.payload.team}Score`]: Math.max(0, action.payload.score) };
       case 'ADJUST_SCORE': {
@@ -360,6 +366,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return state;
       case 'SET_DEFAULT_PERIOD_DURATION':
         return { ...state, defaultPeriodDuration: Math.max(60, action.payload) }; 
+      case 'SET_DEFAULT_OT_PERIOD_DURATION': // Nuevo reducer
+        return { ...state, defaultOTPeriodDuration: Math.max(60, action.payload) };
       case 'SET_DEFAULT_BREAK_DURATION':
         return { ...state, defaultBreakDuration: Math.max(1, action.payload) };
       case 'SET_DEFAULT_PRE_OT_BREAK_DURATION':
@@ -384,12 +392,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return { ...state, autoStartPreOTBreaks: action.payload };
       case 'SET_AUTO_START_TIMEOUTS_VALUE':
         return { ...state, autoStartTimeouts: action.payload };
-      case 'RESET_GAME_STATE':
+      case 'RESET_GAME_STATE': {
+        const isCurrentPeriodOT = initialGlobalState.currentPeriod > state.numberOfRegularPeriods;
+        const initialTimeForReset = isCurrentPeriodOT ? state.defaultOTPeriodDuration : state.defaultPeriodDuration;
         return {
           ...state, 
           homeScore: initialGlobalState.homeScore,
           awayScore: initialGlobalState.awayScore,
-          currentTime: state.defaultPeriodDuration, 
+          currentTime: initialTimeForReset, 
           currentPeriod: initialGlobalState.currentPeriod,
           isClockRunning: initialGlobalState.isClockRunning,
           homePenalties: initialGlobalState.homePenalties,
@@ -399,6 +409,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           periodDisplayOverride: initialGlobalState.periodDisplayOverride,
           preTimeoutState: initialGlobalState.preTimeoutState,
         };
+      }
       default:
         return state;
     }
@@ -469,14 +480,10 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    if (isLoading || isProcessingBroadcastRef.current) {
+    if (isLoading || isProcessingBroadcastRef.current || state._lastActionOriginator !== TAB_ID) {
       if (isProcessingBroadcastRef.current) {
           isProcessingBroadcastRef.current = false;
       }
-      return;
-    }
-
-    if (state._lastActionOriginator !== TAB_ID) {
       return;
     }
 

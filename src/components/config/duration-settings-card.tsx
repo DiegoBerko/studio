@@ -23,6 +23,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 
   // Local state for inputs
   const [localPeriodDurationInput, setLocalPeriodDurationInput] = useState(secondsToMinutes(state.defaultPeriodDuration));
+  const [localOTPeriodDurationInput, setLocalOTPeriodDurationInput] = useState(secondsToMinutes(state.defaultOTPeriodDuration)); // Nuevo estado local
   const [localBreakDurationInput, setLocalBreakDurationInput] = useState(String(state.defaultBreakDuration));
   const [localPreOTBreakDurationInput, setLocalPreOTBreakDurationInput] = useState(String(state.defaultPreOTBreakDuration));
   const [localTimeoutDurationInput, setLocalTimeoutDurationInput] = useState(String(state.defaultTimeoutDuration));
@@ -40,6 +41,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
   useEffect(() => {
     if (!isDirty) {
       setLocalPeriodDurationInput(secondsToMinutes(state.defaultPeriodDuration));
+      setLocalOTPeriodDurationInput(secondsToMinutes(state.defaultOTPeriodDuration)); // Actualizar estado local
       setLocalBreakDurationInput(String(state.defaultBreakDuration));
       setLocalPreOTBreakDurationInput(String(state.defaultPreOTBreakDuration));
       setLocalTimeoutDurationInput(String(state.defaultTimeoutDuration));
@@ -51,6 +53,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
     }
   }, [
     state.defaultPeriodDuration, 
+    state.defaultOTPeriodDuration, // Dependencia del nuevo estado
     state.defaultBreakDuration, 
     state.defaultPreOTBreakDuration, 
     state.defaultTimeoutDuration,
@@ -75,8 +78,12 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       if (!isDirty) return true;
 
       const periodDurationNum = parseInt(localPeriodDurationInput, 10);
-      const finalPeriodDurationSeconds = (isNaN(periodDurationNum) || periodDurationNum < 1) ? 60 : periodDurationNum * 60; // Default 1 min (60s)
+      const finalPeriodDurationSeconds = (isNaN(periodDurationNum) || periodDurationNum < 1) ? 60 : periodDurationNum * 60;
       dispatch({ type: "SET_DEFAULT_PERIOD_DURATION", payload: finalPeriodDurationSeconds });
+
+      const otPeriodDurationNum = parseInt(localOTPeriodDurationInput, 10); // Procesar OT
+      const finalOTPeriodDurationSeconds = (isNaN(otPeriodDurationNum) || otPeriodDurationNum < 1) ? 60 : otPeriodDurationNum * 60;
+      dispatch({ type: "SET_DEFAULT_OT_PERIOD_DURATION", payload: finalOTPeriodDurationSeconds });
 
       const breakDurationNum = parseInt(localBreakDurationInput, 10);
       const finalBreakDurationSeconds = (isNaN(breakDurationNum) || breakDurationNum < 1) ? 1 : breakDurationNum;
@@ -95,7 +102,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       dispatch({ type: "SET_NUMBER_OF_REGULAR_PERIODS", payload: finalNumRegularPeriods });
 
       const numOTPeriods = parseInt(localNumOTPeriodsInput, 10);
-      const finalNumOTPeriods = (isNaN(numOTPeriods) || numOTPeriods < 0) ? 1 : numOTPeriods; // Default 1 OT, can be 0
+      const finalNumOTPeriods = (isNaN(numOTPeriods) || numOTPeriods < 0) ? 1 : numOTPeriods;
       dispatch({ type: "SET_NUMBER_OF_OVERTIME_PERIODS", payload: finalNumOTPeriods });
 
 
@@ -114,6 +121,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
     },
     handleDiscard: () => {
       setLocalPeriodDurationInput(secondsToMinutes(state.defaultPeriodDuration));
+      setLocalOTPeriodDurationInput(secondsToMinutes(state.defaultOTPeriodDuration)); // Reset OT
       setLocalBreakDurationInput(String(state.defaultBreakDuration));
       setLocalPreOTBreakDurationInput(String(state.defaultPreOTBreakDuration));
       setLocalTimeoutDurationInput(String(state.defaultTimeoutDuration));
@@ -157,18 +165,33 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             </div>
         </div>
 
-        <div>
-          <Label htmlFor="periodDuration">Duración del Período (minutos)</Label>
-          <Input
-            id="periodDuration"
-            type="number"
-            value={localPeriodDurationInput}
-            onChange={(e) => { setLocalPeriodDurationInput(e.target.value); markDirty(); }}
-            className="mt-1"
-            placeholder="ej. 20"
-            min="1"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="periodDuration">Duración Período Regular (minutos)</Label>
+              <Input
+                id="periodDuration"
+                type="number"
+                value={localPeriodDurationInput}
+                onChange={(e) => { setLocalPeriodDurationInput(e.target.value); markDirty(); }}
+                className="mt-1"
+                placeholder="ej. 20"
+                min="1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="otPeriodDuration">Duración Overtime (minutos)</Label>
+              <Input
+                id="otPeriodDuration"
+                type="number"
+                value={localOTPeriodDurationInput}
+                onChange={(e) => { setLocalOTPeriodDurationInput(e.target.value); markDirty(); }}
+                className="mt-1"
+                placeholder="ej. 5"
+                min="1"
+              />
+            </div>
         </div>
+
 
         <div className="space-y-3 p-4 border rounded-md bg-muted/20">
           <div>
