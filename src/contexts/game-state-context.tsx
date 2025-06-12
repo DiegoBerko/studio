@@ -68,7 +68,7 @@ export type GameAction =
   | { type: 'RESET_PERIOD_CLOCK' }
   | { type: 'SET_SCORE'; payload: { team: Team; score: number } }
   | { type: 'ADJUST_SCORE'; payload: { team: Team; delta: number } }
-  | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id'> } }
+  | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id' | '_status'> } }
   | { type: 'REMOVE_PENALTY'; payload: { team: Team; penaltyId: string } }
   | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } }
   | { type: 'REORDER_PENALTIES'; payload: { team: Team; startIndex: number; endIndex: number } }
@@ -129,20 +129,29 @@ const GameStateContext = createContext<{
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   const newState = ((): GameState => {
     switch (action.type) {
-      case 'HYDRATE_FROM_STORAGE':
-        return {
+      case 'HYDRATE_FROM_STORAGE': {
+        const hydratedState = {
           ...initialGlobalState,
           ...action.payload,
           _lastActionOriginator: undefined,
           isClockRunning: false,
-          // Ensure currentTime after hydration is based on the (potentially stored) defaultPeriodDuration
           currentTime: (action.payload && action.payload.defaultPeriodDuration) ? action.payload.defaultPeriodDuration : initialGlobalState.defaultPeriodDuration,
         };
+        // Ensure penalties from storage don't have _status
+        hydratedState.homePenalties = (action.payload?.homePenalties || []).map(({ _status, ...p }) => p);
+        hydratedState.awayPenalties = (action.payload?.awayPenalties || []).map(({ _status, ...p }) => p);
+        return hydratedState;
+      }
       case 'SET_STATE_FROM_LOCAL_BROADCAST':
         if (JSON.stringify(state) === JSON.stringify(action.payload)) {
           return state;
         }
-        return { ...action.payload, _lastActionOriginator: undefined };
+        // Ensure penalties from broadcast don't have _status upon direct setting
+        const receivedState = { ...action.payload, _lastActionOriginator: undefined };
+        receivedState.homePenalties = (action.payload.homePenalties || []).map(({ _status, ...p }) => p);
+        receivedState.awayPenalties = (action.payload.awayPenalties || []).map(({ _status, ...p }) => p);
+        return receivedState;
+
       case 'TOGGLE_CLOCK':
         if (state.currentTime <= 0 && !state.isClockRunning) {
             if (state.periodDisplayOverride === "Break" && !state.autoStartBreaks) return state;
@@ -216,38 +225,73 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
       case 'TICK': {
         if (!state.isClockRunning || state.currentTime <= 0) {
-          return { ...state, isClockRunning: false };
+          return { ...state, isClockRunning: state.currentTime > 0 && state.isClockRunning };
         }
         const newTime = state.currentTime - 1;
 
-        let homePenalties = state.homePenalties;
-        let awayPenalties = state.awayPenalties;
+        let homePenaltiesResult = state.homePenalties;
+        let awayPenaltiesResult = state.awayPenalties;
 
-        if (state.periodDisplayOverride === null) {
-          const updatePenalties = (penalties: Penalty[], maxConcurrent: number) => {
-            let runningCount = 0;
-            return penalties.map(p => {
-              if (p.remainingTime > 0 && runningCount < maxConcurrent) {
-                runningCount++;
-                return { ...p, remainingTime: Math.max(0, p.remainingTime - 1) };
+        if (state.periodDisplayOverride === null) { // Penalties only run during regular play
+          const updatePenaltiesForTick = (penalties: Penalty[], maxConcurrent: number): Penalty[] => {
+            const resultPenalties: Penalty[] = [];
+            const activePlayerTickets: Set<string> = new Set(); // Players who have a penalty running in THIS tick
+            let concurrentRunningCount = 0;
+
+            for (const p of penalties) {
+              // Penalties that were 0 at the start of this tick are already effectively expired
+              if (p.remainingTime <= 0) {
+                continue;
               }
-              return p;
-            }).filter(p => p.remainingTime > 0);
+
+              let status: Penalty['_status'] = undefined;
+              let newRemainingTime = p.remainingTime;
+
+              if (activePlayerTickets.has(p.playerNumber)) {
+                status = 'pending_player';
+              } else if (concurrentRunningCount < maxConcurrent) {
+                status = 'running';
+                newRemainingTime = Math.max(0, p.remainingTime - 1);
+                activePlayerTickets.add(p.playerNumber);
+                concurrentRunningCount++;
+              } else {
+                status = 'pending_concurrent';
+              }
+              
+              // Add to results if it's still active or just expired while running
+              if (newRemainingTime > 0) {
+                resultPenalties.push({ ...p, remainingTime: newRemainingTime, _status: status });
+              } else if (status === 'running') { // Just expired while running
+                resultPenalties.push({ ...p, remainingTime: 0, _status: status });
+              } else {
+                // If it was pending and initial time was 0 (or became 0 without running),
+                // it means it shouldn't have been in the list or is an edge case.
+                // Or, if it was pending and now newRemainingTime is 0 (because initial was 0)
+                // We only keep it if it has remaining time OR it just expired *while running*.
+                // So, if newRemainingTime is 0 and it wasn't 'running', it's effectively gone.
+              }
+            }
+            return resultPenalties;
           };
-          homePenalties = updatePenalties(state.homePenalties, state.maxConcurrentPenalties);
-          awayPenalties = updatePenalties(state.awayPenalties, state.maxConcurrentPenalties);
+
+          homePenaltiesResult = updatePenaltiesForTick(state.homePenalties, state.maxConcurrentPenalties);
+          awayPenaltiesResult = updatePenaltiesForTick(state.awayPenalties, state.maxConcurrentPenalties);
         }
+
 
         let newIsClockRunning = state.isClockRunning;
         if (newTime <= 0) {
           newIsClockRunning = false;
         }
-
+        
+        // Filter out penalties that are truly done (remainingTime is 0) for the *next* state
+        // The `updatePenaltiesForTick` already returns penalties that might have just hit 0 but were running.
+        // These will be filtered out at the beginning of the *next* tick.
         return {
           ...state,
           currentTime: newTime,
-          homePenalties,
-          awayPenalties,
+          homePenalties: homePenaltiesResult,
+          awayPenalties: awayPenaltiesResult,
           isClockRunning: newIsClockRunning,
         };
       }
@@ -313,7 +357,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         }
         return state;
       case 'SET_DEFAULT_PERIOD_DURATION':
-        return { ...state, defaultPeriodDuration: Math.max(1, action.payload) }; // Min 1 minute (payload is in seconds)
+        return { ...state, defaultPeriodDuration: Math.max(60, action.payload) }; // Min 1 minute
       case 'SET_DEFAULT_BREAK_DURATION':
         return { ...state, defaultBreakDuration: Math.max(1, action.payload) };
       case 'SET_DEFAULT_PRE_OT_BREAK_DURATION':
@@ -336,10 +380,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return { ...state, autoStartTimeouts: action.payload };
       case 'RESET_GAME_STATE':
         return {
-          ...state, // Keep all existing user-defined settings like default durations, auto-start preferences, max penalties
+          ...state, 
           homeScore: initialGlobalState.homeScore,
           awayScore: initialGlobalState.awayScore,
-          currentTime: state.defaultPeriodDuration, // Reset clock TO THE CONFIGURED default period duration
+          currentTime: state.defaultPeriodDuration, 
           currentPeriod: initialGlobalState.currentPeriod,
           isClockRunning: initialGlobalState.isClockRunning,
           homePenalties: initialGlobalState.homePenalties,
@@ -381,14 +425,20 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
     try {
       const rawStoredState = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (rawStoredState) {
-        storedState = JSON.parse(rawStoredState) as GameState;
-        // Ensure currentTime is initialized based on potentially stored defaultPeriodDuration
+        storedState = JSON.parse(rawStoredState) as Partial<GameState>;
         if (storedState && storedState.defaultPeriodDuration) {
             storedState.currentTime = storedState.defaultPeriodDuration;
         } else {
             storedState.currentTime = initialGlobalState.defaultPeriodDuration;
         }
-        storedState.isClockRunning = false; // Always start paused on load
+        storedState.isClockRunning = false; 
+        // Ensure penalties from storage don't have _status
+        if (storedState.homePenalties) {
+          storedState.homePenalties = storedState.homePenalties.map(({ _status, ...p }) => p);
+        }
+        if (storedState.awayPenalties) {
+          storedState.awayPenalties = storedState.awayPenalties.map(({ _status, ...p }) => p);
+        }
       }
     } catch (error) {
       console.error("Error reading state from localStorage for hydration:", error);
@@ -439,10 +489,25 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       try {
         const stateToSave = { ...state };
         delete stateToSave._lastActionOriginator;
+        // Strip _status before saving
+        stateToSave.homePenalties = stateToSave.homePenalties.map(({ _status, ...p }) => p);
+        stateToSave.awayPenalties = stateToSave.awayPenalties.map(({ _status, ...p }) => p);
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
 
         if (channelRef.current) {
-          channelRef.current.postMessage(state);
+          const stateToBroadcast = { ...state }; // Original state with _status
+          // For broadcast, we can also strip _status if other tabs recalculate it or if it's not strictly needed there.
+          // However, if other tabs also display it, they might benefit from receiving it.
+          // For now, let's send the state as is, including _status, as other tabs might also be display instances.
+          // Correction: to be consistent with HYDRATE_FROM_STORAGE and SET_STATE_FROM_LOCAL_BROADCAST, _status should be stripped
+          // if it's only a runtime calculation within the current tab's reducer.
+          // But the TICK action *generates* it, so it's part of the state for *this tick*.
+          // Let's send state including _status, as it's the result of the reducer for the current tick.
+          // Other tabs receiving it via SET_STATE_FROM_LOCAL_BROADCAST will correctly use it.
+          // The HYDRATE_FROM_STORAGE only strips it on initial load from persistent storage.
+          // Re-evaluating: SET_STATE_FROM_LOCAL_BROADCAST also strips _status. So, it should be stripped before postMessage.
+          const finalStateToBroadcast = {...stateToSave}; // Already stripped
+          channelRef.current.postMessage(finalStateToBroadcast);
         }
       } catch (error)
 {
