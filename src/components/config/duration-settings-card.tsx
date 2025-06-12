@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useGameState, secondsToMinutes } from "@/contexts/game-state-context"; // secondsToMinutes is still used for period
-import type { GameAction } from "@/contexts/game-state-context"; // Import GameAction type
+import { useGameState, secondsToMinutes } from "@/contexts/game-state-context";
+import type { GameAction } from "@/contexts/game-state-context";
 import { ControlCardWrapper } from "@/components/controls/control-card-wrapper";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -15,57 +15,61 @@ export function DurationSettingsCard() {
 
   const handleDurationChange = (
     type: "period" | "break" | "preOTBreak" | "timeout",
-    value: string
+    value: string // Value from input field
   ) => {
-    const rawValue = parseInt(value, 10);
-    
+    let numericValue = parseInt(value, 10);
+    const isDeletion = value === ''; // Check if input was cleared by user
+
     let descriptionForToast = "";
-    let minVal = 1;
+    let minVal = 1; // Default minimum for seconds-based inputs
+    let actionType: GameAction['type'];
+    let successMessage = "";
+    let finalValueInSeconds: number;
 
     if (type === "period") {
       descriptionForToast = "La duración del período debe ser al menos 1 minuto.";
-      minVal = 1; // minutes
-    } else if (type === "break" || type === "preOTBreak") {
-      descriptionForToast = "La duración del descanso debe ser al menos 10 segundos.";
-      minVal = 10; // seconds
-    } else if (type === "timeout") {
-      descriptionForToast = "La duración del Time Out debe ser al menos 10 segundos.";
-      minVal = 10; // seconds
-    }
+      minVal = 1; // minutes for period
+      if (isDeletion) {
+        numericValue = 1; // Default to 1 minute if cleared
+      } else if (isNaN(numericValue) || numericValue < minVal) {
+        toast({ title: "Valor Inválido", description: descriptionForToast, variant: "destructive"});
+        return;
+      }
+      finalValueInSeconds = numericValue * 60;
+      actionType = "SET_DEFAULT_PERIOD_DURATION";
+      successMessage = `Duración de período establecida a ${numericValue} min.`;
 
-    if (isNaN(rawValue) || rawValue < minVal) {
-      toast({ title: "Valor Inválido", description: descriptionForToast, variant: "destructive"});
-      return;
+    } else { // break, preOTBreak, timeout (all in seconds)
+      minVal = 1; // seconds
+      descriptionForToast = "La duración debe ser al menos 1 segundo.";
+
+      if (isDeletion) {
+        numericValue = 1; // Default to 1 second if cleared
+      } else if (isNaN(numericValue) || numericValue < minVal) {
+        toast({ title: "Valor Inválido", description: descriptionForToast, variant: "destructive"});
+        return;
+      }
+      finalValueInSeconds = numericValue;
+
+      switch (type) {
+        case "break":
+          actionType = "SET_DEFAULT_BREAK_DURATION";
+          successMessage = `Duración de descanso regular establecida a ${finalValueInSeconds} seg.`;
+          break;
+        case "preOTBreak":
+          actionType = "SET_DEFAULT_PRE_OT_BREAK_DURATION";
+          successMessage = `Duración de descanso Pre-OT establecida a ${finalValueInSeconds} seg.`;
+          break;
+        case "timeout":
+          actionType = "SET_DEFAULT_TIMEOUT_DURATION";
+          successMessage = `Duración de Time Out establecida a ${finalValueInSeconds} seg.`;
+          break;
+        default:
+          return; // Should not happen
+      }
     }
     
-    let seconds = rawValue;
-    if (type === "period") {
-        seconds = rawValue * 60; // Convert minutes to seconds only for period
-    }
-
-
-    let actionType: GameAction['type'];
-    let successMessage = "";
-
-    switch (type) {
-      case "period":
-        actionType = "SET_DEFAULT_PERIOD_DURATION";
-        successMessage = `Duración de período establecida a ${rawValue} min.`;
-        break;
-      case "break":
-        actionType = "SET_DEFAULT_BREAK_DURATION";
-        successMessage = `Duración de descanso regular establecida a ${seconds} seg.`;
-        break;
-      case "preOTBreak":
-        actionType = "SET_DEFAULT_PRE_OT_BREAK_DURATION";
-        successMessage = `Duración de descanso Pre-OT establecida a ${seconds} seg.`;
-        break;
-      case "timeout":
-        actionType = "SET_DEFAULT_TIMEOUT_DURATION";
-        successMessage = `Duración de Time Out establecida a ${seconds} seg.`;
-        break;
-    }
-    dispatch({ type: actionType, payload: seconds });
+    dispatch({ type: actionType, payload: finalValueInSeconds });
     toast({ title: "Configuración Actualizada", description: successMessage });
   };
 
@@ -124,7 +128,7 @@ export function DurationSettingsCard() {
             <Input
               id="breakDuration"
               type="number"
-              min="10"
+              min="1"
               value={state.defaultBreakDuration}
               onChange={(e) => handleDurationChange("break", e.target.value)}
               className="mt-1"
@@ -152,7 +156,7 @@ export function DurationSettingsCard() {
             <Input
               id="preOTBreakDuration"
               type="number"
-              min="10"
+              min="1"
               value={state.defaultPreOTBreakDuration}
               onChange={(e) => handleDurationChange("preOTBreak", e.target.value)}
               className="mt-1"
@@ -180,7 +184,7 @@ export function DurationSettingsCard() {
             <Input
               id="timeoutDuration"
               type="number"
-              min="10" 
+              min="1" 
               value={state.defaultTimeoutDuration}
               onChange={(e) => handleDurationChange("timeout", e.target.value)}
               className="mt-1"
