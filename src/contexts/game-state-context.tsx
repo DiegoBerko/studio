@@ -85,14 +85,15 @@ export type GameAction =
   | { type: 'SET_DEFAULT_PRE_OT_BREAK_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_TIMEOUT_DURATION'; payload: number }
   | { type: 'SET_MAX_CONCURRENT_PENALTIES'; payload: number }
-  | { type: 'TOGGLE_AUTO_START_BREAKS' } // Kept for potential other uses
-  | { type: 'TOGGLE_AUTO_START_PRE_OT_BREAKS' } // Kept for potential other uses
-  | { type: 'TOGGLE_AUTO_START_TIMEOUTS' } // Kept for potential other uses
+  | { type: 'TOGGLE_AUTO_START_BREAKS' } 
+  | { type: 'TOGGLE_AUTO_START_PRE_OT_BREAKS' } 
+  | { type: 'TOGGLE_AUTO_START_TIMEOUTS' } 
   | { type: 'SET_AUTO_START_BREAKS_VALUE'; payload: boolean }
   | { type: 'SET_AUTO_START_PRE_OT_BREAKS_VALUE'; payload: boolean }
   | { type: 'SET_AUTO_START_TIMEOUTS_VALUE'; payload: boolean }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
-  | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState };
+  | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState }
+  | { type: 'RESET_GAME_STATE' };
 
 
 const initialGlobalState: GameState = {
@@ -133,7 +134,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           ...initialGlobalState,
           ...action.payload,
           _lastActionOriginator: undefined,
-          isClockRunning: false
+          isClockRunning: false,
+          // Ensure currentTime after hydration is based on the (potentially stored) defaultPeriodDuration
+          currentTime: (action.payload && action.payload.defaultPeriodDuration) ? action.payload.defaultPeriodDuration : initialGlobalState.defaultPeriodDuration,
         };
       case 'SET_STATE_FROM_LOCAL_BROADCAST':
         if (JSON.stringify(state) === JSON.stringify(action.payload)) {
@@ -303,14 +306,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             ...state,
             currentPeriod: state.preTimeoutState.period,
             currentTime: state.preTimeoutState.time,
-            isClockRunning: false,
+            isClockRunning: false, 
             periodDisplayOverride: state.preTimeoutState.override,
             preTimeoutState: null,
           };
         }
         return state;
       case 'SET_DEFAULT_PERIOD_DURATION':
-        return { ...state, defaultPeriodDuration: Math.max(60, action.payload) };
+        return { ...state, defaultPeriodDuration: Math.max(1, action.payload) }; // Min 1 minute (payload is in seconds)
       case 'SET_DEFAULT_BREAK_DURATION':
         return { ...state, defaultBreakDuration: Math.max(1, action.payload) };
       case 'SET_DEFAULT_PRE_OT_BREAK_DURATION':
@@ -331,6 +334,21 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return { ...state, autoStartPreOTBreaks: action.payload };
       case 'SET_AUTO_START_TIMEOUTS_VALUE':
         return { ...state, autoStartTimeouts: action.payload };
+      case 'RESET_GAME_STATE':
+        return {
+          ...state, // Keep all existing user-defined settings like default durations, auto-start preferences, max penalties
+          homeScore: initialGlobalState.homeScore,
+          awayScore: initialGlobalState.awayScore,
+          currentTime: state.defaultPeriodDuration, // Reset clock TO THE CONFIGURED default period duration
+          currentPeriod: initialGlobalState.currentPeriod,
+          isClockRunning: initialGlobalState.isClockRunning,
+          homePenalties: initialGlobalState.homePenalties,
+          awayPenalties: initialGlobalState.awayPenalties,
+          homeTeamName: initialGlobalState.homeTeamName,
+          awayTeamName: initialGlobalState.awayTeamName,
+          periodDisplayOverride: initialGlobalState.periodDisplayOverride,
+          preTimeoutState: initialGlobalState.preTimeoutState,
+        };
       default:
         return state;
     }
@@ -364,6 +382,13 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       const rawStoredState = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (rawStoredState) {
         storedState = JSON.parse(rawStoredState) as GameState;
+        // Ensure currentTime is initialized based on potentially stored defaultPeriodDuration
+        if (storedState && storedState.defaultPeriodDuration) {
+            storedState.currentTime = storedState.defaultPeriodDuration;
+        } else {
+            storedState.currentTime = initialGlobalState.defaultPeriodDuration;
+        }
+        storedState.isClockRunning = false; // Always start paused on load
       }
     } catch (error) {
       console.error("Error reading state from localStorage for hydration:", error);
@@ -472,10 +497,13 @@ export const getPeriodText = (period: number): string => {
     return `OT${period - 3}`;
 };
 
-export const minutesToSeconds = (minutes: number): number => minutes * 60;
+export const minutesToSeconds = (minutes: number | string): number => {
+  const numMinutes = typeof minutes === 'string' ? parseInt(minutes, 10) : minutes;
+  if (isNaN(numMinutes) || numMinutes < 0) return 0;
+  return numMinutes * 60;
+};
 export const secondsToMinutes = (seconds: number): string => {
   if (isNaN(seconds) || seconds < 0) return "0";
   return Math.floor(seconds / 60).toString();
 };
-
     
