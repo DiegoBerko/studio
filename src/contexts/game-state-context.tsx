@@ -181,6 +181,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       
       const { _lastActionOriginator, _lastUpdatedTimestamp, ...restOfHydrated } = hydratedBase;
       newStateWithoutMeta = restOfHydrated;
+      // For hydration, we keep the timestamp from storage if it exists, but clear the originator.
       return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: action.payload?._lastUpdatedTimestamp };
     }
     case 'SET_STATE_FROM_LOCAL_BROADCAST': {
@@ -193,7 +194,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       if (!incomingTimestamp && currentTimestamp) {
         return { ...state, _lastActionOriginator: undefined };
       }
-
+      
       const { _lastActionOriginator, ...restOfPayload } = action.payload;
       newStateWithoutMeta = restOfPayload;
       return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: incomingTimestamp };
@@ -288,9 +289,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     case 'TICK': {
-      if (!state.isClockRunning || state.currentTime <= 0) {
-        newStateWithoutMeta = { ...state, isClockRunning: false }; // Ensure clock stops if it reaches 0 or isn't supposed to run
-        break;
+      // This action is dispatched by setInterval. isClockRunning should be true.
+      // If currentTime is already 0, this TICK should effectively be a no-op for time.
+      if (state.currentTime <= 0) {
+         newStateWithoutMeta = { ...state, isClockRunning: false }; // Ensure clock stops
+         break;
       }
       const newTime = state.currentTime - 1;
 
@@ -335,17 +338,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         awayPenaltiesResult = updatePenaltiesForTick(state.awayPenalties, state.maxConcurrentPenalties);
       }
 
-      let newIsClockRunning = state.isClockRunning;
-      if (newTime <= 0) {
-        newIsClockRunning = false;
-      }
-
       newStateWithoutMeta = {
         ...state,
         currentTime: newTime,
         homePenalties: homePenaltiesResult,
         awayPenalties: awayPenaltiesResult,
-        isClockRunning: newIsClockRunning,
+        isClockRunning: newTime > 0, // Clock stops if time reaches 0
       };
       break;
     }
@@ -512,21 +510,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
   if (typeof window !== 'undefined') {
     const nonOriginatingActionTypes: GameAction['type'][] = ['HYDRATE_FROM_STORAGE', 'SET_STATE_FROM_LOCAL_BROADCAST'];
     if (nonOriginatingActionTypes.includes(action.type)) {
-      // Meta fields are handled within these cases specifically.
       return { ...newStateWithoutMeta, _lastActionOriginator: state._lastActionOriginator, _lastUpdatedTimestamp: state._lastUpdatedTimestamp };
     } else if (action.type === 'TICK') {
-      if (state.isClockRunning) {
-        return { ...newStateWithoutMeta, _lastActionOriginator: TAB_ID, _lastUpdatedTimestamp: Date.now() };
-      } else {
-        // If tick is a no-op because clock wasn't running, don't update originator or timestamp
-        return { ...newStateWithoutMeta, _lastActionOriginator: state._lastActionOriginator, _lastUpdatedTimestamp: state._lastUpdatedTimestamp };
-      }
+      return { ...newStateWithoutMeta, _lastActionOriginator: TAB_ID, _lastUpdatedTimestamp: Date.now() };
     } else {
-      // For all other user-initiated actions
       return { ...newStateWithoutMeta, _lastActionOriginator: TAB_ID, _lastUpdatedTimestamp: Date.now() };
     }
   }
-  const { _lastActionOriginator, _lastUpdatedTimestamp, ...restOfState } = state;
+  const { _lastActionOriginator, _lastUpdatedTimestamp, ...restOfState } = state; // Should not happen in browser
   return { ...newStateWithoutMeta, _lastActionOriginator, _lastUpdatedTimestamp };
 };
 
@@ -534,9 +525,30 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(gameReducer, initialGlobalState);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPageVisible, setIsPageVisible] = useState(true);
   const hasHydratedRef = useRef(false);
   const channelRef = useRef<BroadcastChannel | null>(null);
 
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined') {
+        setIsPageVisible(!document.hidden);
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      // Set initial state based on current visibility
+      setIsPageVisible(!document.hidden);
+    }
+
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined' || hasHydratedRef.current) {
@@ -575,8 +587,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       return () => {
         if (channelRef.current) {
           channelRef.current.removeEventListener('message', handleMessage);
-          // channelRef.current.close(); // Consider closing channel on unmount, though spec says they are garbage collected.
-          // channelRef.current = null;
         }
       };
     } else {
@@ -586,13 +596,9 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    if (isLoading) return; 
+    if (isLoading || typeof window === 'undefined') return; 
 
-    if (state._lastActionOriginator !== TAB_ID) {
-      return;
-    }
-
-    if (typeof window !== 'undefined') {
+    if (state._lastActionOriginator === TAB_ID) {
       try {
         const stateForStorage = { ...state };
         
@@ -613,7 +619,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     let timerId: NodeJS.Timeout | undefined;
-    if (state.isClockRunning) {
+    if (state.isClockRunning && isPageVisible) { // Only run if clock should be running AND page is visible
       timerId = setInterval(() => {
         dispatch({ type: 'TICK' });
       }, 1000);
@@ -623,7 +629,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         clearInterval(timerId);
       }
     };
-  }, [state.isClockRunning]);
+  }, [state.isClockRunning, isPageVisible]); // Dependencies include isPageVisible
 
 
   return (
@@ -686,5 +692,7 @@ export const secondsToMinutes = (seconds: number): string => {
 
 
 
+
+    
 
     
