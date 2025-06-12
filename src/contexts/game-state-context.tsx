@@ -39,6 +39,9 @@ interface PreTimeoutState {
   time: number;
   isClockRunning: boolean;
   override: PeriodDisplayOverrideType;
+  // Store previous timing fields for accurate restoration
+  clockStartTimeMs: number | null;
+  remainingTimeAtStartSec: number | null;
 }
 
 export interface ConfigFields {
@@ -68,6 +71,8 @@ interface GameState extends ConfigFields {
   awayTeamName: string;
   periodDisplayOverride: PeriodDisplayOverrideType;
   preTimeoutState: PreTimeoutState | null;
+  clockStartTimeMs: number | null; // Timestamp when clock last started/resumed
+  remainingTimeAtStartSec: number | null; // currentTime value when clock last started/resumed
   _lastActionOriginator?: string;
   _lastUpdatedTimestamp?: number;
 }
@@ -137,6 +142,8 @@ const initialGlobalState: GameState = {
   numberOfRegularPeriods: INITIAL_NUMBER_OF_REGULAR_PERIODS,
   numberOfOvertimePeriods: INITIAL_NUMBER_OF_OVERTIME_PERIODS,
   preTimeoutState: null,
+  clockStartTimeMs: null,
+  remainingTimeAtStartSec: null,
   _lastActionOriginator: undefined,
   _lastUpdatedTimestamp: undefined,
 };
@@ -150,16 +157,18 @@ const GameStateContext = createContext<{
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   let newStateWithoutMeta: Omit<GameState, '_lastActionOriginator' | '_lastUpdatedTimestamp'>;
-  let newTimestamp = Date.now(); // Default for actions originating here
+  let newTimestamp = Date.now();
 
   switch (action.type) {
     case 'HYDRATE_FROM_STORAGE': {
        const hydratedBase: GameState = {
-        ...initialGlobalState, // Start with compiled-in defaults
-        ...(action.payload ?? {}), // Overlay with stored values
+        ...initialGlobalState, 
+        ...(action.payload ?? {}),
       };
-      // ALWAYS start with clock paused when hydrating from storage
+      
       hydratedBase.isClockRunning = false; 
+      hydratedBase.clockStartTimeMs = null;
+      hydratedBase.remainingTimeAtStartSec = null;
 
       const cleanPenaltiesOnHydrate = (penalties?: Penalty[]) => (penalties || []).map(({ _status, ...p }) => p);
       hydratedBase.homePenalties = cleanPenaltiesOnHydrate(action.payload?.homePenalties);
@@ -170,20 +179,17 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           (hydratedBase.defaultOTPeriodDuration ?? initialGlobalState.defaultOTPeriodDuration) :
           (hydratedBase.defaultPeriodDuration ?? initialGlobalState.defaultPeriodDuration);
 
-      // Validate and set currentTime
-      if (action.payload?.currentTime === undefined || action.payload.currentTime === null || action.payload.currentTime > hydratedPeriodDuration || action.payload.currentTime < 0) {
+      if (action.payload?.currentTime === undefined || action.payload.currentTime === null || action.payload.currentTime < 0 || action.payload.currentTime > hydratedPeriodDuration ) {
           hydratedBase.currentTime = hydratedPeriodDuration;
       } else {
           hydratedBase.currentTime = action.payload.currentTime;
       }
-      // Ensure clock is off if time is zero, even if forced off above
       if (hydratedBase.currentTime <= 0) {
-          hydratedBase.isClockRunning = false;
+          hydratedBase.isClockRunning = false; // Ensure clock is off if time is zero
       }
       
       const { _lastActionOriginator, _lastUpdatedTimestamp, ...restOfHydrated } = hydratedBase;
       newStateWithoutMeta = restOfHydrated;
-      // For hydration, keep the timestamp from storage if it exists, originator is cleared.
       return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: action.payload?._lastUpdatedTimestamp };
     }
     case 'SET_STATE_FROM_LOCAL_BROADCAST': {
@@ -191,35 +197,71 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const currentTimestamp = state._lastUpdatedTimestamp;
 
       if (incomingTimestamp && currentTimestamp && incomingTimestamp < currentTimestamp) {
-        newStateWithoutMeta = state; 
-        return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: currentTimestamp };
+        return { ...state, _lastActionOriginator: undefined }; // Keep current state, just clear originator
       }
       if (incomingTimestamp === undefined && currentTimestamp !== undefined) {
-        newStateWithoutMeta = state;
-        return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: currentTimestamp };
+         return { ...state, _lastActionOriginator: undefined }; // Prefer state with timestamp
       }
       
       const { _lastActionOriginator, ...restOfPayload } = action.payload;
       newStateWithoutMeta = restOfPayload;
       return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: incomingTimestamp };
     }
-    case 'TOGGLE_CLOCK':
-      if (state.currentTime <= 0 && !state.isClockRunning) {
-          if (state.periodDisplayOverride === "Break" && !state.autoStartBreaks) { newStateWithoutMeta = state; break; }
-          if (state.periodDisplayOverride === "Pre-OT Break" && !state.autoStartPreOTBreaks) { newStateWithoutMeta = state; break; }
-          if (state.periodDisplayOverride === "Time Out" && !state.autoStartTimeouts) { newStateWithoutMeta = state; break; }
-          if (state.periodDisplayOverride === null && state.currentTime === 0) { newStateWithoutMeta = state; break; }
+    case 'TOGGLE_CLOCK': {
+      let newCurrentTime = state.currentTime;
+      if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartSec) {
+        // Pausing: Calculate actual current time
+        const elapsedMs = Date.now() - state.clockStartTimeMs;
+        const elapsedSec = Math.floor(elapsedMs / 1000);
+        newCurrentTime = Math.max(0, state.remainingTimeAtStartSec - elapsedSec);
       }
-      newStateWithoutMeta = { ...state, isClockRunning: !state.isClockRunning };
+
+      const newIsClockRunning = !state.isClockRunning && newCurrentTime > 0;
+
+      newStateWithoutMeta = { 
+        ...state, 
+        currentTime: newCurrentTime,
+        isClockRunning: newIsClockRunning,
+        clockStartTimeMs: newIsClockRunning ? Date.now() : null,
+        remainingTimeAtStartSec: newIsClockRunning ? newCurrentTime : null,
+      };
+      // Additional condition from original logic: if clock becomes off and time is 0, ensure timing fields are null.
+      if (!newIsClockRunning) {
+        newStateWithoutMeta.clockStartTimeMs = null;
+        newStateWithoutMeta.remainingTimeAtStartSec = null;
+      }
       break;
+    }
     case 'SET_TIME': {
       const newTime = Math.max(0, action.payload.minutes * 60 + action.payload.seconds);
-      newStateWithoutMeta = { ...state, currentTime: newTime, isClockRunning: newTime > 0 ? state.isClockRunning : false };
+      const newIsClockRunning = newTime > 0 ? state.isClockRunning : false;
+      newStateWithoutMeta = { 
+        ...state, 
+        currentTime: newTime,
+        isClockRunning: newIsClockRunning,
+        clockStartTimeMs: newIsClockRunning ? Date.now() : null,
+        remainingTimeAtStartSec: newIsClockRunning ? newTime : null,
+       };
+      if (!newIsClockRunning) {
+        newStateWithoutMeta.clockStartTimeMs = null;
+        newStateWithoutMeta.remainingTimeAtStartSec = null;
+      }
       break;
     }
     case 'ADJUST_TIME': {
       const newTime = Math.max(0, state.currentTime + action.payload);
-      newStateWithoutMeta = { ...state, currentTime: newTime, isClockRunning: newTime > 0 ? state.isClockRunning : false };
+      const newIsClockRunning = newTime > 0 ? state.isClockRunning : false;
+      newStateWithoutMeta = { 
+        ...state, 
+        currentTime: newTime,
+        isClockRunning: newIsClockRunning,
+        clockStartTimeMs: newIsClockRunning ? Date.now() : null,
+        remainingTimeAtStartSec: newIsClockRunning ? newTime : null,
+      };
+       if (!newIsClockRunning) {
+        newStateWithoutMeta.clockStartTimeMs = null;
+        newStateWithoutMeta.remainingTimeAtStartSec = null;
+      }
       break;
     }
     case 'SET_PERIOD': {
@@ -233,6 +275,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         isClockRunning: false,
         currentTime: periodDuration,
         preTimeoutState: null,
+        clockStartTimeMs: null,
+        remainingTimeAtStartSec: null,
       };
       break;
     }
@@ -243,7 +287,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         currentTime: periodDuration,
         isClockRunning: false,
-        periodDisplayOverride: null
+        periodDisplayOverride: null,
+        clockStartTimeMs: null,
+        remainingTimeAtStartSec: null,
       };
       break;
     }
@@ -293,24 +339,44 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     case 'TICK': {
-      if (!state.isClockRunning || state.currentTime <= 0) {
-         newStateWithoutMeta = { ...state, isClockRunning: false }; 
-         break;
+      let newCurrentTime = state.currentTime;
+      let newIsClockRunning = state.isClockRunning;
+      let newClockStartTimeMs = state.clockStartTimeMs;
+      let newRemainingTimeAtStartSec = state.remainingTimeAtStartSec;
+
+      if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartSec) {
+        const elapsedMs = Date.now() - state.clockStartTimeMs;
+        const elapsedSec = Math.floor(elapsedMs / 1000);
+        const calculatedTime = state.remainingTimeAtStartSec - elapsedSec;
+
+        if (calculatedTime <= 0) {
+          newCurrentTime = 0;
+          newIsClockRunning = false;
+          newClockStartTimeMs = null;
+          newRemainingTimeAtStartSec = null;
+        } else {
+          newCurrentTime = calculatedTime;
+        }
+      } else if (state.isClockRunning && state.currentTime <= 0) {
+        // Clock was running but time hit zero (e.g. from a manual set_time to 0 then play)
+        newIsClockRunning = false;
+        newClockStartTimeMs = null;
+        newRemainingTimeAtStartSec = null;
       }
-      const newTime = state.currentTime - 1;
+
 
       let homePenaltiesResult = state.homePenalties;
       let awayPenaltiesResult = state.awayPenalties;
 
-      if (state.periodDisplayOverride === null) { // Only tick penalties if it's game time
+      if (state.isClockRunning && state.periodDisplayOverride === null && newCurrentTime > 0) { // Penalties only tick if game clock is running & it's game time
         const updatePenaltiesForTick = (penalties: Penalty[], maxConcurrent: number): Penalty[] => {
           const resultPenalties: Penalty[] = [];
           const activePlayerTickets: Set<string> = new Set();
           let concurrentRunningCount = 0;
 
           for (const p of penalties) {
-            if (p.remainingTime <= 0) { // Skip penalties already at 0
-              continue;
+            if (p.remainingTime <= 0) { 
+              continue; 
             }
 
             let status: Penalty['_status'] = undefined;
@@ -329,24 +395,24 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
               status = 'pending_concurrent';
             }
             
-            // Only add to results if it's still running or just finished this tick
             if (newRemainingTimeForPenalty > 0 || (status === 'running' && newRemainingTimeForPenalty === 0 && p.remainingTime > 0) ) {
                resultPenalties.push({ ...p, remainingTime: newRemainingTimeForPenalty, _status: status });
             }
           }
           return resultPenalties;
         };
-
         homePenaltiesResult = updatePenaltiesForTick(state.homePenalties, state.maxConcurrentPenalties);
         awayPenaltiesResult = updatePenaltiesForTick(state.awayPenalties, state.maxConcurrentPenalties);
       }
 
       newStateWithoutMeta = {
         ...state,
-        currentTime: newTime,
+        currentTime: newCurrentTime,
+        isClockRunning: newIsClockRunning,
+        clockStartTimeMs: newClockStartTimeMs,
+        remainingTimeAtStartSec: newRemainingTimeAtStartSec,
         homePenalties: homePenaltiesResult,
         awayPenalties: awayPenaltiesResult,
-        isClockRunning: newTime > 0, 
       };
       break;
     }
@@ -361,8 +427,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         currentTime: state.defaultBreakDuration,
         periodDisplayOverride: 'Break',
-        isClockRunning: state.autoStartBreaks,
+        isClockRunning: state.autoStartBreaks && state.defaultBreakDuration > 0,
         preTimeoutState: null,
+        clockStartTimeMs: state.autoStartBreaks && state.defaultBreakDuration > 0 ? Date.now() : null,
+        remainingTimeAtStartSec: state.autoStartBreaks && state.defaultBreakDuration > 0 ? state.defaultBreakDuration : null,
       };
       break;
     case 'START_PRE_OT_BREAK':
@@ -370,8 +438,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         currentTime: state.defaultPreOTBreakDuration,
         periodDisplayOverride: 'Pre-OT Break',
-        isClockRunning: state.autoStartPreOTBreaks,
+        isClockRunning: state.autoStartPreOTBreaks && state.defaultPreOTBreakDuration > 0,
         preTimeoutState: null,
+        clockStartTimeMs: state.autoStartPreOTBreaks && state.defaultPreOTBreakDuration > 0 ? Date.now() : null,
+        remainingTimeAtStartSec: state.autoStartPreOTBreaks && state.defaultPreOTBreakDuration > 0 ? state.defaultPreOTBreakDuration : null,
       };
       break;
     case 'START_BREAK_AFTER_PREVIOUS_PERIOD': {
@@ -381,13 +451,18 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       if (periodBeforeBreak < 1) { newStateWithoutMeta = state; break; }
 
       const isPreOT = periodBeforeBreak >= state.numberOfRegularPeriods;
+      const breakDuration = isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration;
+      const autoStart = isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks;
+
       newStateWithoutMeta = {
         ...state,
         currentPeriod: periodBeforeBreak,
-        currentTime: isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration,
+        currentTime: breakDuration,
         periodDisplayOverride: isPreOT ? 'Pre-OT Break' : 'Break',
-        isClockRunning: isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks,
+        isClockRunning: autoStart && breakDuration > 0,
         preTimeoutState: null,
+        clockStartTimeMs: autoStart && breakDuration > 0 ? Date.now() : null,
+        remainingTimeAtStartSec: autoStart && breakDuration > 0 ? breakDuration : null,
       };
       break;
     }
@@ -399,20 +474,27 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           time: state.currentTime,
           isClockRunning: state.isClockRunning,
           override: state.periodDisplayOverride,
+          clockStartTimeMs: state.clockStartTimeMs, // Persist these from game state
+          remainingTimeAtStartSec: state.remainingTimeAtStartSec,
         },
         currentTime: state.defaultTimeoutDuration,
         periodDisplayOverride: 'Time Out',
-        isClockRunning: state.autoStartTimeouts,
+        isClockRunning: state.autoStartTimeouts && state.defaultTimeoutDuration > 0,
+        clockStartTimeMs: state.autoStartTimeouts && state.defaultTimeoutDuration > 0 ? Date.now() : null,
+        remainingTimeAtStartSec: state.autoStartTimeouts && state.defaultTimeoutDuration > 0 ? state.defaultTimeoutDuration : null,
       };
       break;
     case 'END_TIMEOUT':
       if (state.preTimeoutState) {
+        const shouldResumeClock = state.preTimeoutState.isClockRunning && state.preTimeoutState.time > 0;
         newStateWithoutMeta = {
           ...state,
           currentPeriod: state.preTimeoutState.period,
           currentTime: state.preTimeoutState.time,
-          isClockRunning: false, 
+          isClockRunning: shouldResumeClock,
           periodDisplayOverride: state.preTimeoutState.override,
+          clockStartTimeMs: shouldResumeClock ? Date.now() : null,
+          remainingTimeAtStartSec: shouldResumeClock ? state.preTimeoutState.time : null,
           preTimeoutState: null,
         };
       } else {
@@ -490,48 +572,38 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           ? (state.defaultOTPeriodDuration ?? initialsToKeepConfig.defaultOTPeriodDuration)
           : (state.defaultPeriodDuration ?? initialsToKeepConfig.defaultPeriodDuration);
       newStateWithoutMeta = {
-        ...state, // Keep current config (durations, names, etc.)
+        ...state, 
         homeScore: initialsToKeepConfig.homeScore,
         awayScore: initialsToKeepConfig.awayScore,
         currentTime: initialClockTime,
         currentPeriod: initialsToKeepConfig.currentPeriod,
-        isClockRunning: false, // Always start paused on reset
+        isClockRunning: false, 
         homePenalties: initialsToKeepConfig.homePenalties,
         awayPenalties: initialsToKeepConfig.awayPenalties,
         homeTeamName: initialsToKeepConfig.homeTeamName,
         awayTeamName: initialsToKeepConfig.awayTeamName,
         periodDisplayOverride: initialsToKeepConfig.periodDisplayOverride,
         preTimeoutState: initialsToKeepConfig.preTimeoutState,
+        clockStartTimeMs: null,
+        remainingTimeAtStartSec: null,
       };
       break;
     }
     default:
-      // This case should not be reached if all action types are handled
-      // However, to satisfy TypeScript, ensure newStateWithoutMeta is assigned.
-      // Reverting to state ensures no unintended modification.
       newStateWithoutMeta = state; 
-      newTimestamp = state._lastUpdatedTimestamp || Date.now(); // Preserve timestamp if no change
+      newTimestamp = state._lastUpdatedTimestamp || Date.now();
       break;
   }
 
-  // Determine if this action is a non-originating update
   const nonOriginatingActionTypes: GameAction['type'][] = ['HYDRATE_FROM_STORAGE', 'SET_STATE_FROM_LOCAL_BROADCAST'];
   if (nonOriginatingActionTypes.includes(action.type)) {
-    // For HYDRATE_FROM_STORAGE, the timestamp is already handled (taken from payload or undefined)
-    // For SET_STATE_FROM_LOCAL_BROADCAST, the timestamp is also handled (taken from payload or current state's)
-    // _lastActionOriginator is set to undefined for these.
-    // So, we just return what was constructed inside those cases.
-    // This logic block is slightly redundant with the return inside HYDRATE/SET_STATE cases but confirms intent.
     if (action.type === 'HYDRATE_FROM_STORAGE') return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: (newStateWithoutMeta as GameState)._lastUpdatedTimestamp };
     if (action.type === 'SET_STATE_FROM_LOCAL_BROADCAST') return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: (newStateWithoutMeta as GameState)._lastUpdatedTimestamp };
-
-  } else if (action.type === 'TICK' && !state.isClockRunning) {
-    // If TICK was dispatched but clock wasn't (or shouldn't be) running,
-    // it's a no-op for timestamp/originator to prevent unnecessary broadcast/storage writes.
+  } else if (action.type === 'TICK' && !state.isClockRunning && !newStateWithoutMeta.isClockRunning) {
+    // If TICK was dispatched but clock wasn't running and isn't starting now, it's a no-op for timestamp/originator.
     return { ...newStateWithoutMeta, _lastActionOriginator: state._lastActionOriginator, _lastUpdatedTimestamp: state._lastUpdatedTimestamp };
   }
   
-  // For all other actions (originated locally or a TICK that ran)
   return { ...newStateWithoutMeta, _lastActionOriginator: TAB_ID, _lastUpdatedTimestamp: newTimestamp };
 };
 
@@ -553,7 +625,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
 
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', handleVisibilityChange);
-      setIsPageVisible(!document.hidden); // Set initial state
+      setIsPageVisible(!document.hidden); 
     }
 
     return () => {
@@ -583,7 +655,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
     }
 
     dispatch({ type: 'HYDRATE_FROM_STORAGE', payload: payloadForHydration });
-    setIsLoading(false); // Hydration complete
+    setIsLoading(false); 
 
     if ('BroadcastChannel' in window) {
       if (!channelRef.current) {
@@ -593,9 +665,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
          if (event.data && event.data._lastActionOriginator && event.data._lastActionOriginator !== TAB_ID) {
             const receivedState = event.data as GameState;
             dispatch({ type: 'SET_STATE_FROM_LOCAL_BROADCAST', payload: receivedState });
-        } else if (event.data && !event.data._lastActionOriginator && event.data.type === 'REQUEST_STATE_SYNC') {
-            // This case is for a more advanced sync if needed, not currently used.
-            // If a new tab requests state, the "master" tab could send its current state.
         }
       };
       channelRef.current.addEventListener('message', handleMessage);
@@ -603,28 +672,21 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       return () => {
         if (channelRef.current) {
           channelRef.current.removeEventListener('message', handleMessage);
-          // Consider closing channel if it's the last tab, but browser usually handles this.
         }
       };
     } else {
       console.warn('BroadcastChannel API not available. Multi-tab sync will not work.');
     }
-  }, []); // Runs once on mount
+  }, []); 
 
 
   useEffect(() => {
-    // This effect handles saving to localStorage and broadcasting
     if (isLoading || typeof window === 'undefined' || state._lastActionOriginator !== TAB_ID) {
-      // Don't save or broadcast if:
-      // - Still loading/hydrating
-      // - Not in a browser environment
-      // - The last action was NOT originated by this tab (i.e., it was from broadcast or hydration)
       return;
     }
 
     try {
       const stateForStorage = { ...state };
-      // Clean transient _status from penalties before saving
       const cleanPenalties = (penalties: Penalty[]) => (penalties || []).map(({ _status, ...p }) => p);
       stateForStorage.homePenalties = cleanPenalties(state.homePenalties);
       stateForStorage.awayPenalties = cleanPenalties(state.awayPenalties);
@@ -632,27 +694,26 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
 
       if (channelRef.current) {
-        channelRef.current.postMessage(state); // Broadcast the full state including _lastActionOriginator and _lastUpdatedTimestamp
+        channelRef.current.postMessage(state); 
       }
     } catch (error) {
       console.error("Error saving state to localStorage or broadcasting:", error);
     }
-  }, [state, isLoading]); // Depends on the entire state and loading status
+  }, [state, isLoading]); 
 
   useEffect(() => {
-    // This effect handles the game clock TICK interval
     let timerId: NodeJS.Timeout | undefined;
-    if (state.isClockRunning && isPageVisible) { // Only run if clock should be running AND page is visible
+    if (state.isClockRunning && isPageVisible) { 
       timerId = setInterval(() => {
         dispatch({ type: 'TICK' });
-      }, 1000);
+      }, 1000); // Intervalo de 1 segundo para despachar TICK
     }
     return () => {
       if (timerId) {
         clearInterval(timerId);
       }
     };
-  }, [state.isClockRunning, isPageVisible]); // Depends on clock running status and page visibility
+  }, [state.isClockRunning, isPageVisible]); 
 
 
   return (
@@ -679,26 +740,24 @@ export const formatTime = (totalSeconds: number): string => {
 
 export const getActualPeriodText = (period: number, override: PeriodDisplayOverrideType, numberOfRegularPeriods: number): string => {
   if (override === "Time Out") return "TIME OUT";
-  if (override) return override; // Covers "Break" and "Pre-OT Break"
+  if (override) return override; 
   return getPeriodText(period, numberOfRegularPeriods);
 };
 
 export const getPeriodText = (period: number, numRegPeriods: number): string => {
-    if (period <= 0) return "---"; // Should ideally not happen with validation
+    if (period <= 0) return "---"; 
     if (period <= numRegPeriods) {
         if (period === 1) return "1ST";
         if (period === 2) return "2ND";
         if (period === 3) return "3RD";
-        // For periods beyond 3rd, use ordinal numbers
         if (period % 10 === 1 && period % 100 !== 11) return `${period}ST`;
         if (period % 10 === 2 && period % 100 !== 12) return `${period}ND`;
         if (period % 10 === 3 && period % 100 !== 13) return `${period}RD`;
-        return `${period}TH`; // Covers 4th, 5th, etc.
+        return `${period}TH`; 
     }
-    // Overtime periods
     const overtimeNumber = period - numRegPeriods;
-    if (overtimeNumber === 1) return 'OT'; // Standard OT
-    return `OT${overtimeNumber}`; // For multiple OTs like OT2, OT3
+    if (overtimeNumber === 1) return 'OT'; 
+    return `OT${overtimeNumber}`; 
 };
 
 
@@ -711,3 +770,5 @@ export const secondsToMinutes = (seconds: number): string => {
   if (isNaN(seconds) || seconds < 0) return "0";
   return Math.floor(seconds / 60).toString();
 };
+
+
