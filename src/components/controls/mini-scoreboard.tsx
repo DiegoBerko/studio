@@ -46,7 +46,7 @@ export function MiniScoreboard() {
   };
 
   const handleToggleClock = () => {
-    const isFirstGameAction = state.currentPeriod === 0 && // Warm-up
+    const isFirstGameAction = state.currentPeriod === 0 && 
                               state.periodDisplayOverride === 'Warm-up' && 
                               state.currentTime === state.defaultWarmUpDuration;
     const hasDefaultTeamNames = state.homeTeamName.trim().toUpperCase() === 'LOCAL' || 
@@ -92,9 +92,20 @@ export function MiniScoreboard() {
       return;
     }
     if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
-      // If in a break, SET_PERIOD to state.currentPeriod effectively ends the break and returns to that period's start.
-      dispatch({ type: 'SET_PERIOD', payload: state.currentPeriod });
-      toast({ title: "Período Restaurado", description: `Retornando a ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
+      const actionToConfirm = () => {
+        dispatch({ type: 'SET_PERIOD', payload: state.currentPeriod });
+        toast({ title: "Período Restaurado", description: `Retornando a ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
+      };
+
+      const currentBreakDuration = state.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
+      const shouldConfirm = state.currentTime > 0 && state.currentTime < currentBreakDuration;
+      
+      checkAndConfirm(
+        shouldConfirm,
+        "Confirmar Acción",
+        `El descanso no ha finalizado. ¿Estás seguro de que quieres retornar a ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}?`,
+        actionToConfirm
+      );
     } else { // In Warm-up, Regular Period, or OT Period
       if (state.currentPeriod === 1) { // Currently in 1st Period
         const actionToConfirm = () => {
@@ -163,8 +174,20 @@ export function MiniScoreboard() {
     } else if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") { // In a break
       const nextNumericPeriod = state.currentPeriod + 1;
       if (nextNumericPeriod <= MAX_TOTAL_GAME_PERIODS) {
-        dispatch({ type: 'SET_PERIOD', payload: nextNumericPeriod });
-        toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(nextNumericPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
+        const actionToConfirm = () => {
+            dispatch({ type: 'SET_PERIOD', payload: nextNumericPeriod });
+            toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(nextNumericPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
+        };
+        
+        const currentBreakDuration = state.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
+        const shouldConfirm = state.currentTime > 0 && state.currentTime < currentBreakDuration;
+
+        checkAndConfirm(
+            shouldConfirm,
+            "Confirmar Acción",
+            `El descanso no ha finalizado. ¿Estás seguro de que quieres iniciar ${getPeriodText(nextNumericPeriod, state.numberOfRegularPeriods)}?`,
+            actionToConfirm
+        );
       } else {
         toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}.`, variant: "destructive" });
       }
@@ -407,3 +430,6 @@ export function MiniScoreboard() {
     </>
   );
 }
+
+
+    
