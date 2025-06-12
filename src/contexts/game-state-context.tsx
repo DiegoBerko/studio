@@ -27,6 +27,8 @@ const INITIAL_MAX_CONCURRENT_PENALTIES = 2;
 const INITIAL_AUTO_START_BREAKS = true;
 const INITIAL_AUTO_START_PRE_OT_BREAKS = false;
 const INITIAL_AUTO_START_TIMEOUTS = true;
+const INITIAL_NUMBER_OF_REGULAR_PERIODS = 3;
+const INITIAL_NUMBER_OF_OVERTIME_PERIODS = 1;
 
 type PeriodDisplayOverrideType = "Break" | "Pre-OT Break" | "Time Out" | null;
 
@@ -56,6 +58,8 @@ interface GameState {
   autoStartBreaks: boolean;
   autoStartPreOTBreaks: boolean;
   autoStartTimeouts: boolean;
+  numberOfRegularPeriods: number;
+  numberOfOvertimePeriods: number;
   preTimeoutState: PreTimeoutState | null;
   _lastActionOriginator?: string;
 }
@@ -85,6 +89,8 @@ export type GameAction =
   | { type: 'SET_DEFAULT_PRE_OT_BREAK_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_TIMEOUT_DURATION'; payload: number }
   | { type: 'SET_MAX_CONCURRENT_PENALTIES'; payload: number }
+  | { type: 'SET_NUMBER_OF_REGULAR_PERIODS'; payload: number }
+  | { type: 'SET_NUMBER_OF_OVERTIME_PERIODS'; payload: number }
   | { type: 'TOGGLE_AUTO_START_BREAKS' }
   | { type: 'TOGGLE_AUTO_START_PRE_OT_BREAKS' }
   | { type: 'TOGGLE_AUTO_START_TIMEOUTS' }
@@ -115,6 +121,8 @@ const initialGlobalState: GameState = {
   autoStartBreaks: INITIAL_AUTO_START_BREAKS,
   autoStartPreOTBreaks: INITIAL_AUTO_START_PRE_OT_BREAKS,
   autoStartTimeouts: INITIAL_AUTO_START_TIMEOUTS,
+  numberOfRegularPeriods: INITIAL_NUMBER_OF_REGULAR_PERIODS,
+  numberOfOvertimePeriods: INITIAL_NUMBER_OF_OVERTIME_PERIODS,
   preTimeoutState: null,
   _lastActionOriginator: undefined,
 };
@@ -131,27 +139,27 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     switch (action.type) {
       case 'HYDRATE_FROM_STORAGE': {
         const hydratedBase = {
-          ...initialGlobalState,
-          ...action.payload,
+          ...initialGlobalState, // Start with current app defaults
+          ...action.payload,     // Override with anything from localStorage
         };
 
+        // Ensure isClockRunning is correctly set (from payload or default)
+        // and _lastActionOriginator is cleared for the current tab
         const hydratedState: GameState = {
           ...hydratedBase,
-          // isClockRunning is now taken from action.payload or initialGlobalState
+          isClockRunning: action.payload?.isClockRunning ?? initialGlobalState.isClockRunning,
           _lastActionOriginator: undefined,
         };
 
+        // Clean _status from penalties
         hydratedState.homePenalties = (action.payload?.homePenalties || []).map(({ _status, ...p }: Penalty) => p);
         hydratedState.awayPenalties = (action.payload?.awayPenalties || []).map(({ _status, ...p }: Penalty) => p);
         return hydratedState;
       }
       case 'SET_STATE_FROM_LOCAL_BROADCAST':
-        // El payload viene con _lastActionOriginator. Lo limpiamos para el estado interno de esta pestaña.
-        // Las penalidades en action.payload SÍ pueden tener _status (si el TICK las actualizó en la pestaña emisora).
-        // Es importante mantenerlos para que la UI receptora refleje ese estado inmediatamente.
         const receivedState = {
           ...action.payload,
-          _lastActionOriginator: undefined, // Limpiar para el estado interno de ESTA pestaña
+          _lastActionOriginator: undefined, 
         };
         return receivedState;
 
@@ -235,17 +243,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         let homePenaltiesResult = state.homePenalties;
         let awayPenaltiesResult = state.awayPenalties;
 
-        if (state.periodDisplayOverride === null) { // Penalties only run during regular play
+        if (state.periodDisplayOverride === null) { 
           const updatePenaltiesForTick = (penalties: Penalty[], maxConcurrent: number): Penalty[] => {
             const resultPenalties: Penalty[] = [];
-            const activePlayerTickets: Set<string> = new Set(); // Players who have a penalty running in THIS tick
+            const activePlayerTickets: Set<string> = new Set(); 
             let concurrentRunningCount = 0;
 
             for (const p of penalties) {
               if (p.remainingTime <= 0) {
-                // If a penalty was already at 0 but had a status (e.g. from broadcast),
-                // we keep it for one render cycle if it was 'running' to show 00:00.
-                // Otherwise, we filter it out if it's truly done or wasn't supposed to be running.
                 if (p._status === 'running' && p.remainingTime === 0) {
                     // Keep it to display 00:00 then it will be gone in next processing.
                 } else {
@@ -317,8 +322,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
         const periodBeforeBreak = state.periodDisplayOverride !== null ? state.currentPeriod : state.currentPeriod - 1;
         if (periodBeforeBreak < 1) return state;
-
-        const isPreOT = periodBeforeBreak >= 3;
+        
+        const isPreOT = periodBeforeBreak >= state.numberOfRegularPeriods;
         return {
           ...state,
           currentPeriod: periodBeforeBreak,
@@ -347,7 +352,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             ...state,
             currentPeriod: state.preTimeoutState.period,
             currentTime: state.preTimeoutState.time,
-            isClockRunning: false,
+            isClockRunning: false, 
             periodDisplayOverride: state.preTimeoutState.override,
             preTimeoutState: null,
           };
@@ -363,6 +368,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return { ...state, defaultTimeoutDuration: Math.max(1, action.payload) };
       case 'SET_MAX_CONCURRENT_PENALTIES':
         return { ...state, maxConcurrentPenalties: Math.max(1, action.payload) };
+      case 'SET_NUMBER_OF_REGULAR_PERIODS':
+        return { ...state, numberOfRegularPeriods: Math.max(1, action.payload) };
+      case 'SET_NUMBER_OF_OVERTIME_PERIODS':
+        return { ...state, numberOfOvertimePeriods: Math.max(0, action.payload) };
       case 'TOGGLE_AUTO_START_BREAKS':
         return { ...state, autoStartBreaks: !state.autoStartBreaks };
       case 'TOGGLE_AUTO_START_PRE_OT_BREAKS':
@@ -377,16 +386,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return { ...state, autoStartTimeouts: action.payload };
       case 'RESET_GAME_STATE':
         return {
-          ...state, // Conserva las configuraciones como defaultXDuration, maxPenalties, autoStart...
+          ...state, 
           homeScore: initialGlobalState.homeScore,
           awayScore: initialGlobalState.awayScore,
-          currentTime: state.defaultPeriodDuration, // Usa la duración de período configurada
+          currentTime: state.defaultPeriodDuration, 
           currentPeriod: initialGlobalState.currentPeriod,
           isClockRunning: initialGlobalState.isClockRunning,
           homePenalties: initialGlobalState.homePenalties,
           awayPenalties: initialGlobalState.awayPenalties,
-          homeTeamName: initialGlobalState.homeTeamName, // Podría resetearse o mantenerse, aquí se resetea
-          awayTeamName: initialGlobalState.awayTeamName, // Podría resetearse o mantenerse, aquí se resetea
+          homeTeamName: initialGlobalState.homeTeamName, 
+          awayTeamName: initialGlobalState.awayTeamName, 
           periodDisplayOverride: initialGlobalState.periodDisplayOverride,
           preTimeoutState: initialGlobalState.preTimeoutState,
         };
@@ -467,21 +476,18 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Solo guardar y transmitir si ESTA pestaña originó el último cambio significativo.
     if (state._lastActionOriginator !== TAB_ID) {
       return;
     }
 
     if (typeof window !== 'undefined') {
       try {
-        // Guardar en localStorage SIN el originator y SIN _status de penalidades
         const stateForStorage = { ...state };
         delete stateForStorage._lastActionOriginator;
         stateForStorage.homePenalties = (state.homePenalties || []).map(({ _status, ...p }) => p);
         stateForStorage.awayPenalties = (state.awayPenalties || []).map(({ _status, ...p }) => p);
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
 
-        // Transmitir por BroadcastChannel CON el originator y CON _status de penalidades
         if (channelRef.current) {
           channelRef.current.postMessage(state); 
         }
@@ -524,18 +530,31 @@ export const formatTime = (totalSeconds: number): string => {
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
-export const getActualPeriodText = (period: number, override: PeriodDisplayOverrideType): string => {
+export const getActualPeriodText = (period: number, override: PeriodDisplayOverrideType, numberOfRegularPeriods: number): string => {
   if (override === "Time Out") return "TIME OUT";
-  if (override) return override;
-  return getPeriodText(period);
+  if (override) return override; // "Break" or "Pre-OT Break"
+  return getPeriodText(period, numberOfRegularPeriods);
 };
 
-export const getPeriodText = (period: number): string => {
+export const getPeriodText = (period: number, numRegPeriods: number): string => {
     if (period <= 0) return "---";
-    if (period <= 3) return `${period}${period === 1 ? 'ST' : period === 2 ? 'ND' : 'RD'}`;
-    if (period === 4) return 'OT';
-    return `OT${period - 3}`;
+    if (period <= numRegPeriods) {
+        // For regular periods, use 1ST, 2ND, 3RD, NTH
+        if (period === 1) return "1ST";
+        if (period === 2) return "2ND";
+        if (period === 3) return "3RD";
+        // For 4th, 5th etc. regular periods (if numRegPeriods > 3)
+        if (period % 10 === 1 && period % 100 !== 11) return `${period}ST`;
+        if (period % 10 === 2 && period % 100 !== 12) return `${period}ND`;
+        if (period % 10 === 3 && period % 100 !== 13) return `${period}RD`;
+        return `${period}TH`;
+    }
+    // Overtime periods
+    const overtimeNumber = period - numRegPeriods;
+    if (overtimeNumber === 1) return 'OT';
+    return `OT${overtimeNumber}`;
 };
+
 
 export const minutesToSeconds = (minutes: number | string): number => {
   const numMinutes = typeof minutes === 'string' ? parseInt(minutes, 10) : minutes;

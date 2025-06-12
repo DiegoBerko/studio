@@ -11,8 +11,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const MAX_PERIOD_NUMBER = 7; // Considerando 3 periodos + 4 OTs (OT, OT2, OT3, OT4)
-
 export function MiniScoreboard() {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
@@ -22,6 +20,8 @@ export function MiniScoreboard() {
     description: string;
     onConfirm: () => void;
   } | null>(null);
+
+  const MAX_PERIOD_NUMBER = state.numberOfRegularPeriods + state.numberOfOvertimePeriods;
 
   const handleNameChange = (team: Team, name: string) => {
     if (team === 'home') {
@@ -67,7 +67,7 @@ export function MiniScoreboard() {
     if (condition) {
       setPendingConfirmation({ title, description, onConfirm: action });
     } else {
-      action(); // Execute directly
+      action(); 
     }
   };
 
@@ -78,17 +78,20 @@ export function MiniScoreboard() {
     }
     if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
       dispatch({ type: 'SET_PERIOD', payload: state.currentPeriod });
-      toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(state.currentPeriod)}. Reloj reiniciado y pausado.` });
-    } else { // state.periodDisplayOverride is null (we are in a regular period)
+      toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
+    } else { 
       if (state.currentPeriod > 1) {
         const actionToConfirm = () => {
           dispatch({ type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' }); 
-          const breakType = (state.currentPeriod -1) >= 3 ? "Pre-OT Break" : "Break";
-          const duration = (state.currentPeriod -1) >= 3 ? state.defaultPreOTBreakDuration : state.defaultBreakDuration;
-          const autoStart = (state.currentPeriod -1) >= 3 ? state.autoStartPreOTBreaks : state.autoStartBreaks;
+          
+          const periodBeforeIntendedBreak = state.currentPeriod -1;
+          const isPreOT = periodBeforeIntendedBreak >= state.numberOfRegularPeriods;
+          const breakType = isPreOT ? "Pre-OT Break" : "Break";
+          const duration = isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration;
+          const autoStart = isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks;
           toast({ 
               title: `${breakType} Iniciado`, 
-              description: `${breakType} iniciado después de ${getPeriodText(state.currentPeriod-1)} (${secondsToMinutes(duration)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
+              description: `${breakType} iniciado después de ${getPeriodText(periodBeforeIntendedBreak, state.numberOfRegularPeriods)} (${secondsToMinutes(duration)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
           });
         };
         
@@ -123,14 +126,14 @@ export function MiniScoreboard() {
       const nextNumericPeriod = state.currentPeriod + 1;
       if (nextNumericPeriod <= MAX_PERIOD_NUMBER) {
         dispatch({ type: 'SET_PERIOD', payload: nextNumericPeriod });
-        toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(nextNumericPeriod)}. Reloj reiniciado y pausado.` });
+        toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(nextNumericPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
       } else {
-        toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod)}.`, variant: "destructive" });
+        toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}.`, variant: "destructive" });
       }
-    } else { // Estamos en un período normal
+    } else { 
       if (state.currentPeriod < MAX_PERIOD_NUMBER) {
         const actionToConfirm = () => {
-          const isPreOT = state.currentPeriod >= 3; 
+          const isPreOT = state.currentPeriod >= state.numberOfRegularPeriods; 
           const breakType = isPreOT ? "Pre-OT Break" : "Break";
           const duration = isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration;
           const autoStart = isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks;
@@ -142,7 +145,7 @@ export function MiniScoreboard() {
           }
           toast({ 
               title: `${breakType} Iniciado`, 
-              description: `${breakType} iniciado después de ${getPeriodText(state.currentPeriod)} (${secondsToMinutes(duration)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
+              description: `${breakType} iniciado después de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)} (${secondsToMinutes(duration)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
           });
         };
 
@@ -157,13 +160,16 @@ export function MiniScoreboard() {
           actionToConfirm
         );
       } else {
-        toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod)}.`, variant: "destructive" });
+         toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}.`, variant: "destructive" });
       }
     }
   };
   
   const isPreviousPeriodDisabled = (state.periodDisplayOverride === null && state.currentPeriod <= 1) || state.periodDisplayOverride === "Time Out";
-  const isNextPeriodDisabled = (state.periodDisplayOverride === null && state.currentPeriod >= MAX_PERIOD_NUMBER) || (state.periodDisplayOverride === "Time Out" && state.currentTime > 0) ;
+  const isNextPeriodDisabled = (state.periodDisplayOverride === null && state.currentPeriod >= MAX_PERIOD_NUMBER && state.numberOfOvertimePeriods > 0) ||
+                               (state.periodDisplayOverride === null && state.currentPeriod >= state.numberOfRegularPeriods && state.numberOfOvertimePeriods === 0) ||
+                               (state.periodDisplayOverride === "Time Out" && state.currentTime > 0);
+
 
   const showNextActionButton = state.currentTime <= 0 && !state.isClockRunning;
   const nextActionButtonText = state.periodDisplayOverride === "Time Out" && state.currentTime <=0 ? "Finalizar Time Out" : "Siguiente";
@@ -265,7 +271,7 @@ export function MiniScoreboard() {
                 <ChevronLeft className="h-5 w-5" />
               </Button>
               <p className="text-lg text-primary-foreground uppercase w-28 truncate">
-                {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride)}
+                {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods)}
               </p>
               <Button 
                 onClick={handleNextAction} 
@@ -285,7 +291,7 @@ export function MiniScoreboard() {
             </div>
             {state.periodDisplayOverride === "Time Out" && state.preTimeoutState && (
               <div className="text-xs text-muted-foreground mt-1">
-                Retornando a: {getPeriodText(state.preTimeoutState.period)} - {formatTime(state.preTimeoutState.time)}
+                Retornando a: {getPeriodText(state.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.preTimeoutState.time)}
                 {state.preTimeoutState.override ? ` (${state.preTimeoutState.override})` : ''}
               </div>
             )}

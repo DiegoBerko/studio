@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 
 export interface DurationSettingsCardRef {
-  handleSave: () => boolean; // Returns true if save was successful (or no changes)
+  handleSave: () => boolean; 
   handleDiscard: () => void;
   getIsDirty: () => boolean;
 }
@@ -31,6 +31,9 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
   const [localAutoStartPreOTBreaks, setLocalAutoStartPreOTBreaks] = useState(state.autoStartPreOTBreaks);
   const [localAutoStartTimeouts, setLocalAutoStartTimeouts] = useState(state.autoStartTimeouts);
 
+  const [localNumRegularPeriodsInput, setLocalNumRegularPeriodsInput] = useState(String(state.numberOfRegularPeriods));
+  const [localNumOTPeriodsInput, setLocalNumOTPeriodsInput] = useState(String(state.numberOfOvertimePeriods));
+
   const [isDirty, setIsDirty] = useState(false);
 
   // Effect to update local state if global state changes and form isn't dirty
@@ -43,6 +46,8 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       setLocalAutoStartBreaks(state.autoStartBreaks);
       setLocalAutoStartPreOTBreaks(state.autoStartPreOTBreaks);
       setLocalAutoStartTimeouts(state.autoStartTimeouts);
+      setLocalNumRegularPeriodsInput(String(state.numberOfRegularPeriods));
+      setLocalNumOTPeriodsInput(String(state.numberOfOvertimePeriods));
     }
   }, [
     state.defaultPeriodDuration, 
@@ -52,15 +57,15 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
     state.autoStartBreaks,
     state.autoStartPreOTBreaks,
     state.autoStartTimeouts,
-    isDirty // Re-evaluate if isDirty changes (e.g., after save/discard)
+    state.numberOfRegularPeriods,
+    state.numberOfOvertimePeriods,
+    isDirty 
   ]);
 
-  // Effect to report dirty status to parent
   useEffect(() => {
     onDirtyChange(isDirty);
   }, [isDirty, onDirtyChange]);
   
-  // Helper to mark dirty
   const markDirty = () => {
     if (!isDirty) setIsDirty(true);
   };
@@ -70,7 +75,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       if (!isDirty) return true;
 
       const periodDurationNum = parseInt(localPeriodDurationInput, 10);
-      const finalPeriodDurationSeconds = (isNaN(periodDurationNum) || periodDurationNum < 1) ? 60 : periodDurationNum * 60;
+      const finalPeriodDurationSeconds = (isNaN(periodDurationNum) || periodDurationNum < 1) ? 60 : periodDurationNum * 60; // Default 1 min (60s)
       dispatch({ type: "SET_DEFAULT_PERIOD_DURATION", payload: finalPeriodDurationSeconds });
 
       const breakDurationNum = parseInt(localBreakDurationInput, 10);
@@ -84,6 +89,15 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       const timeoutDurationNum = parseInt(localTimeoutDurationInput, 10);
       const finalTimeoutDurationSeconds = (isNaN(timeoutDurationNum) || timeoutDurationNum < 1) ? 1 : timeoutDurationNum;
       dispatch({ type: "SET_DEFAULT_TIMEOUT_DURATION", payload: finalTimeoutDurationSeconds });
+
+      const numRegularPeriods = parseInt(localNumRegularPeriodsInput, 10);
+      const finalNumRegularPeriods = (isNaN(numRegularPeriods) || numRegularPeriods < 1) ? 3 : numRegularPeriods;
+      dispatch({ type: "SET_NUMBER_OF_REGULAR_PERIODS", payload: finalNumRegularPeriods });
+
+      const numOTPeriods = parseInt(localNumOTPeriodsInput, 10);
+      const finalNumOTPeriods = (isNaN(numOTPeriods) || numOTPeriods < 0) ? 1 : numOTPeriods; // Default 1 OT, can be 0
+      dispatch({ type: "SET_NUMBER_OF_OVERTIME_PERIODS", payload: finalNumOTPeriods });
+
 
       if (localAutoStartBreaks !== state.autoStartBreaks) {
         dispatch({ type: "SET_AUTO_START_BREAKS_VALUE", payload: localAutoStartBreaks });
@@ -106,14 +120,43 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       setLocalAutoStartBreaks(state.autoStartBreaks);
       setLocalAutoStartPreOTBreaks(state.autoStartPreOTBreaks);
       setLocalAutoStartTimeouts(state.autoStartTimeouts);
+      setLocalNumRegularPeriodsInput(String(state.numberOfRegularPeriods));
+      setLocalNumOTPeriodsInput(String(state.numberOfOvertimePeriods));
       setIsDirty(false);
     },
     getIsDirty: () => isDirty,
   }));
 
   return (
-    <ControlCardWrapper title="Configuración de Tiempos y Arranque Automático">
+    <ControlCardWrapper title="Configuración de Tiempos, Períodos y Arranque Automático">
       <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <Label htmlFor="numRegularPeriods">Número de Períodos Regulares</Label>
+                <Input
+                id="numRegularPeriods"
+                type="number"
+                value={localNumRegularPeriodsInput}
+                onChange={(e) => { setLocalNumRegularPeriodsInput(e.target.value); markDirty(); }}
+                className="mt-1"
+                placeholder="ej. 3"
+                min="1"
+                />
+            </div>
+            <div>
+                <Label htmlFor="numOTPeriods">Número de Períodos de Overtime</Label>
+                <Input
+                id="numOTPeriods"
+                type="number"
+                value={localNumOTPeriodsInput}
+                onChange={(e) => { setLocalNumOTPeriodsInput(e.target.value); markDirty(); }}
+                className="mt-1"
+                placeholder="ej. 1 (0 para ninguno)"
+                min="0"
+                />
+            </div>
+        </div>
+
         <div>
           <Label htmlFor="periodDuration">Duración del Período (minutos)</Label>
           <Input
@@ -123,6 +166,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             onChange={(e) => { setLocalPeriodDurationInput(e.target.value); markDirty(); }}
             className="mt-1"
             placeholder="ej. 20"
+            min="1"
           />
         </div>
 
@@ -136,6 +180,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
               onChange={(e) => { setLocalBreakDurationInput(e.target.value); markDirty(); }}
               className="mt-1"
               placeholder="ej. 120"
+              min="1"
             />
           </div>
           <div className="flex items-center justify-between pt-2">
@@ -163,6 +208,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
               onChange={(e) => { setLocalPreOTBreakDurationInput(e.target.value); markDirty(); }}
               className="mt-1"
               placeholder="ej. 60"
+              min="1"
             />
           </div>
           <div className="flex items-center justify-between pt-2">
@@ -190,6 +236,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
               onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
               className="mt-1"
               placeholder="ej. 30"
+              min="1"
             />
           </div>
           <div className="flex items-center justify-between pt-2">
