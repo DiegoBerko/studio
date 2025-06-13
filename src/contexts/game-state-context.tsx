@@ -302,6 +302,30 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
   return newPenalties;
 };
 
+const statusOrderValues: Record<NonNullable<Penalty['_status']>, number> = { 
+  running: 1, 
+  pending_player: 2, 
+  pending_concurrent: 3,
+};
+
+const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
+  const penaltiesToSort = [...penalties]; // Create a shallow copy to sort
+  return penaltiesToSort.sort((a, b) => {
+    const aStatusVal = a._status ? (statusOrderValues[a._status] ?? 4) : 4; // Penalties with undefined status (e.g., expired) go last
+    const bStatusVal = b._status ? (statusOrderValues[b._status] ?? 4) : 4;
+
+    if (aStatusVal !== bStatusVal) {
+      return aStatusVal - bStatusVal;
+    }
+    // If statuses are the same, maintain original relative order (relies on stable sort)
+    return 0; 
+  });
+};
+
+const cleanPenaltiesForStorage = (penalties?: Penalty[]): Omit<Penalty, '_status'>[] => {
+    return (penalties || []).map(({ _status, ...p }) => p);
+};
+
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   let newStateWithoutMeta: Omit<GameState, '_lastActionOriginator' | '_lastUpdatedTimestamp'>;
@@ -317,14 +341,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       hydratedBase.isClockRunning = false; 
       hydratedBase.clockStartTimeMs = null;
       hydratedBase.remainingTimeAtStartCs = null;
-
-      const cleanPenaltiesOnHydrate = (penalties?: Penalty[]) => (penalties || []).map(({ _status, ...p }) => p);
       
-      let rawHomePenalties = cleanPenaltiesOnHydrate(action.payload?.homePenalties);
-      let rawAwayPenalties = cleanPenaltiesOnHydrate(action.payload?.awayPenalties);
+      let rawHomePenalties = cleanPenaltiesForStorage(action.payload?.homePenalties as Penalty[] | undefined);
+      let rawAwayPenalties = cleanPenaltiesForStorage(action.payload?.awayPenalties as Penalty[] | undefined);
 
-      hydratedBase.homePenalties = updatePenaltyStatusesOnly(rawHomePenalties, hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties);
-      hydratedBase.awayPenalties = updatePenaltyStatusesOnly(rawAwayPenalties, hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties);
+      hydratedBase.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(rawHomePenalties as Penalty[], hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties));
+      hydratedBase.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(rawAwayPenalties as Penalty[], hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties));
 
 
       let initialHydratedTimeCs: number;
@@ -542,12 +564,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
       let penalties = [...state[`${action.payload.team}Penalties`], newPenalty];
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
+      penalties = sortPenaltiesByStatus(penalties);
       newStateWithoutMeta = { ...state, [`${action.payload.team}Penalties`]: penalties };
       break;
     }
     case 'REMOVE_PENALTY': {
       let penalties = state[`${action.payload.team}Penalties`].filter(p => p.id !== action.payload.penaltyId);
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
+      penalties = sortPenaltiesByStatus(penalties);
       newStateWithoutMeta = { ...state, [`${action.payload.team}Penalties`]: penalties };
       break;
     }
@@ -562,6 +586,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return p;
       });
       updatedPenalties = updatePenaltyStatusesOnly(updatedPenalties, state.maxConcurrentPenalties);
+      updatedPenalties = sortPenaltiesByStatus(updatedPenalties);
       newStateWithoutMeta = { ...state, [`${team}Penalties`]: updatedPenalties };
       break;
     }
@@ -572,7 +597,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       if (removed) {
         currentPenalties.splice(endIndex, 0, removed);
       }
-      const reorderedPenalties = updatePenaltyStatusesOnly(currentPenalties, state.maxConcurrentPenalties);
+      let reorderedPenalties = updatePenaltyStatusesOnly(currentPenalties, state.maxConcurrentPenalties);
+      reorderedPenalties = sortPenaltiesByStatus(reorderedPenalties);
       newStateWithoutMeta = { ...state, [`${team}Penalties`]: reorderedPenalties };
       break;
     }
@@ -630,17 +656,20 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             };
             homePenaltiesResult = updatePenaltiesForOneSecondTick(state.homePenalties, state.maxConcurrentPenalties);
             awayPenaltiesResult = updatePenaltiesForOneSecondTick(state.awayPenalties, state.maxConcurrentPenalties);
-          } else { // Status might need update even if second boundary not crossed (e.g. penalty added/removed and clock is running)
+          } else { 
             homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
             awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
           }
-        } else if (state.isClockRunning) { // Clock is running, but not for game penalties (e.g. timeout, break)
+        } else if (state.isClockRunning) { 
             homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
             awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
         }
       } else if (state.isClockRunning && state.currentTime <= 0) {
          newCalculatedTimeCs = 0; 
       }
+      
+      homePenaltiesResult = sortPenaltiesByStatus(homePenaltiesResult);
+      awayPenaltiesResult = sortPenaltiesByStatus(awayPenaltiesResult);
 
 
       if (state.isClockRunning && newCalculatedTimeCs <= 0) {
@@ -808,9 +837,15 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_DEFAULT_TIMEOUT_DURATION': 
       newStateWithoutMeta = { ...state, defaultTimeoutDuration: Math.max(1 * CENTISECONDS_PER_SECOND, action.payload) };
       break;
-    case 'SET_MAX_CONCURRENT_PENALTIES':
-      newStateWithoutMeta = { ...state, maxConcurrentPenalties: Math.max(1, action.payload) };
+    case 'SET_MAX_CONCURRENT_PENALTIES': {
+      const newMax = Math.max(1, action.payload);
+      let homePenalties = updatePenaltyStatusesOnly(state.homePenalties, newMax);
+      homePenalties = sortPenaltiesByStatus(homePenalties);
+      let awayPenalties = updatePenaltyStatusesOnly(state.awayPenalties, newMax);
+      awayPenalties = sortPenaltiesByStatus(awayPenalties);
+      newStateWithoutMeta = { ...state, maxConcurrentPenalties: newMax, homePenalties, awayPenalties };
       break;
+    }
     case 'SET_NUMBER_OF_REGULAR_PERIODS':
       newStateWithoutMeta = { ...state, numberOfRegularPeriods: Math.max(1, action.payload) };
       break;
@@ -852,6 +887,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         numberOfOvertimePeriods: config.numberOfOvertimePeriods ?? state.numberOfOvertimePeriods,
         playersPerTeamOnIce: config.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
       };
+      // Recalculate and sort penalties if maxConcurrentPenalties changed
+      const newMaxPen = newStateWithoutMeta.maxConcurrentPenalties;
+      newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, newMaxPen));
+      newStateWithoutMeta.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.awayPenalties, newMaxPen));
       break;
     }
     case 'RESET_CONFIG_TO_DEFAULTS': {
@@ -873,6 +912,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         numberOfOvertimePeriods: INITIAL_NUMBER_OF_OVERTIME_PERIODS,
         playersPerTeamOnIce: INITIAL_PLAYERS_PER_TEAM_ON_ICE,
       };
+      // Recalculate and sort penalties with initial maxConcurrentPenalties
+      const initialMaxPen = INITIAL_MAX_CONCURRENT_PENALTIES;
+      newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, initialMaxPen));
+      newStateWithoutMeta.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.awayPenalties, initialMaxPen));
       break;
     }
     case 'RESET_GAME_STATE': {
@@ -888,8 +931,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         currentPeriod: 0, 
         currentTime: initialWarmUpDurationCs,
         isClockRunning: autoStartWarmUp && initialWarmUpDurationCs > 0, 
-        homePenalties: updatePenaltyStatusesOnly([], state.maxConcurrentPenalties), // Reset penalties
-        awayPenalties: updatePenaltyStatusesOnly([], state.maxConcurrentPenalties), // Reset penalties
+        homePenalties: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
+        awayPenalties: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
         homeTeamName: initialsToKeepConfig.homeTeamName,
         awayTeamName: initialsToKeepConfig.awayTeamName,
         periodDisplayOverride: 'Warm-up',
@@ -997,9 +1040,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const stateForStorage = { ...state };
-      // Do not store _status in localStorage as it's transient
-      const cleanPenaltiesForStorage = (penalties: Penalty[]) => (penalties || []).map(({ _status, ...p }) => p);
+      const stateForStorage: GameState = { ...state };
       stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
       stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
       
