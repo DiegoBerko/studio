@@ -25,12 +25,21 @@ export default function ControlsPage() {
   const [pageDisplayState, setPageDisplayState] = useState<PageDisplayState>('Checking');
   const [currentLockHolderId, setCurrentLockHolderId] = useState<string | null>(null);
   
-  const [instanceId] = useState(() => crypto.randomUUID());
+  const [instanceId, setInstanceId] = useState<string | null>(null);
   
   const channelRef = useRef<BroadcastChannel | null>(null);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
 
+  useEffect(() => {
+    setInstanceId(crypto.randomUUID());
+  }, []);
+
   const checkLockStatus = useCallback(() => {
+    if (!instanceId) {
+      // instanceId is not yet available, try again later or handle appropriately
+      // For now, we'll just return, assuming this will be re-triggered or is not critical yet
+      return;
+    }
     const lockIdFromStorage = localStorage.getItem(CONTROLS_LOCK_KEY);
     
     if (!lockIdFromStorage) {
@@ -51,6 +60,7 @@ export default function ControlsPage() {
 
 
   useEffect(() => {
+    if (!instanceId) return; // Wait for instanceId to be generated
     console.log(`ControlsPage Effect: Instance ${instanceId.slice(-6)} mounting/updating. Current state: ${pageDisplayState}`);
     
     setPageDisplayState('Checking'); 
@@ -61,6 +71,7 @@ export default function ControlsPage() {
     }
 
     const handleChannelMessage = (message: MessageEvent) => {
+      if (!instanceId) return;
       console.log(`Instance ${instanceId.slice(-6)} received channel message:`, message.data);
       if (message.data?.type === 'TAKEOVER_COMMAND') {
         if (message.data.newPrimaryId !== instanceId) {
@@ -81,6 +92,7 @@ export default function ControlsPage() {
     channelRef.current.onmessage = handleChannelMessage;
 
     const handleStorageChange = (event: StorageEvent) => {
+      if (!instanceId) return;
       if (event.key === CONTROLS_LOCK_KEY) {
         console.log(`Instance ${instanceId.slice(-6)} detected storage change for ${CONTROLS_LOCK_KEY}. New value: ${event.newValue?.slice(-6)}, Old value: ${event.oldValue?.slice(-6)}`);
         checkLockStatus();
@@ -89,6 +101,7 @@ export default function ControlsPage() {
     window.addEventListener('storage', handleStorageChange);
 
     const handleBeforeUnload = () => {
+      if (!instanceId) return;
       const currentLockIdInStorage = localStorage.getItem(CONTROLS_LOCK_KEY);
       if (currentLockIdInStorage === instanceId) {
         localStorage.removeItem(CONTROLS_LOCK_KEY);
@@ -100,6 +113,7 @@ export default function ControlsPage() {
     checkLockStatus();
 
     return () => {
+      if (!instanceId) return;
       console.log(`ControlsPage Cleanup: Instance ${instanceId.slice(-6)} unmounting. Current lock holder in storage: ${localStorage.getItem(CONTROLS_LOCK_KEY)?.slice(-6)}`);
       
       const currentLockIdInStorage = localStorage.getItem(CONTROLS_LOCK_KEY);
@@ -155,6 +169,10 @@ export default function ControlsPage() {
 
 
   const handleTakeOver = useCallback(() => {
+    if (!instanceId) {
+      toast({ title: "Error", description: "No se pudo obtener el ID de la instancia. Intenta recargar.", variant: "destructive" });
+      return;
+    }
     console.log(`Instance ${instanceId.slice(-6)} attempting to take over.`);
     localStorage.setItem(CONTROLS_LOCK_KEY, instanceId);
     if (channelRef.current) {
@@ -175,13 +193,13 @@ export default function ControlsPage() {
     setShowResetConfirmation(false);
   };
 
-  if (pageDisplayState === 'Checking') {
+  if (pageDisplayState === 'Checking' || !instanceId) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-10rem)] text-center p-4">
         <RefreshCw className="h-12 w-12 animate-spin text-primary mb-4" />
         <p className="text-xl text-foreground">Verificando instancia de controles...</p>
         <p className="text-sm text-muted-foreground">Esto tomará un momento.</p>
-        <p className="text-xs text-muted-foreground mt-2">ID de esta instancia: ...{instanceId.slice(-6)}</p>
+        <p className="text-xs text-muted-foreground mt-2">ID de esta instancia: ...{instanceId ? instanceId.slice(-6) : 'generando...'}</p>
       </div>
     );
   }
@@ -203,7 +221,7 @@ export default function ControlsPage() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-6">
-          ID de esta instancia: ...{instanceId.slice(-6)} <br />
+          ID de esta instancia: ...{instanceId ? instanceId.slice(-6) : 'N/A'} <br />
           ID de la instancia activa: ...{currentLockHolderId?.slice(-6) || 'Desconocido'}
         </p>
       </div>
@@ -248,8 +266,9 @@ export default function ControlsPage() {
         </p>
       </div>
        <p className="text-xs text-muted-foreground mt-6 text-center">
-          ID de esta instancia de Controles (Primaria): ...{instanceId.slice(-6)}
+          ID de esta instancia de Controles (Primaria): ...{instanceId ? instanceId.slice(-6) : 'N/A'}
       </p>
     </div>
   );
 }
+
