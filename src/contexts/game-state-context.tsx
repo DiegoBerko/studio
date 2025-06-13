@@ -974,14 +974,14 @@ export const useGameState = () => {
 
 export const formatTime = (
   totalCentiseconds: number,
-  displayCentisecondsWhenUnderMinute: boolean = false
+  displayTenthsWhenUnderMinute: boolean = false
 ): string => {
   if (isNaN(totalCentiseconds) || totalCentiseconds < 0) totalCentiseconds = 0;
 
-  if (displayCentisecondsWhenUnderMinute && totalCentiseconds < (60 * CENTISECONDS_PER_SECOND)) {
+  if (displayTenthsWhenUnderMinute && totalCentiseconds < (60 * CENTISECONDS_PER_SECOND)) {
     const seconds = Math.floor(totalCentiseconds / CENTISECONDS_PER_SECOND);
-    const centiseconds = totalCentiseconds % CENTISECONDS_PER_SECOND;
-    return `${seconds.toString().padStart(2, '0')}.${centiseconds.toString().padStart(2, '0')}`;
+    const tenths = Math.floor((totalCentiseconds % CENTISECONDS_PER_SECOND) / 10);
+    return `${seconds.toString().padStart(2, '0')}.${tenths.toString()}`;
   } else { 
     const totalSecondsOnly = Math.floor(totalCentiseconds / CENTISECONDS_PER_SECOND);
     const minutes = Math.floor(totalSecondsOnly / 60);

@@ -14,22 +14,24 @@ export function TimeControlCard() {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
 
-  // Local state for inputs
   const [localMinutes, setLocalMinutes] = useState(() => 
-    String(Math.floor(state.currentTime / 60)).padStart(2, '0')
+    String(Math.floor(state.currentTime / 6000)).padStart(2, '0') // 6000 cs = 60s
   );
   const [localSeconds, setLocalSeconds] = useState(() => 
-    String(state.currentTime % 60).padStart(2, '0')
+    String(Math.floor((state.currentTime % 6000) / 100)).padStart(2, '0') // cs to s
   );
   const [isDirty, setIsDirty] = useState(false);
 
-  // Effect to update local inputs if global time changes
-  // OR if the inputs are not dirty (user hasn't started typing)
   useEffect(() => {
-    if (state.isClockRunning || !isDirty) {
-      setLocalMinutes(String(Math.floor(state.currentTime / 60)).padStart(2, '0'));
-      setLocalSeconds(String(state.currentTime % 60).padStart(2, '0'));
-      if (isDirty && state.isClockRunning) { // If clock starts running while dirty, reset dirty flag
+    // Only update inputs from global state if:
+    // 1. The inputs haven't been touched by the user (isDirty is false)
+    // OR
+    // 2. The clock is running AND it's NOT in the last minute (currentTime >= 6000 centiseconds)
+    if (!isDirty || (state.isClockRunning && state.currentTime >= 6000)) {
+      setLocalMinutes(String(Math.floor(state.currentTime / 6000)).padStart(2, '0'));
+      setLocalSeconds(String(Math.floor((state.currentTime % 6000) / 100)).padStart(2, '0'));
+      // If inputs were dirty but got updated because clock is running (and not in last min)
+      if (isDirty && state.isClockRunning) {
         setIsDirty(false);
       }
     }
@@ -78,6 +80,7 @@ export function TimeControlCard() {
     const finalSeconds = Math.min(secondsNum, 59);
     const finalMinutes = minutesNum;
 
+    // Dispatch expects payload in minutes and seconds, conversion to CS happens in reducer
     dispatch({ type: 'SET_TIME', payload: { minutes: finalMinutes, seconds: finalSeconds } });
     toast({ 
       title: "Reloj Actualizado", 
@@ -91,7 +94,7 @@ export function TimeControlCard() {
     const autoStart = state.autoStartTimeouts;
     toast({ 
         title: "Time Out Iniciado", 
-        description: `Time Out de ${state.defaultTimeoutDuration} segundos. Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
+        description: `Time Out de ${state.defaultTimeoutDuration / 100} segundos. Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
     });
   };
 
@@ -104,7 +107,7 @@ export function TimeControlCard() {
   return (
     <ControlCardWrapper title="Ajustes de Tiempo y Time Out">
       <div className="space-y-4">
-        <fieldset disabled={state.isClockRunning} className="space-y-2">
+        <fieldset disabled={state.isClockRunning && state.currentTime < 6000} className="space-y-2">
           <Label htmlFor="minutes-manual">Establecer Tiempo Manualmente</Label>
           <div className="flex items-center gap-2">
             <Input
@@ -117,7 +120,7 @@ export function TimeControlCard() {
               placeholder="MM"
               className="w-1/3"
               aria-label="Establecer minutos"
-              disabled={state.isClockRunning}
+              disabled={state.isClockRunning && state.currentTime < 6000}
             />
             <span className="font-bold text-primary-foreground">:</span>
             <Input
@@ -130,18 +133,21 @@ export function TimeControlCard() {
               placeholder="SS"
               className="w-1/3"
               aria-label="Establecer segundos"
-              disabled={state.isClockRunning}
+              disabled={state.isClockRunning && state.currentTime < 6000}
             />
             <Button 
               onClick={handleSetTime} 
               variant="secondary" 
               className="flex-1" 
               aria-label="Aplicar Cambio de Tiempo"
-              disabled={state.isClockRunning || !isDirty}
+              disabled={(state.isClockRunning && state.currentTime < 6000) || !isDirty}
             >
               Establecer
             </Button>
           </div>
+           {(state.isClockRunning && state.currentTime < 6000) && (
+            <p className="text-xs text-muted-foreground pt-1">El ajuste manual de tiempo está deshabilitado mientras el reloj corre en el último minuto.</p>
+          )}
         </fieldset>
 
         <div className="border-t border-border pt-4">
@@ -159,4 +165,3 @@ export function TimeControlCard() {
     </ControlCardWrapper>
   );
 }
-
