@@ -296,6 +296,9 @@ export default function ConfigPage() {
 
       <div className="space-y-6 p-6 border rounded-md bg-card">
         <h2 className="text-xl font-semibold text-primary-foreground">Acciones</h2>
+        <p className="text-sm text-muted-foreground">
+          Guarda tu configuración actual en un archivo, carga una configuración previamente guardada, o restablece todas las configuraciones a sus valores predeterminados de fábrica.
+        </p>
         <div className="flex flex-col sm:flex-row gap-4">
           <Button onClick={prepareExportConfig} variant="outline" className="flex-1">
             <Download className="mr-2 h-4 w-4" /> Exportar Configuración
@@ -303,8 +306,8 @@ export default function ConfigPage() {
           <Button onClick={handleImportClick} variant="outline" className="flex-1">
             <Upload className="mr-2 h-4 w-4" /> Importar Configuración
           </Button>
-          <Button onClick={handlePrepareResetConfig} variant="destructive" > {/* Removed flex-1 */}
-            <RotateCcw className="mr-2 h-4 w-4" /> Restablecer Predeterminados
+          <Button onClick={handlePrepareResetConfig} variant="destructive" >
+            <RotateCcw className="mr-2 h-4 w-4" /> Restablecer
           </Button>
           <input
             type="file"
