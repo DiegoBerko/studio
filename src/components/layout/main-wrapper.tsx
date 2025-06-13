@@ -12,7 +12,7 @@ export function MainWrapper({ children }: { children: ReactNode }) {
   return (
     <main className={cn(
       "flex-1",
-      isScoreboardPage ? "w-full px-4 sm:px-6 lg:px-8 pt-4 pb-8" : "container py-8"
+      isScoreboardPage ? "w-full px-4 sm:px-6 lg:px-8 pb-8" : "container py-8" // Removido pt-4 de aquí
     )}>
       {children}
     </main>
