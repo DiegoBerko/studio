@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useGameState, formatTime } from '@/contexts/game-state-context';
+import { useGameState, formatTime, CENTISECONDS_PER_SECOND } from '@/contexts/game-state-context';
 import type { Penalty, Team } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,12 +19,12 @@ interface PenaltyControlCardProps {
   teamName: string; // Actual display name from state
 }
 
-const ADJUST_TIME_DELTA = 1; // Segundos para ajustar
+const ADJUST_TIME_DELTA_SECONDS = 1; 
 
 export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) {
   const { state, dispatch } = useGameState();
   const [playerNumber, setPlayerNumber] = useState('');
-  const [penaltyDuration, setPenaltyDuration] = useState('120');
+  const [penaltyDurationSeconds, setPenaltyDurationSeconds] = useState('120'); // Store as seconds string
   const { toast } = useToast();
 
   const [draggedPenaltyId, setDraggedPenaltyId] = useState<string | null>(null);
@@ -36,20 +36,22 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     e.preventDefault();
     const trimmedPlayerNumber = playerNumber.trim();
 
-    if (!trimmedPlayerNumber || !penaltyDuration) {
+    if (!trimmedPlayerNumber || !penaltyDurationSeconds) {
       toast({ title: "Error", description: "Número de jugador y duración son requeridos.", variant: "destructive" });
       return;
     }
-    const durationSec = parseInt(penaltyDuration, 10);
+    const durationSec = parseInt(penaltyDurationSeconds, 10);
     dispatch({
       type: 'ADD_PENALTY',
       payload: {
         team,
+        // Penalty durations (initial and remaining) are stored in seconds in the Penalty type
         penalty: { playerNumber: trimmedPlayerNumber, initialDuration: durationSec, remainingTime: durationSec },
       },
     });
-    toast({ title: "Penalidad Agregada", description: `Jugador ${trimmedPlayerNumber} de ${teamName} recibió una penalidad de ${formatTime(durationSec)}.` });
+    toast({ title: "Penalidad Agregada", description: `Jugador ${trimmedPlayerNumber} de ${teamName} recibió una penalidad de ${formatTime(durationSec * CENTISECONDS_PER_SECOND)}.` });
     setPlayerNumber('');
+    // setPenaltyDurationSeconds('120'); // Optionally reset duration
   };
 
   const handleRemovePenalty = (penaltyId: string) => {
@@ -57,15 +59,14 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     toast({ title: "Penalidad Removida", description: `Penalidad para ${teamName} removida.` });
   };
 
-  const handleAdjustPenaltyTime = (penaltyId: string, delta: number) => {
-    dispatch({ type: 'ADJUST_PENALTY_TIME', payload: { team, penaltyId, delta } });
+  const handleAdjustPenaltyTime = (penaltyId: string, deltaSeconds: number) => {
+    dispatch({ type: 'ADJUST_PENALTY_TIME', payload: { team, penaltyId, delta: deltaSeconds } });
     const penalty = penalties.find(p => p.id === penaltyId);
     if (penalty) {
-        toast({ title: "Tiempo de Penalidad Ajustado", description: `Tiempo para Jugador ${penalty.playerNumber} (${teamName}) ajustado en ${delta > 0 ? '+' : ''}${delta}s.` });
+        toast({ title: "Tiempo de Penalidad Ajustado", description: `Tiempo para Jugador ${penalty.playerNumber} (${teamName}) ajustado en ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s.` });
     }
   };
 
-  // Drag and Drop Handlers
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, penaltyId: string) => {
     setDraggedPenaltyId(penaltyId);
     e.dataTransfer.effectAllowed = "move";
@@ -129,13 +130,13 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
             />
           </div>
           <div>
-            <Label htmlFor={`${team}-penaltyDuration`}>Duración</Label>
-            <Select value={penaltyDuration} onValueChange={setPenaltyDuration}>
+            <Label htmlFor={`${team}-penaltyDuration`}>Duración (segundos)</Label>
+            <Select value={penaltyDurationSeconds} onValueChange={setPenaltyDurationSeconds}>
               <SelectTrigger id={`${team}-penaltyDuration`}>
                 <SelectValue placeholder="Seleccionar duración" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="5">0:05 (Prueba)</SelectItem>
+                <SelectItem value="4">0:04 (Prueba)</SelectItem>
                 <SelectItem value="120">2:00 (Menor)</SelectItem>
                 <SelectItem value="240">4:00 (Doble Menor)</SelectItem>
                 <SelectItem value="300">5:00 (Mayor)</SelectItem>
@@ -182,7 +183,8 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                       <p className="font-semibold">Jugador {p.playerNumber}</p>
                       <div className="flex items-center text-xs text-muted-foreground">
                         <Clock className="h-3 w-3 mr-1" />
-                        <span>{formatTime(p.remainingTime)} / {formatTime(p.initialDuration)}</span>
+                        {/* Format penalty time (stored in seconds) to MM:SS using centiseconds for formatTime */}
+                        <span>{formatTime(p.remainingTime * CENTISECONDS_PER_SECOND)} / {formatTime(p.initialDuration * CENTISECONDS_PER_SECOND)}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 ml-2">
@@ -190,8 +192,8 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={() => handleAdjustPenaltyTime(p.id, -ADJUST_TIME_DELTA)}
-                        aria-label={`Restar ${ADJUST_TIME_DELTA}s a penalidad de jugador ${p.playerNumber}`}
+                        onClick={() => handleAdjustPenaltyTime(p.id, -ADJUST_TIME_DELTA_SECONDS)}
+                        aria-label={`Restar ${ADJUST_TIME_DELTA_SECONDS}s a penalidad de jugador ${p.playerNumber}`}
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
@@ -199,8 +201,8 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={() => handleAdjustPenaltyTime(p.id, ADJUST_TIME_DELTA)}
-                        aria-label={`Sumar ${ADJUST_TIME_DELTA}s a penalidad de jugador ${p.playerNumber}`}
+                        onClick={() => handleAdjustPenaltyTime(p.id, ADJUST_TIME_DELTA_SECONDS)}
+                        aria-label={`Sumar ${ADJUST_TIME_DELTA_SECONDS}s a penalidad de jugador ${p.playerNumber}`}
                       >
                         <Plus className="h-3 w-3" />
                       </Button>
@@ -230,4 +232,3 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     </ControlCardWrapper>
   );
 }
-

@@ -2,7 +2,12 @@
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
-import { useGameState, secondsToMinutes, minutesToSeconds } from "@/contexts/game-state-context";
+import { 
+  useGameState, 
+  centisecondsToDisplayMinutes, 
+  centisecondsToDisplaySeconds,
+  CENTISECONDS_PER_SECOND
+} from "@/contexts/game-state-context";
 import { ControlCardWrapper } from "@/components/controls/control-card-wrapper";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -21,13 +26,13 @@ interface DurationSettingsCardProps {
 export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, DurationSettingsCardProps>(({ onDirtyChange }, ref) => {
   const { state, dispatch } = useGameState();
 
-  // Local state for inputs
-  const [localWarmUpDurationInput, setLocalWarmUpDurationInput] = useState(secondsToMinutes(state.defaultWarmUpDuration));
-  const [localPeriodDurationInput, setLocalPeriodDurationInput] = useState(secondsToMinutes(state.defaultPeriodDuration));
-  const [localOTPeriodDurationInput, setLocalOTPeriodDurationInput] = useState(secondsToMinutes(state.defaultOTPeriodDuration));
-  const [localBreakDurationInput, setLocalBreakDurationInput] = useState(String(state.defaultBreakDuration));
-  const [localPreOTBreakDurationInput, setLocalPreOTBreakDurationInput] = useState(String(state.defaultPreOTBreakDuration));
-  const [localTimeoutDurationInput, setLocalTimeoutDurationInput] = useState(String(state.defaultTimeoutDuration));
+  // Local state for inputs (stores minutes or seconds as strings for UI)
+  const [localWarmUpDurationInput, setLocalWarmUpDurationInput] = useState(centisecondsToDisplayMinutes(state.defaultWarmUpDuration));
+  const [localPeriodDurationInput, setLocalPeriodDurationInput] = useState(centisecondsToDisplayMinutes(state.defaultPeriodDuration));
+  const [localOTPeriodDurationInput, setLocalOTPeriodDurationInput] = useState(centisecondsToDisplayMinutes(state.defaultOTPeriodDuration));
+  const [localBreakDurationInput, setLocalBreakDurationInput] = useState(centisecondsToDisplaySeconds(state.defaultBreakDuration));
+  const [localPreOTBreakDurationInput, setLocalPreOTBreakDurationInput] = useState(centisecondsToDisplaySeconds(state.defaultPreOTBreakDuration));
+  const [localTimeoutDurationInput, setLocalTimeoutDurationInput] = useState(centisecondsToDisplaySeconds(state.defaultTimeoutDuration));
   
   const [localAutoStartWarmUp, setLocalAutoStartWarmUp] = useState(state.autoStartWarmUp);
   const [localAutoStartBreaks, setLocalAutoStartBreaks] = useState(state.autoStartBreaks);
@@ -39,15 +44,14 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 
   const [isDirty, setIsDirty] = useState(false);
 
-  // Effect to update local state if global state changes and form isn't dirty
   useEffect(() => {
     if (!isDirty) {
-      setLocalWarmUpDurationInput(secondsToMinutes(state.defaultWarmUpDuration));
-      setLocalPeriodDurationInput(secondsToMinutes(state.defaultPeriodDuration));
-      setLocalOTPeriodDurationInput(secondsToMinutes(state.defaultOTPeriodDuration));
-      setLocalBreakDurationInput(String(state.defaultBreakDuration));
-      setLocalPreOTBreakDurationInput(String(state.defaultPreOTBreakDuration));
-      setLocalTimeoutDurationInput(String(state.defaultTimeoutDuration));
+      setLocalWarmUpDurationInput(centisecondsToDisplayMinutes(state.defaultWarmUpDuration));
+      setLocalPeriodDurationInput(centisecondsToDisplayMinutes(state.defaultPeriodDuration));
+      setLocalOTPeriodDurationInput(centisecondsToDisplayMinutes(state.defaultOTPeriodDuration));
+      setLocalBreakDurationInput(centisecondsToDisplaySeconds(state.defaultBreakDuration));
+      setLocalPreOTBreakDurationInput(centisecondsToDisplaySeconds(state.defaultPreOTBreakDuration));
+      setLocalTimeoutDurationInput(centisecondsToDisplaySeconds(state.defaultTimeoutDuration));
       setLocalAutoStartWarmUp(state.autoStartWarmUp);
       setLocalAutoStartBreaks(state.autoStartBreaks);
       setLocalAutoStartPreOTBreaks(state.autoStartPreOTBreaks);
@@ -83,36 +87,36 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
     handleSave: () => {
       if (!isDirty) return true;
 
-      const warmUpDurationNum = parseInt(localWarmUpDurationInput, 10);
-      const finalWarmUpDurationSeconds = (isNaN(warmUpDurationNum) || warmUpDurationNum < 1) ? 60 : warmUpDurationNum * 60;
-      dispatch({ type: "SET_DEFAULT_WARM_UP_DURATION", payload: finalWarmUpDurationSeconds });
+      const warmUpDurationMin = parseInt(localWarmUpDurationInput, 10);
+      const finalWarmUpDurationCs = (isNaN(warmUpDurationMin) || warmUpDurationMin < 1) ? (60 * CENTISECONDS_PER_SECOND) : warmUpDurationMin * 60 * CENTISECONDS_PER_SECOND;
+      dispatch({ type: "SET_DEFAULT_WARM_UP_DURATION", payload: finalWarmUpDurationCs });
 
-      const periodDurationNum = parseInt(localPeriodDurationInput, 10);
-      const finalPeriodDurationSeconds = (isNaN(periodDurationNum) || periodDurationNum < 1) ? 60 : periodDurationNum * 60;
-      dispatch({ type: "SET_DEFAULT_PERIOD_DURATION", payload: finalPeriodDurationSeconds });
+      const periodDurationMin = parseInt(localPeriodDurationInput, 10);
+      const finalPeriodDurationCs = (isNaN(periodDurationMin) || periodDurationMin < 1) ? (60 * CENTISECONDS_PER_SECOND) : periodDurationMin * 60 * CENTISECONDS_PER_SECOND;
+      dispatch({ type: "SET_DEFAULT_PERIOD_DURATION", payload: finalPeriodDurationCs });
 
-      const otPeriodDurationNum = parseInt(localOTPeriodDurationInput, 10);
-      const finalOTPeriodDurationSeconds = (isNaN(otPeriodDurationNum) || otPeriodDurationNum < 1) ? 60 : otPeriodDurationNum * 60;
-      dispatch({ type: "SET_DEFAULT_OT_PERIOD_DURATION", payload: finalOTPeriodDurationSeconds });
+      const otPeriodDurationMin = parseInt(localOTPeriodDurationInput, 10);
+      const finalOTPeriodDurationCs = (isNaN(otPeriodDurationMin) || otPeriodDurationMin < 1) ? (60 * CENTISECONDS_PER_SECOND) : otPeriodDurationMin * 60 * CENTISECONDS_PER_SECOND;
+      dispatch({ type: "SET_DEFAULT_OT_PERIOD_DURATION", payload: finalOTPeriodDurationCs });
 
-      const breakDurationNum = parseInt(localBreakDurationInput, 10);
-      const finalBreakDurationSeconds = (isNaN(breakDurationNum) || breakDurationNum < 1) ? 1 : breakDurationNum;
-      dispatch({ type: "SET_DEFAULT_BREAK_DURATION", payload: finalBreakDurationSeconds });
+      const breakDurationSec = parseInt(localBreakDurationInput, 10);
+      const finalBreakDurationCs = (isNaN(breakDurationSec) || breakDurationSec < 1) ? (1 * CENTISECONDS_PER_SECOND) : breakDurationSec * CENTISECONDS_PER_SECOND;
+      dispatch({ type: "SET_DEFAULT_BREAK_DURATION", payload: finalBreakDurationCs });
 
-      const preOTBreakDurationNum = parseInt(localPreOTBreakDurationInput, 10);
-      const finalPreOTBreakDurationSeconds = (isNaN(preOTBreakDurationNum) || preOTBreakDurationNum < 1) ? 1 : preOTBreakDurationNum;
-      dispatch({ type: "SET_DEFAULT_PRE_OT_BREAK_DURATION", payload: finalPreOTBreakDurationSeconds });
+      const preOTBreakDurationSec = parseInt(localPreOTBreakDurationInput, 10);
+      const finalPreOTBreakDurationCs = (isNaN(preOTBreakDurationSec) || preOTBreakDurationSec < 1) ? (1 * CENTISECONDS_PER_SECOND) : preOTBreakDurationSec * CENTISECONDS_PER_SECOND;
+      dispatch({ type: "SET_DEFAULT_PRE_OT_BREAK_DURATION", payload: finalPreOTBreakDurationCs });
       
-      const timeoutDurationNum = parseInt(localTimeoutDurationInput, 10);
-      const finalTimeoutDurationSeconds = (isNaN(timeoutDurationNum) || timeoutDurationNum < 1) ? 1 : timeoutDurationNum;
-      dispatch({ type: "SET_DEFAULT_TIMEOUT_DURATION", payload: finalTimeoutDurationSeconds });
+      const timeoutDurationSec = parseInt(localTimeoutDurationInput, 10);
+      const finalTimeoutDurationCs = (isNaN(timeoutDurationSec) || timeoutDurationSec < 1) ? (1 * CENTISECONDS_PER_SECOND) : timeoutDurationSec * CENTISECONDS_PER_SECOND;
+      dispatch({ type: "SET_DEFAULT_TIMEOUT_DURATION", payload: finalTimeoutDurationCs });
 
       const numRegularPeriods = parseInt(localNumRegularPeriodsInput, 10);
       const finalNumRegularPeriods = (isNaN(numRegularPeriods) || numRegularPeriods < 1) ? 3 : numRegularPeriods;
       dispatch({ type: "SET_NUMBER_OF_REGULAR_PERIODS", payload: finalNumRegularPeriods });
 
       const numOTPeriods = parseInt(localNumOTPeriodsInput, 10);
-      const finalNumOTPeriods = (isNaN(numOTPeriods) || numOTPeriods < 0) ? 1 : numOTPeriods;
+      const finalNumOTPeriods = (isNaN(numOTPeriods) || numOTPeriods < 0) ? 1 : numOTPeriods; // Allow 0 for no OT
       dispatch({ type: "SET_NUMBER_OF_OVERTIME_PERIODS", payload: finalNumOTPeriods });
 
       if (localAutoStartWarmUp !== state.autoStartWarmUp) {
@@ -132,12 +136,12 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       return true;
     },
     handleDiscard: () => {
-      setLocalWarmUpDurationInput(secondsToMinutes(state.defaultWarmUpDuration));
-      setLocalPeriodDurationInput(secondsToMinutes(state.defaultPeriodDuration));
-      setLocalOTPeriodDurationInput(secondsToMinutes(state.defaultOTPeriodDuration));
-      setLocalBreakDurationInput(String(state.defaultBreakDuration));
-      setLocalPreOTBreakDurationInput(String(state.defaultPreOTBreakDuration));
-      setLocalTimeoutDurationInput(String(state.defaultTimeoutDuration));
+      setLocalWarmUpDurationInput(centisecondsToDisplayMinutes(state.defaultWarmUpDuration));
+      setLocalPeriodDurationInput(centisecondsToDisplayMinutes(state.defaultPeriodDuration));
+      setLocalOTPeriodDurationInput(centisecondsToDisplayMinutes(state.defaultOTPeriodDuration));
+      setLocalBreakDurationInput(centisecondsToDisplaySeconds(state.defaultBreakDuration));
+      setLocalPreOTBreakDurationInput(centisecondsToDisplaySeconds(state.defaultPreOTBreakDuration));
+      setLocalTimeoutDurationInput(centisecondsToDisplaySeconds(state.defaultTimeoutDuration));
       setLocalAutoStartWarmUp(state.autoStartWarmUp);
       setLocalAutoStartBreaks(state.autoStartBreaks);
       setLocalAutoStartPreOTBreaks(state.autoStartPreOTBreaks);
