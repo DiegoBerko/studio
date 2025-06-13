@@ -17,7 +17,7 @@ export function CompactHeaderScoreboard() {
 
   return (
     <Card className="bg-card shadow-xl">
-      <CardContent className="p-4 md:p-6 grid grid-cols-[auto_1fr_auto] items-center gap-x-2 md:gap-x-4">
+      <CardContent className="p-4 md:p-6 grid grid-cols-[auto_1fr_auto] items-center gap-x-4 md:gap-x-6 lg:gap-x-8">
         <TeamScoreDisplay 
           teamActualName={state.homeTeamName} 
           teamDisplayName="Local" 

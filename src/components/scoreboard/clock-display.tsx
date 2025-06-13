@@ -25,7 +25,7 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
         )}>
         {formatTime(state.currentTime, { showTenths: isMainClockLastMinute, includeMinutesForTenths: false })}
       </div>
-      <div className="mt-1 text-4xl md:text-6xl lg:text-7xl xl:text-8xl font-semibold text-primary-foreground uppercase tracking-wider relative">
+      <div className="mt-1 text-3xl md:text-5xl lg:text-6xl xl:text-7xl font-semibold text-primary-foreground uppercase tracking-wider relative">
         <div className="inline-block relative">
           <span>
             {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods)}
@@ -52,3 +52,4 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
     </div>
   );
 }
+
