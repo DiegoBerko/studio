@@ -28,16 +28,16 @@ export function PenaltyCard({ penalty }: PenaltyCardProps) {
           </div>
           <div className="flex items-center gap-1 text-accent font-mono text-3xl md:text-4xl">
             <Clock className="h-4 w-4 md:h-6 md:w-6 text-accent" />
-            {formatTime(penalty.remainingTime)}
+            {formatTime(penalty.remainingTime * 100, { showTenths: false })}
           </div>
         </div>
         <div className="flex justify-between items-center">
           <div className="text-sm md:text-base text-muted-foreground mt-1">
-            ({formatTime(penalty.initialDuration)} Min)
+            ({formatTime(penalty.initialDuration * 100, { showTenths: false })} Min)
           </div>
           {isWaiting && (
-            <div className="text-sm text-muted-foreground/80 mt-1 italic">
-              {penalty._status === 'pending_player' ? 'Esperando (jugador)' : 'Esperando (puesto)'}
+            <div className="text-sm md:text-base text-muted-foreground/80 mt-1 italic">
+              Esperando
             </div>
           )}
         </div>

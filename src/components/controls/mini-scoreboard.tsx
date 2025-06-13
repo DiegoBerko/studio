@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
+import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -337,12 +337,26 @@ export function MiniScoreboard() {
   );
   const commonSpanClass = cn(!state.isClockRunning && "cursor-pointer hover:underline");
 
+  const activeHomePenaltiesCount = state.homePenalties.filter(p => p._status === 'running').length;
+  const playersOnIceForHome = Math.max(0, state.playersPerTeamOnIce - activeHomePenaltiesCount);
+
+  const activeAwayPenaltiesCount = state.awayPenalties.filter(p => p._status === 'running').length;
+  const playersOnIceForAway = Math.max(0, state.playersPerTeamOnIce - activeAwayPenaltiesCount);
+
   return (
     <>
       <Card className="mb-8 bg-card shadow-lg">
         <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8 py-6">
           {/* Home Team Section */}
           <div className="flex-1 space-y-1">
+            <div className="flex justify-center items-center gap-1 mb-1 h-5">
+              {playersOnIceForHome > 0 && Array(playersOnIceForHome).fill(null).map((_, index) => (
+                <User key={index} className="h-5 w-5 text-primary-foreground/80" />
+              ))}
+              {playersOnIceForHome === 0 && state.playersPerTeamOnIce > 0 && (
+                <span className="text-xs text-destructive animate-pulse">0 JUGADORES</span>
+              )}
+            </div>
             <Input
               value={state.homeTeamName}
               onChange={(e) => handleNameChange('home', e.target.value)}
@@ -429,7 +443,7 @@ export function MiniScoreboard() {
                     if (e.key === 'Enter') handleTimeEditConfirm();
                     if (e.key === 'Escape') setEditingSegment(null);
                   }}
-                  className={cn(commonInputClass, "w-[60px]")} // Approx width for 2 digits
+                  className={cn(commonInputClass, "w-[60px]")} 
                   maxLength={2}
                 />
               ) : (
@@ -453,7 +467,7 @@ export function MiniScoreboard() {
                     if (e.key === 'Enter') handleTimeEditConfirm();
                     if (e.key === 'Escape') setEditingSegment(null);
                   }}
-                  className={cn(commonInputClass, "w-[60px]")} // Approx width for 2 digits
+                  className={cn(commonInputClass, "w-[60px]")} 
                   maxLength={2}
                 />
               ) : (
@@ -479,7 +493,7 @@ export function MiniScoreboard() {
                         if (e.key === 'Enter') handleTimeEditConfirm();
                         if (e.key === 'Escape') setEditingSegment(null);
                       }}
-                      className={cn(commonInputClass, "w-[30px] text-orange-500")} // Approx width for 1 digit
+                      className={cn(commonInputClass, "w-[30px] text-orange-500")} 
                       maxLength={1}
                     />
                   ) : (
@@ -546,6 +560,14 @@ export function MiniScoreboard() {
 
           {/* Away Team Section */}
           <div className="flex-1 space-y-1">
+            <div className="flex justify-center items-center gap-1 mb-1 h-5">
+              {playersOnIceForAway > 0 && Array(playersOnIceForAway).fill(null).map((_, index) => (
+                <User key={index} className="h-5 w-5 text-primary-foreground/80" />
+              ))}
+              {playersOnIceForAway === 0 && state.playersPerTeamOnIce > 0 && (
+                <span className="text-xs text-destructive animate-pulse">0 JUGADORES</span>
+              )}
+            </div>
             <Input
               value={state.awayTeamName}
               onChange={(e) => handleNameChange('away', e.target.value)}
@@ -601,5 +623,4 @@ export function MiniScoreboard() {
     </>
   );
 }
-
     
