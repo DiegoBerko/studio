@@ -230,9 +230,9 @@ export default function ConfigPage() {
 
   const performConfigReset = () => {
     dispatch({ type: 'RESET_CONFIG_TO_DEFAULTS' });
-    setIsConfigNameDirty(false); // This will trigger useEffect to update localConfigName from new state.configName
-    durationSettingsRef.current?.handleDiscard(); // Resets child card and its dirty state
-    penaltySettingsRef.current?.handleDiscard();  // Resets child card and its dirty state
+    setIsConfigNameDirty(false); 
+    durationSettingsRef.current?.handleDiscard(); 
+    penaltySettingsRef.current?.handleDiscard();  
 
     toast({
       title: "Configuración Restablecida",
@@ -303,7 +303,7 @@ export default function ConfigPage() {
           <Button onClick={handleImportClick} variant="outline" className="flex-1">
             <Upload className="mr-2 h-4 w-4" /> Importar Configuración
           </Button>
-          <Button onClick={handlePrepareResetConfig} variant="destructive" className="flex-1">
+          <Button onClick={handlePrepareResetConfig} variant="destructive" > {/* Removed flex-1 */}
             <RotateCcw className="mr-2 h-4 w-4" /> Restablecer Predeterminados
           </Button>
           <input
@@ -362,4 +362,3 @@ export default function ConfigPage() {
     </div>
   );
 }
-
