@@ -27,12 +27,14 @@ const CagedUserIcon = ({ className }: { className?: string }) => (
     <circle cx="12" cy="7" r="4" strokeWidth="2" />
 
     {/* Cage Bars - drawn AFTER player, with explicit grey stroke */}
-    {/* Outer vertical bars */}
-    <line x1="5" y1="2" x2="5" y2="22" strokeWidth="1.2" stroke="hsl(var(--muted-foreground))" />
-    <line x1="19" y1="2" x2="19" y2="22" strokeWidth="1.2" stroke="hsl(var(--muted-foreground))" />
-    {/* Inner vertical bars - reduced to two for more spacing */}
-    <line x1="8.5" y1="2" x2="8.5" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
-    <line x1="15.5" y1="2" x2="15.5" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
+    {/* Bar 1 (leftmost) */}
+    <line x1="6" y1="2" x2="6" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
+    {/* Bar 2 */}
+    <line x1="10" y1="2" x2="10" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
+    {/* Bar 3 */}
+    <line x1="14" y1="2" x2="14" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
+    {/* Bar 4 (rightmost) */}
+    <line x1="18" y1="2" x2="18" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
   </svg>
 );
 
