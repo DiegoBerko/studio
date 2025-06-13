@@ -26,14 +26,14 @@ const CagedUserIcon = ({ className }: { className?: string }) => (
     <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" strokeWidth="2" />
     <circle cx="12" cy="7" r="4" strokeWidth="2" />
 
-    {/* Cage Bars - drawn AFTER player, with explicit black stroke */}
+    {/* Cage Bars - drawn AFTER player, with explicit white stroke */}
     {/* Outer vertical bars */}
-    <line x1="5" y1="2" x2="5" y2="22" strokeWidth="1.2" stroke="black" />
-    <line x1="19" y1="2" x2="19" y2="22" strokeWidth="1.2" stroke="black" />
+    <line x1="5" y1="2" x2="5" y2="22" strokeWidth="1.2" stroke="white" />
+    <line x1="19" y1="2" x2="19" y2="22" strokeWidth="1.2" stroke="white" />
     {/* Inner vertical bars */}
-    <line x1="8.5" y1="2" x2="8.5" y2="22" strokeWidth="1" stroke="black" />
-    <line x1="12" y1="2" x2="12" y2="22" strokeWidth="1" stroke="black" />
-    <line x1="15.5" y1="2" x2="15.5" y2="22" strokeWidth="1" stroke="black" />
+    <line x1="8.5" y1="2" x2="8.5" y2="22" strokeWidth="1" stroke="white" />
+    <line x1="12" y1="2" x2="12" y2="22" strokeWidth="1" stroke="white" />
+    <line x1="15.5" y1="2" x2="15.5" y2="22" strokeWidth="1" stroke="white" />
   </svg>
 );
 
@@ -72,3 +72,4 @@ export function PenaltyCard({ penalty }: PenaltyCardProps) {
     </Card>
   );
 }
+
