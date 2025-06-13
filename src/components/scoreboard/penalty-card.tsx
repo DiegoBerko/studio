@@ -4,7 +4,7 @@
 import type { Penalty } from '@/types';
 import { formatTime } from '@/contexts/game-state-context';
 import { Card, CardContent } from '@/components/ui/card';
-import { Clock } from 'lucide-react'; // User icon removed
+import { Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PenaltyCardProps {
@@ -18,19 +18,23 @@ const CagedUserIcon = ({ className }: { className?: string }) => (
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}
   >
-    {/* User Icon Paths */}
-    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-    {/* Cage Bars */}
-    <line x1="4" y1="3" x2="4" y2="21" /> {/* Left bar */}
-    <line x1="20" y1="3" x2="20" y2="21" /> {/* Right bar */}
-    <line x1="2" y1="10" x2="22" y2="10" /> {/* Middle horizontal bar */}
-    <line x1="2" y1="15" x2="22" y2="15" /> {/* Lower horizontal bar */}
+    {/* User Icon Paths - thicker stroke */}
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" strokeWidth="2" />
+    <circle cx="12" cy="7" r="4" strokeWidth="2" />
+    {/* Cage Bars - thinner stroke */}
+    <line x1="4" y1="3" x2="4" y2="21" strokeWidth="1" /> {/* Left vertical bar */}
+    <line x1="20" y1="3" x2="20" y2="21" strokeWidth="1" /> {/* Right vertical bar */}
+    {/* Optional: Add more thinner vertical bars if desired for a denser cage effect
+    <line x1="8" y1="3" x2="8" y2="21" strokeWidth="1" />
+    <line x1="12" y1="3" x2="12" y2="21" strokeWidth="1" />
+    <line x1="16" y1="3" x2="16" y2="21" strokeWidth="1" />
+    */}
+    <line x1="2" y1="10" x2="22" y2="10" strokeWidth="1" /> {/* Middle horizontal bar */}
+    <line x1="2" y1="15" x2="22" y2="15" strokeWidth="1" /> {/* Lower horizontal bar */}
   </svg>
 );
 
