@@ -24,9 +24,9 @@ if (typeof window !== 'undefined') {
 const INITIAL_CONFIG_NAME = "Configuración Predeterminada";
 const INITIAL_WARM_UP_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND; // 5 minutos
 const INITIAL_PERIOD_DURATION = 20 * 60 * CENTISECONDS_PER_SECOND; // 20 minutos
-const INITIAL_OT_PERIOD_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND; // 5 minutos (default, aunque ahora numberOfOvertimePeriods es 0)
+const INITIAL_OT_PERIOD_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND; 
 const INITIAL_BREAK_DURATION = 2 * 60 * CENTISECONDS_PER_SECOND; // 2 minutos
-const INITIAL_PRE_OT_BREAK_DURATION = 60 * CENTISECONDS_PER_SECOND; // 1 minuto (default)
+const INITIAL_PRE_OT_BREAK_DURATION = 60 * CENTISECONDS_PER_SECOND; 
 const INITIAL_TIMEOUT_DURATION = 30 * CENTISECONDS_PER_SECOND; // 30 segundos
 const INITIAL_MAX_CONCURRENT_PENALTIES = 2;
 const INITIAL_AUTO_START_WARM_UP = true;
@@ -991,16 +991,28 @@ export const useGameState = () => {
 
 export const formatTime = (
   totalCentiseconds: number,
-  displayTenthsWhenUnderMinute: boolean = false
+  options: {
+    showTenths?: boolean;
+    includeMinutesForTenths?: boolean;
+  } = {}
 ): string => {
   if (isNaN(totalCentiseconds) || totalCentiseconds < 0) totalCentiseconds = 0;
 
-  if (displayTenthsWhenUnderMinute && totalCentiseconds < (60 * CENTISECONDS_PER_SECOND)) {
-    const seconds = Math.floor(totalCentiseconds / CENTISECONDS_PER_SECOND);
-    const tenths = Math.floor((totalCentiseconds % CENTISECONDS_PER_SECOND) / 10); 
-    return `${seconds.toString().padStart(2, '0')}.${tenths.toString()}`;
+  const isUnderMinute = totalCentiseconds < 6000; // 60 seconds * 100 centiseconds
+
+  if (isUnderMinute && options.showTenths) {
+    const seconds = Math.floor(totalCentiseconds / 100);
+    const tenths = Math.floor((totalCentiseconds % 100) / 10);
+    if (options.includeMinutesForTenths) {
+      // Format MM:SS.D (e.g., 00:59.9)
+      return `00:${seconds.toString().padStart(2, '0')}.${tenths.toString()}`;
+    } else {
+      // Format SS.D (e.g., 59.9)
+      return `${seconds.toString().padStart(2, '0')}.${tenths.toString()}`;
+    }
   } else { 
-    const totalSecondsOnly = Math.floor(totalCentiseconds / CENTISECONDS_PER_SECOND);
+    // Format MM:SS for times >= 1 minute or when tenths are not shown
+    const totalSecondsOnly = Math.floor(totalCentiseconds / 100);
     const minutes = Math.floor(totalSecondsOnly / 60);
     const seconds = totalSecondsOnly % 60;
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
@@ -1055,4 +1067,3 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 };
 
     
-

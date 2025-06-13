@@ -21,9 +21,9 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
     <div className={cn("text-center", className)}>
       <div className={cn(
           "text-8xl md:text-[10rem] font-bold font-headline tabular-nums tracking-tighter",
-          isMainClockLastMinute ? "text-orange-500" : "text-accent" // text-accent is red now
+          isMainClockLastMinute ? "text-orange-500" : "text-accent" 
         )}>
-        {formatTime(state.currentTime, isMainClockLastMinute)}
+        {formatTime(state.currentTime, { showTenths: isMainClockLastMinute, includeMinutesForTenths: false })}
       </div>
       <div className="mt-1 text-4xl md:text-6xl font-semibold text-primary-foreground uppercase tracking-wider relative">
         <div className="inline-block relative">
@@ -45,7 +45,7 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
             "mt-2 text-lg md:text-xl normal-case tracking-normal",
             isPreTimeoutLastMinute ? "text-orange-500/80" : "text-muted-foreground"
           )}>
-          {getPeriodText(state.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.preTimeoutState.time, isPreTimeoutLastMinute)}
+          {getPeriodText(state.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.preTimeoutState.time, { showTenths: isPreTimeoutLastMinute, includeMinutesForTenths: false })}
           {state.preTimeoutState.override ? ` (${state.preTimeoutState.override})` : ''}
         </div>
       )}

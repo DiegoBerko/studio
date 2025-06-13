@@ -38,8 +38,8 @@ export function MiniScoreboard() {
     toast({ title: `Puntuación de ${teamName} Actualizada`, description: `Puntuación ${delta > 0 ? 'aumentada' : 'disminuida'} en ${Math.abs(delta)}.` });
   };
 
-  const handleTimeAdjust = (deltaSeconds: number) => { // delta is in full seconds
-    dispatch({ type: 'ADJUST_TIME', payload: deltaSeconds * 100 }); // Replaced CENTISECONDS_PER_SECOND
+  const handleTimeAdjust = (deltaSeconds: number) => { 
+    dispatch({ type: 'ADJUST_TIME', payload: deltaSeconds * 100 }); 
     toast({ 
       title: "Reloj Ajustado", 
       description: `Tiempo ajustado en ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds} segundo${Math.abs(deltaSeconds) === 1 ? '' : 's'}.` 
@@ -246,11 +246,11 @@ export function MiniScoreboard() {
     nextActionButtonText = "Iniciar 1er Período";
   }
 
-  const isMainClockLastMinute = state.currentTime < 6000 && state.currentTime >= 0 && // Replaced (60 * CENTISECONDS_PER_SECOND)
+  const isMainClockLastMinute = state.currentTime < 6000 && state.currentTime >= 0 && 
                                (state.periodDisplayOverride !== null || state.currentPeriod >= 0);
                                
   const preTimeoutTimeCs = state.preTimeoutState?.time;
-  const isPreTimeoutLastMinute = typeof preTimeoutTimeCs === 'number' && preTimeoutTimeCs < 6000 && preTimeoutTimeCs >= 0; // Replaced (60 * CENTISECONDS_PER_SECOND)
+  const isPreTimeoutLastMinute = typeof preTimeoutTimeCs === 'number' && preTimeoutTimeCs < 6000 && preTimeoutTimeCs >= 0;
 
 
   return (
@@ -322,7 +322,7 @@ export function MiniScoreboard() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 text-muted-foreground hover:text-accent"
-                  onClick={() => handleTimeAdjust(-1)} // Adjust by 1 second
+                  onClick={() => handleTimeAdjust(-1)} 
                   aria-label="Restar 1 segundo al reloj"
                   disabled={state.currentTime <=0}
                 >
@@ -333,14 +333,14 @@ export function MiniScoreboard() {
                   "text-5xl font-bold tabular-nums",
                   isMainClockLastMinute ? "text-orange-500" : "text-accent"
                 )}>
-                {formatTime(state.currentTime, isMainClockLastMinute)}
+                {formatTime(state.currentTime, { showTenths: isMainClockLastMinute, includeMinutesForTenths: true })}
               </p>
               {!state.isClockRunning && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 text-muted-foreground hover:text-accent"
-                  onClick={() => handleTimeAdjust(1)} // Adjust by 1 second
+                  onClick={() => handleTimeAdjust(1)} 
                   aria-label="Sumar 1 segundo al reloj"
                 >
                   <Plus className="h-3 w-3" />
@@ -382,7 +382,7 @@ export function MiniScoreboard() {
                   "text-xs mt-1 normal-case",
                   isPreTimeoutLastMinute ? "text-orange-500/80" : "text-muted-foreground"
                 )}>
-                Retornando a: {getPeriodText(state.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.preTimeoutState.time, isPreTimeoutLastMinute)}
+                Retornando a: {getPeriodText(state.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.preTimeoutState.time, { showTenths: isPreTimeoutLastMinute, includeMinutesForTenths: true })}
                 {state.preTimeoutState.override ? ` (${state.preTimeoutState.override})` : ''}
               </div>
             )}
