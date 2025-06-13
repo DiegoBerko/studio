@@ -25,7 +25,6 @@ export default function ControlsPage() {
   const [pageDisplayState, setPageDisplayState] = useState<PageDisplayState>('Checking');
   const [currentLockHolderId, setCurrentLockHolderId] = useState<string | null>(null);
   
-  // Stable instanceId for the component instance's lifetime
   const [instanceId] = useState(() => crypto.randomUUID());
   
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -35,18 +34,15 @@ export default function ControlsPage() {
     const lockIdFromStorage = localStorage.getItem(CONTROLS_LOCK_KEY);
     
     if (!lockIdFromStorage) {
-      // No lock, this instance takes it
       localStorage.setItem(CONTROLS_LOCK_KEY, instanceId);
       setCurrentLockHolderId(instanceId);
       setPageDisplayState('Primary');
       console.log(`Instance ${instanceId.slice(-6)} took lock (no prior lock). State: Primary`);
     } else if (lockIdFromStorage === instanceId) {
-      // This instance already holds the lock (e.g., after hot reload or previous successful acquisition)
       setPageDisplayState('Primary');
       setCurrentLockHolderId(instanceId);
       console.log(`Instance ${instanceId.slice(-6)} confirmed lock. State: Primary`);
     } else {
-      // Another instance holds the lock
       setPageDisplayState('Secondary');
       setCurrentLockHolderId(lockIdFromStorage);
       console.log(`Instance ${instanceId.slice(-6)} found lock by ${lockIdFromStorage.slice(-6)}. State: Secondary`);
@@ -57,7 +53,7 @@ export default function ControlsPage() {
   useEffect(() => {
     console.log(`ControlsPage Effect: Instance ${instanceId.slice(-6)} mounting/updating. Current state: ${pageDisplayState}`);
     
-    setPageDisplayState('Checking'); // Ensure we are in checking state before evaluation
+    setPageDisplayState('Checking'); 
 
     if (!channelRef.current) {
       channelRef.current = new BroadcastChannel(CONTROLS_CHANNEL_NAME);
@@ -71,7 +67,6 @@ export default function ControlsPage() {
           console.log(`Instance ${instanceId.slice(-6)} received TAKEOVER by ${message.data.newPrimaryId.slice(-6)}, navigating to /`);
           router.push('/');
         } else {
-          // This instance just took over, ensure its state is Primary
           console.log(`Instance ${instanceId.slice(-6)} is the new primary from TAKEOVER_COMMAND.`);
           setPageDisplayState('Primary');
           setCurrentLockHolderId(instanceId);
@@ -97,37 +92,66 @@ export default function ControlsPage() {
       const currentLockIdInStorage = localStorage.getItem(CONTROLS_LOCK_KEY);
       if (currentLockIdInStorage === instanceId) {
         localStorage.removeItem(CONTROLS_LOCK_KEY);
-        // Note: Posting to BroadcastChannel in 'beforeunload' can be unreliable
         console.log(`Instance ${instanceId.slice(-6)} released lock on beforeunload.`);
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     
-    // Initial lock status check
     checkLockStatus();
 
     return () => {
       console.log(`ControlsPage Cleanup: Instance ${instanceId.slice(-6)} unmounting. Current lock holder in storage: ${localStorage.getItem(CONTROLS_LOCK_KEY)?.slice(-6)}`);
       
-      // Important: Check if this instance still holds the lock before removing
       const currentLockIdInStorage = localStorage.getItem(CONTROLS_LOCK_KEY);
       if (currentLockIdInStorage === instanceId) {
         localStorage.removeItem(CONTROLS_LOCK_KEY);
-        if (channelRef.current) { // Post release only if channel exists
+        if (channelRef.current) { 
              channelRef.current.postMessage({ type: 'LOCK_RELEASED', releasedBy: instanceId });
         }
         console.log(`Instance ${instanceId.slice(-6)} released lock via useEffect cleanup.`);
       }
       
       if (channelRef.current) {
-        channelRef.current.close(); // Close the channel
+        channelRef.current.close(); 
         channelRef.current = null;
         console.log(`Instance ${instanceId.slice(-6)} closed BroadcastChannel.`);
       }
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [instanceId, checkLockStatus, router]); // router added as push is used
+  }, [instanceId, checkLockStatus, router]);
+
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (pageDisplayState !== 'Primary') {
+        return;
+      }
+
+      if (event.code === 'Space' || event.key === ' ') {
+        const activeElement = document.activeElement as HTMLElement;
+        
+        if (
+          activeElement &&
+          (activeElement.tagName === 'INPUT' ||
+            activeElement.tagName === 'TEXTAREA' ||
+            activeElement.tagName === 'SELECT' ||
+            activeElement.isContentEditable ||
+            activeElement.getAttribute?.('role') === 'button')
+        ) {
+          return; 
+        }
+        
+        event.preventDefault();
+        dispatch({ type: 'TOGGLE_CLOCK' });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [dispatch, pageDisplayState]);
 
 
   const handleTakeOver = useCallback(() => {
@@ -137,7 +161,7 @@ export default function ControlsPage() {
       channelRef.current.postMessage({ type: 'TAKEOVER_COMMAND', newPrimaryId: instanceId });
     }
     setCurrentLockHolderId(instanceId);
-    setPageDisplayState('Primary'); // Directly set to primary after taking action
+    setPageDisplayState('Primary'); 
     toast({ title: "Control Adquirido", description: "Esta pestaña ahora es la principal para los controles." });
   }, [instanceId, toast, setCurrentLockHolderId, setPageDisplayState]);
 
@@ -186,13 +210,11 @@ export default function ControlsPage() {
     );
   }
 
-  // pageDisplayState === 'Primary'
   return (
     <div className="w-full max-w-5xl mx-auto space-y-8">
       <MiniScoreboard />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <TimeControlCard />
-        {/* ScorePeriodControlCard was removed, placeholder/layout logic here if needed */}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <PenaltyControlCard team="home" teamName={state.homeTeamName} />
