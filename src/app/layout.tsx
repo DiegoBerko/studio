@@ -1,9 +1,11 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { GameStateProvider } from '@/contexts/game-state-context';
 import { Toaster } from "@/components/ui/toaster";
 import { Header } from '@/components/layout/header';
 import { cn } from '@/lib/utils';
+import { MainWrapper } from '@/components/layout/main-wrapper'; // Import new component
 
 export const metadata: Metadata = {
   title: 'IceVision - Hockey Scoreboard',
@@ -25,9 +27,9 @@ export default function RootLayout({
       <body className={cn("min-h-screen bg-background font-body antialiased")}>
         <GameStateProvider>
           <Header />
-          <main className="flex-1 container py-8">
+          <MainWrapper> {/* Use the client wrapper here */}
             {children}
-          </main>
+          </MainWrapper>
           <Toaster />
         </GameStateProvider>
       </body>

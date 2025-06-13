@@ -29,20 +29,20 @@ export function TeamScoreDisplay({ teamActualName, teamDisplayName, score, playe
   
   return (
     <div className={cn("flex flex-col items-center text-center", className)}>
-      <div className="flex justify-center items-center gap-1 mb-1 h-5">
+      <div className="flex justify-center items-center gap-1 mb-1 h-5 md:h-6 lg:h-7">
         {playersOnIce > 0 && Array(playersOnIce).fill(null).map((_, index) => (
-          <User key={index} className="h-5 w-5 text-primary-foreground/80" />
+          <User key={index} className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary-foreground/80" />
         ))}
         {playersOnIce === 0 && configuredPlayersPerTeam > 0 && (
-          <span className="text-sm text-destructive animate-pulse">0 JUGADORES</span>
+          <span className="text-sm md:text-base lg:text-lg text-destructive animate-pulse">0 JUGADORES</span>
         )}
       </div>
-      <h2 className="text-xl md:text-3xl font-bold text-foreground uppercase tracking-wide truncate w-full px-1">{teamActualName}</h2>
-      <p className="text-xs md:text-sm text-muted-foreground -mt-0.5 md:-mt-1 mb-1 md:mb-1.5">({teamDisplayName})</p>
+      <h2 className="text-xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground uppercase tracking-wide truncate w-full px-1">{teamActualName}</h2>
+      <p className="text-xs md:text-sm lg:text-base text-muted-foreground -mt-0.5 md:-mt-1 mb-1 md:mb-1.5">({teamDisplayName})</p>
       <div 
         className={cn(
-            "text-5xl md:text-7xl font-bold font-headline text-accent tabular-nums tracking-tighter",
-            flash && "animate-score-flash" // Ensure this animation is defined in tailwind.config.ts
+            "text-5xl md:text-7xl lg:text-8xl xl:text-9xl font-bold font-headline text-accent tabular-nums tracking-tighter",
+            flash && "animate-score-flash"
           )}
       >
         {score}
@@ -50,4 +50,3 @@ export function TeamScoreDisplay({ teamActualName, teamDisplayName, score, playe
     </div>
   );
 }
-

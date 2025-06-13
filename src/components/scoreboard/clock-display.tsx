@@ -20,19 +20,19 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
   return (
     <div className={cn("text-center", className)}>
       <div className={cn(
-          "text-8xl md:text-[10rem] font-bold font-headline tabular-nums tracking-tighter",
+          "text-8xl md:text-[10rem] lg:text-[12rem] xl:text-[14rem] font-bold font-headline tabular-nums tracking-tighter",
           isMainClockLastMinute ? "text-orange-500" : "text-accent" 
         )}>
         {formatTime(state.currentTime, { showTenths: isMainClockLastMinute, includeMinutesForTenths: false })}
       </div>
-      <div className="mt-1 text-4xl md:text-6xl font-semibold text-primary-foreground uppercase tracking-wider relative">
+      <div className="mt-1 text-4xl md:text-6xl lg:text-7xl xl:text-8xl font-semibold text-primary-foreground uppercase tracking-wider relative">
         <div className="inline-block relative">
           <span>
             {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods)}
           </span>
           {!state.isClockRunning && state.currentTime > 0 && (
             <span
-              className="absolute left-full top-1/2 transform -translate-y-1/2 ml-3 text-sm md:text-base font-normal text-muted-foreground normal-case tracking-normal px-2 py-1 bg-background/50 rounded-md whitespace-nowrap"
+              className="absolute left-full top-1/2 transform -translate-y-1/2 ml-3 text-sm md:text-base lg:text-lg font-normal text-muted-foreground normal-case tracking-normal px-2 py-1 bg-background/50 rounded-md whitespace-nowrap"
               style={{ lineHeight: 'normal' }}
             >
               Paused
@@ -42,7 +42,7 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
       </div>
       {state.preTimeoutState && (
         <div className={cn(
-            "mt-2 text-lg md:text-xl normal-case tracking-normal",
+            "mt-2 text-lg md:text-xl lg:text-2xl normal-case tracking-normal",
             isPreTimeoutLastMinute ? "text-orange-500/80" : "text-muted-foreground"
           )}>
           {getPeriodText(state.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.preTimeoutState.time, { showTenths: isPreTimeoutLastMinute, includeMinutesForTenths: false })}
