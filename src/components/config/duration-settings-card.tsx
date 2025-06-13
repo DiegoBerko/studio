@@ -5,8 +5,8 @@ import React, { useState, useEffect, useImperativeHandle, forwardRef } from "rea
 import { 
   useGameState, 
   centisecondsToDisplayMinutes, 
-  centisecondsToDisplaySeconds,
-  CENTISECONDS_PER_SECOND
+  centisecondsToDisplaySeconds
+  // CENTISECONDS_PER_SECOND - Removed import
 } from "@/contexts/game-state-context";
 import { ControlCardWrapper } from "@/components/controls/control-card-wrapper";
 import { Label } from "@/components/ui/label";
@@ -88,27 +88,27 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       if (!isDirty) return true;
 
       const warmUpDurationMin = parseInt(localWarmUpDurationInput, 10);
-      const finalWarmUpDurationCs = (isNaN(warmUpDurationMin) || warmUpDurationMin < 1) ? (60 * CENTISECONDS_PER_SECOND) : warmUpDurationMin * 60 * CENTISECONDS_PER_SECOND;
+      const finalWarmUpDurationCs = (isNaN(warmUpDurationMin) || warmUpDurationMin < 1) ? (60 * 100) : warmUpDurationMin * 60 * 100; // 100 = CENTISECONDS_PER_SECOND
       dispatch({ type: "SET_DEFAULT_WARM_UP_DURATION", payload: finalWarmUpDurationCs });
 
       const periodDurationMin = parseInt(localPeriodDurationInput, 10);
-      const finalPeriodDurationCs = (isNaN(periodDurationMin) || periodDurationMin < 1) ? (60 * CENTISECONDS_PER_SECOND) : periodDurationMin * 60 * CENTISECONDS_PER_SECOND;
+      const finalPeriodDurationCs = (isNaN(periodDurationMin) || periodDurationMin < 1) ? (60 * 100) : periodDurationMin * 60 * 100; // 100 = CENTISECONDS_PER_SECOND
       dispatch({ type: "SET_DEFAULT_PERIOD_DURATION", payload: finalPeriodDurationCs });
 
       const otPeriodDurationMin = parseInt(localOTPeriodDurationInput, 10);
-      const finalOTPeriodDurationCs = (isNaN(otPeriodDurationMin) || otPeriodDurationMin < 1) ? (60 * CENTISECONDS_PER_SECOND) : otPeriodDurationMin * 60 * CENTISECONDS_PER_SECOND;
+      const finalOTPeriodDurationCs = (isNaN(otPeriodDurationMin) || otPeriodDurationMin < 1) ? (60 * 100) : otPeriodDurationMin * 60 * 100; // 100 = CENTISECONDS_PER_SECOND
       dispatch({ type: "SET_DEFAULT_OT_PERIOD_DURATION", payload: finalOTPeriodDurationCs });
 
       const breakDurationSec = parseInt(localBreakDurationInput, 10);
-      const finalBreakDurationCs = (isNaN(breakDurationSec) || breakDurationSec < 1) ? (1 * CENTISECONDS_PER_SECOND) : breakDurationSec * CENTISECONDS_PER_SECOND;
+      const finalBreakDurationCs = (isNaN(breakDurationSec) || breakDurationSec < 1) ? (1 * 100) : breakDurationSec * 100; // 100 = CENTISECONDS_PER_SECOND
       dispatch({ type: "SET_DEFAULT_BREAK_DURATION", payload: finalBreakDurationCs });
 
       const preOTBreakDurationSec = parseInt(localPreOTBreakDurationInput, 10);
-      const finalPreOTBreakDurationCs = (isNaN(preOTBreakDurationSec) || preOTBreakDurationSec < 1) ? (1 * CENTISECONDS_PER_SECOND) : preOTBreakDurationSec * CENTISECONDS_PER_SECOND;
+      const finalPreOTBreakDurationCs = (isNaN(preOTBreakDurationSec) || preOTBreakDurationSec < 1) ? (1 * 100) : preOTBreakDurationSec * 100; // 100 = CENTISECONDS_PER_SECOND
       dispatch({ type: "SET_DEFAULT_PRE_OT_BREAK_DURATION", payload: finalPreOTBreakDurationCs });
       
       const timeoutDurationSec = parseInt(localTimeoutDurationInput, 10);
-      const finalTimeoutDurationCs = (isNaN(timeoutDurationSec) || timeoutDurationSec < 1) ? (1 * CENTISECONDS_PER_SECOND) : timeoutDurationSec * CENTISECONDS_PER_SECOND;
+      const finalTimeoutDurationCs = (isNaN(timeoutDurationSec) || timeoutDurationSec < 1) ? (1 * 100) : timeoutDurationSec * 100; // 100 = CENTISECONDS_PER_SECOND
       dispatch({ type: "SET_DEFAULT_TIMEOUT_DURATION", payload: finalTimeoutDurationCs });
 
       const numRegularPeriods = parseInt(localNumRegularPeriodsInput, 10);
@@ -328,3 +328,5 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
+
+    
