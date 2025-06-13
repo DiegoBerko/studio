@@ -22,12 +22,12 @@ if (typeof window !== 'undefined') {
 
 // Duraciones por defecto iniciales, se guardarán en centésimas de segundo
 const INITIAL_CONFIG_NAME = "Configuración Predeterminada";
-const INITIAL_WARM_UP_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND; // 5 minutos
-const INITIAL_PERIOD_DURATION = 20 * 60 * CENTISECONDS_PER_SECOND; // 20 minutos
+const INITIAL_WARM_UP_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND; 
+const INITIAL_PERIOD_DURATION = 20 * 60 * CENTISECONDS_PER_SECOND; 
 const INITIAL_OT_PERIOD_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND; 
-const INITIAL_BREAK_DURATION = 2 * 60 * CENTISECONDS_PER_SECOND; // 2 minutos
+const INITIAL_BREAK_DURATION = 2 * 60 * CENTISECONDS_PER_SECOND; 
 const INITIAL_PRE_OT_BREAK_DURATION = 60 * CENTISECONDS_PER_SECOND; 
-const INITIAL_TIMEOUT_DURATION = 30 * CENTISECONDS_PER_SECOND; // 30 segundos
+const INITIAL_TIMEOUT_DURATION = 30 * CENTISECONDS_PER_SECOND; 
 const INITIAL_MAX_CONCURRENT_PENALTIES = 2;
 const INITIAL_AUTO_START_WARM_UP = true;
 const INITIAL_AUTO_START_BREAKS = true;
@@ -273,6 +273,35 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
   };
 };
 
+const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number): Penalty[] => {
+  const newPenalties: Penalty[] = [];
+  const activePlayerTickets: Set<string> = new Set();
+  let concurrentRunningCount = 0;
+
+  for (const p of penalties) {
+    let currentStatus: Penalty['_status'] = undefined;
+    // Penalties with no time left don't need a status related to running/pending
+    if (p.remainingTime <= 0) {
+      newPenalties.push({ ...p, _status: undefined });
+      continue;
+    }
+
+    if (activePlayerTickets.has(p.playerNumber)) {
+      currentStatus = 'pending_player';
+    } else if (concurrentRunningCount < maxConcurrent) {
+      currentStatus = 'running';
+      // Add to activePlayerTickets only if it's actually running and has time.
+      // This ensures a player with multiple penalties serves them one by one.
+      activePlayerTickets.add(p.playerNumber);
+      concurrentRunningCount++;
+    } else {
+      currentStatus = 'pending_concurrent';
+    }
+    newPenalties.push({ ...p, _status: currentStatus });
+  }
+  return newPenalties;
+};
+
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   let newStateWithoutMeta: Omit<GameState, '_lastActionOriginator' | '_lastUpdatedTimestamp'>;
@@ -290,8 +319,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       hydratedBase.remainingTimeAtStartCs = null;
 
       const cleanPenaltiesOnHydrate = (penalties?: Penalty[]) => (penalties || []).map(({ _status, ...p }) => p);
-      hydratedBase.homePenalties = cleanPenaltiesOnHydrate(action.payload?.homePenalties);
-      hydratedBase.awayPenalties = cleanPenaltiesOnHydrate(action.payload?.awayPenalties);
+      
+      let rawHomePenalties = cleanPenaltiesOnHydrate(action.payload?.homePenalties);
+      let rawAwayPenalties = cleanPenaltiesOnHydrate(action.payload?.awayPenalties);
+
+      hydratedBase.homePenalties = updatePenaltyStatusesOnly(rawHomePenalties, hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties);
+      hydratedBase.awayPenalties = updatePenaltyStatusesOnly(rawAwayPenalties, hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties);
+
 
       let initialHydratedTimeCs: number;
       const hydratedPeriod = hydratedBase.currentPeriod ?? initialGlobalState.currentPeriod;
@@ -506,18 +540,20 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         remainingTime: action.payload.penalty.remainingTime,     
         id: (typeof window !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random().toString(36).slice(2))
       };
-      const penalties = [...state[`${action.payload.team}Penalties`], newPenalty];
+      let penalties = [...state[`${action.payload.team}Penalties`], newPenalty];
+      penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
       newStateWithoutMeta = { ...state, [`${action.payload.team}Penalties`]: penalties };
       break;
     }
     case 'REMOVE_PENALTY': {
-      const penalties = state[`${action.payload.team}Penalties`].filter(p => p.id !== action.payload.penaltyId);
+      let penalties = state[`${action.payload.team}Penalties`].filter(p => p.id !== action.payload.penaltyId);
+      penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
       newStateWithoutMeta = { ...state, [`${action.payload.team}Penalties`]: penalties };
       break;
     }
     case 'ADJUST_PENALTY_TIME': { 
       const { team, penaltyId, delta } = action.payload;
-      const updatedPenalties = state[`${team}Penalties`].map(p => {
+      let updatedPenalties = state[`${team}Penalties`].map(p => {
         if (p.id === penaltyId) {
           const newRemainingTimeSec = Math.max(0, p.remainingTime + delta);
           const cappedTimeSec = delta > 0 ? Math.min(newRemainingTimeSec, p.initialDuration) : newRemainingTimeSec;
@@ -525,6 +561,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         }
         return p;
       });
+      updatedPenalties = updatePenaltyStatusesOnly(updatedPenalties, state.maxConcurrentPenalties);
       newStateWithoutMeta = { ...state, [`${team}Penalties`]: updatedPenalties };
       break;
     }
@@ -535,7 +572,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       if (removed) {
         currentPenalties.splice(endIndex, 0, removed);
       }
-      newStateWithoutMeta = { ...state, [`${team}Penalties`]: currentPenalties };
+      const reorderedPenalties = updatePenaltyStatusesOnly(currentPenalties, state.maxConcurrentPenalties);
+      newStateWithoutMeta = { ...state, [`${team}Penalties`]: reorderedPenalties };
       break;
     }
     case 'TICK': {
@@ -592,7 +630,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             };
             homePenaltiesResult = updatePenaltiesForOneSecondTick(state.homePenalties, state.maxConcurrentPenalties);
             awayPenaltiesResult = updatePenaltiesForOneSecondTick(state.awayPenalties, state.maxConcurrentPenalties);
+          } else { // Status might need update even if second boundary not crossed (e.g. penalty added/removed and clock is running)
+            homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
+            awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
           }
+        } else if (state.isClockRunning) { // Clock is running, but not for game penalties (e.g. timeout, break)
+            homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
+            awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
         }
       } else if (state.isClockRunning && state.currentTime <= 0) {
          newCalculatedTimeCs = 0; 
@@ -844,8 +888,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         currentPeriod: 0, 
         currentTime: initialWarmUpDurationCs,
         isClockRunning: autoStartWarmUp && initialWarmUpDurationCs > 0, 
-        homePenalties: initialsToKeepConfig.homePenalties,
-        awayPenalties: initialsToKeepConfig.awayPenalties,
+        homePenalties: updatePenaltyStatusesOnly([], state.maxConcurrentPenalties), // Reset penalties
+        awayPenalties: updatePenaltyStatusesOnly([], state.maxConcurrentPenalties), // Reset penalties
         homeTeamName: initialsToKeepConfig.homeTeamName,
         awayTeamName: initialsToKeepConfig.awayTeamName,
         periodDisplayOverride: 'Warm-up',
@@ -954,9 +998,10 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const stateForStorage = { ...state };
-      const cleanPenalties = (penalties: Penalty[]) => (penalties || []).map(({ _status, ...p }) => p);
-      stateForStorage.homePenalties = cleanPenalties(state.homePenalties);
-      stateForStorage.awayPenalties = cleanPenalties(state.awayPenalties);
+      // Do not store _status in localStorage as it's transient
+      const cleanPenaltiesForStorage = (penalties: Penalty[]) => (penalties || []).map(({ _status, ...p }) => p);
+      stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
+      stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
       
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
 
@@ -1007,7 +1052,7 @@ export const formatTime = (
 ): string => {
   if (isNaN(totalCentiseconds) || totalCentiseconds < 0) totalCentiseconds = 0;
 
-  const isUnderMinute = totalCentiseconds < 6000; // 60 seconds * 100 centiseconds
+  const isUnderMinute = totalCentiseconds < 6000;
 
   if (isUnderMinute && options.showTenths) {
     const seconds = Math.floor(totalCentiseconds / 100);
@@ -1073,4 +1118,3 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 };
 
     
-
