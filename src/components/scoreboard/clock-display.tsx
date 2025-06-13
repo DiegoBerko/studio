@@ -11,10 +11,19 @@ interface ClockDisplayProps {
 export function ClockDisplay({ className }: ClockDisplayProps) {
   const { state } = useGameState();
 
+  const isMainClockLastMinute = state.currentTime < 60 && state.currentTime >= 0 && 
+                                (state.periodDisplayOverride !== null || state.currentPeriod >= 0); // Ensure it's a running phase
+
+  const preTimeoutTime = state.preTimeoutState?.time;
+  const isPreTimeoutLastMinute = typeof preTimeoutTime === 'number' && preTimeoutTime < 60 && preTimeoutTime >= 0;
+
   return (
     <div className={cn("text-center", className)}>
-      <div className="text-8xl md:text-[10rem] font-bold font-headline text-accent tabular-nums tracking-tighter">
-        {formatTime(state.currentTime)}
+      <div className={cn(
+          "text-8xl md:text-[10rem] font-bold font-headline tabular-nums tracking-tighter",
+          isMainClockLastMinute ? "text-orange-500" : "text-accent"
+        )}>
+        {formatTime(state.currentTime, isMainClockLastMinute)}
       </div>
       {/* Period and Paused display section */}
       <div className="mt-1 text-4xl md:text-6xl font-semibold text-primary-foreground uppercase tracking-wider relative"> {/* text-center is inherited, relative for Paused positioning */}
@@ -32,9 +41,12 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
           )}
         </div>
       </div>
-      {state.periodDisplayOverride === "Time Out" && state.preTimeoutState && (
-        <div className="mt-2 text-lg md:text-xl text-muted-foreground normal-case tracking-normal">
-          {getPeriodText(state.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.preTimeoutState.time)}
+      {state.preTimeoutState && (
+        <div className={cn(
+            "mt-2 text-lg md:text-xl normal-case tracking-normal",
+            isPreTimeoutLastMinute ? "text-orange-500/80" : "text-muted-foreground" // Slightly less prominent orange for pre-timeout
+          )}>
+          {getPeriodText(state.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.preTimeoutState.time, isPreTimeoutLastMinute)}
           {state.preTimeoutState.override ? ` (${state.preTimeoutState.override})` : ''}
         </div>
       )}
@@ -42,3 +54,4 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
   );
 }
 
+    

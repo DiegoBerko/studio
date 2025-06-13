@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export function MiniScoreboard() {
   const { state, dispatch } = useGameState();
@@ -245,6 +246,12 @@ export function MiniScoreboard() {
     nextActionButtonText = "Iniciar 1er Período";
   }
 
+  const isMainClockLastMinute = state.currentTime < 60 && state.currentTime >= 0 &&
+                               (state.periodDisplayOverride !== null || state.currentPeriod >= 0);
+                               
+  const preTimeoutTime = state.preTimeoutState?.time;
+  const isPreTimeoutLastMinute = typeof preTimeoutTime === 'number' && preTimeoutTime < 60 && preTimeoutTime >= 0;
+
 
   return (
     <>
@@ -322,7 +329,12 @@ export function MiniScoreboard() {
                   <Minus className="h-3 w-3" />
                 </Button>
               )}
-              <p className="text-5xl font-bold text-accent tabular-nums">{formatTime(state.currentTime)}</p>
+              <p className={cn(
+                  "text-5xl font-bold tabular-nums",
+                  isMainClockLastMinute ? "text-orange-500" : "text-accent"
+                )}>
+                {formatTime(state.currentTime, isMainClockLastMinute)}
+              </p>
               {!state.isClockRunning && (
                 <Button
                   variant="ghost"
@@ -365,9 +377,12 @@ export function MiniScoreboard() {
                 </span>
               )}
             </div>
-            {state.periodDisplayOverride === "Time Out" && state.preTimeoutState && (
-              <div className="text-xs text-muted-foreground mt-1">
-                Retornando a: {getPeriodText(state.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.preTimeoutState.time)}
+            {state.preTimeoutState && (
+              <div className={cn(
+                  "text-xs mt-1 normal-case",
+                  isPreTimeoutLastMinute ? "text-orange-500/80" : "text-muted-foreground"
+                )}>
+                Retornando a: {getPeriodText(state.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.preTimeoutState.time, isPreTimeoutLastMinute)}
                 {state.preTimeoutState.override ? ` (${state.preTimeoutState.override})` : ''}
               </div>
             )}
@@ -430,6 +445,4 @@ export function MiniScoreboard() {
     </>
   );
 }
-
-
     
