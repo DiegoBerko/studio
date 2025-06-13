@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes } from '@/contexts/game-state-context';
 import type { Team } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
@@ -11,6 +11,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+type EditingSegment = 'minutes' | 'seconds' | 'tenths';
 
 export function MiniScoreboard() {
   const { state, dispatch } = useGameState();
@@ -23,6 +25,28 @@ export function MiniScoreboard() {
   } | null>(null);
 
   const MAX_TOTAL_GAME_PERIODS = state.numberOfRegularPeriods + state.numberOfOvertimePeriods;
+
+  const [editingSegment, setEditingSegment] = useState<EditingSegment | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const getTimeParts = useCallback((timeCs: number) => {
+    const safeTimeCs = Math.max(0, timeCs);
+    const totalSecondsOnly = Math.floor(safeTimeCs / 100);
+    const minutes = Math.floor(totalSecondsOnly / 60);
+    const seconds = totalSecondsOnly % 60;
+    const tenths = Math.floor((safeTimeCs % 100) / 10);
+    return { minutes, seconds, tenths };
+  }, []);
+
+  const timeParts = getTimeParts(state.currentTime);
+
+  useEffect(() => {
+    if (editingSegment && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingSegment]);
 
   const handleNameChange = (team: Team, name: string) => {
     if (team === 'home') {
@@ -47,6 +71,7 @@ export function MiniScoreboard() {
   };
 
   const handleToggleClock = () => {
+    setEditingSegment(null); // Cancel any ongoing edit
     const isFirstGameAction = state.currentPeriod === 0 && 
                               state.periodDisplayOverride === 'Warm-up' && 
                               state.currentTime === state.defaultWarmUpDuration;
@@ -88,6 +113,7 @@ export function MiniScoreboard() {
   };
 
   const handlePreviousPeriod = () => {
+    setEditingSegment(null);
     if (state.periodDisplayOverride === "Time Out") {
       toast({ title: "Time Out Activo", description: "Finaliza el Time Out para cambiar de período.", variant: "destructive" });
       return;
@@ -150,6 +176,7 @@ export function MiniScoreboard() {
   };
 
   const handleNextAction = () => { 
+    setEditingSegment(null);
     if (state.periodDisplayOverride === "Time Out") {
       if (state.currentTime <= 0) {
         dispatch({ type: 'END_TIMEOUT' });
@@ -236,7 +263,6 @@ export function MiniScoreboard() {
       isNextActionDisabled = true; 
   }
 
-
   const showNextActionButton = state.currentTime <= 0 && !state.isClockRunning;
   
   let nextActionButtonText = "Siguiente";
@@ -252,6 +278,64 @@ export function MiniScoreboard() {
   const preTimeoutTimeCs = state.preTimeoutState?.time;
   const isPreTimeoutLastMinute = typeof preTimeoutTimeCs === 'number' && preTimeoutTimeCs < 6000 && preTimeoutTimeCs >= 0;
 
+  const handleSegmentClick = (segment: EditingSegment) => {
+    if (state.isClockRunning) return;
+    setEditingSegment(segment);
+    switch (segment) {
+      case 'minutes': setEditValue(String(timeParts.minutes).padStart(2, '0')); break;
+      case 'seconds': setEditValue(String(timeParts.seconds).padStart(2, '0')); break;
+      case 'tenths': setEditValue(String(timeParts.tenths)); break;
+    }
+  };
+
+  const handleTimeEditConfirm = () => {
+    if (!editingSegment) return;
+
+    const { minutes: currentMins, seconds: currentSecs, tenths: currentTenths } = timeParts;
+    let newTimeCs = state.currentTime;
+    const value = parseInt(editValue, 10);
+
+    if (isNaN(value)) {
+      setEditingSegment(null);
+      toast({ title: "Valor Inválido", description: "Por favor, ingresa un número.", variant: "destructive" });
+      return;
+    }
+
+    switch (editingSegment) {
+      case 'minutes':
+        const newMinutes = Math.max(0, Math.min(value, 99));
+        newTimeCs = (newMinutes * 60 * 100) + (currentSecs * 100) + (currentTenths * 10);
+        break;
+      case 'seconds':
+        const newSeconds = Math.max(0, Math.min(value, 59));
+        newTimeCs = (currentMins * 60 * 100) + (newSeconds * 100) + (currentTenths * 10);
+        break;
+      case 'tenths':
+        if (isMainClockLastMinute) { // Only edit tenths if relevant
+          const newTenthsVal = Math.max(0, Math.min(value, 9));
+          newTimeCs = (currentMins * 60 * 100) + (currentSecs * 100) + (newTenthsVal * 10);
+        }
+        break;
+    }
+    newTimeCs = Math.max(0, newTimeCs);
+
+    const payloadMinutes = Math.floor(newTimeCs / 6000);
+    const payloadSeconds = Math.floor((newTimeCs % 6000) / 100);
+
+    dispatch({ type: 'SET_TIME', payload: { minutes: payloadMinutes, seconds: payloadSeconds } });
+    toast({
+      title: "Reloj Actualizado",
+      description: `Tiempo establecido a ${formatTime(newTimeCs, { showTenths: newTimeCs < 6000, includeMinutesForTenths: true })}`,
+    });
+    setEditingSegment(null);
+  };
+
+  const commonInputClass = cn(
+    "bg-transparent border-0 p-0 text-center h-auto tabular-nums focus:ring-0 focus:outline-none focus:border-b focus:border-primary",
+    "text-5xl font-bold",
+    isMainClockLastMinute ? "text-orange-500" : "text-accent"
+  );
+  const commonSpanClass = cn(!state.isClockRunning && "cursor-pointer hover:underline");
 
   return (
     <>
@@ -316,37 +400,109 @@ export function MiniScoreboard() {
               </Button>
             )}
             
-            <div className="flex items-center justify-center gap-1">
+            <div className={cn("text-5xl font-bold tabular-nums flex items-baseline justify-center gap-0.5", isMainClockLastMinute ? "text-orange-500" : "text-accent")}>
               {!state.isClockRunning && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-accent"
+                  className="h-6 w-6 text-muted-foreground hover:text-accent self-center mr-1"
                   onClick={() => handleTimeAdjust(-1)} 
                   aria-label="Restar 1 segundo al reloj"
-                  disabled={state.currentTime <=0}
+                  disabled={state.currentTime <=0 || editingSegment !== null}
                 >
                   <Minus className="h-3 w-3" />
                 </Button>
               )}
-              <p className={cn(
-                  "text-5xl font-bold tabular-nums",
-                  isMainClockLastMinute ? "text-orange-500" : "text-accent"
-                )}>
-                {formatTime(state.currentTime, { showTenths: isMainClockLastMinute, includeMinutesForTenths: true })}
-              </p>
+
+              {editingSegment === 'minutes' ? (
+                <Input
+                  ref={inputRef}
+                  type="text"
+                  inputMode="numeric"
+                  value={editValue}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (/^\d*$/.test(val) && val.length <= 2) setEditValue(val);
+                  }}
+                  onBlur={handleTimeEditConfirm}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleTimeEditConfirm();
+                    if (e.key === 'Escape') setEditingSegment(null);
+                  }}
+                  className={cn(commonInputClass, "w-[60px]")} // Approx width for 2 digits
+                  maxLength={2}
+                />
+              ) : (
+                <span onClick={() => handleSegmentClick('minutes')} className={commonSpanClass}>
+                  {String(timeParts.minutes).padStart(2, '0')}
+                </span>
+              )}
+              <span className={isMainClockLastMinute ? "text-orange-500" : "text-accent"}>:</span>
+              {editingSegment === 'seconds' ? (
+                <Input
+                  ref={inputRef}
+                  type="text"
+                  inputMode="numeric"
+                  value={editValue}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (/^\d*$/.test(val) && val.length <= 2) setEditValue(val);
+                  }}
+                  onBlur={handleTimeEditConfirm}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleTimeEditConfirm();
+                    if (e.key === 'Escape') setEditingSegment(null);
+                  }}
+                  className={cn(commonInputClass, "w-[60px]")} // Approx width for 2 digits
+                  maxLength={2}
+                />
+              ) : (
+                <span onClick={() => handleSegmentClick('seconds')} className={commonSpanClass}>
+                  {String(timeParts.seconds).padStart(2, '0')}
+                </span>
+              )}
+              {isMainClockLastMinute && (
+                <>
+                  <span className="text-orange-500">.</span>
+                  {editingSegment === 'tenths' ? (
+                    <Input
+                      ref={inputRef}
+                      type="text"
+                      inputMode="numeric"
+                      value={editValue}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (/^\d*$/.test(val) && val.length <= 1) setEditValue(val);
+                      }}
+                      onBlur={handleTimeEditConfirm}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleTimeEditConfirm();
+                        if (e.key === 'Escape') setEditingSegment(null);
+                      }}
+                      className={cn(commonInputClass, "w-[30px] text-orange-500")} // Approx width for 1 digit
+                      maxLength={1}
+                    />
+                  ) : (
+                    <span onClick={() => handleSegmentClick('tenths')} className={cn(commonSpanClass, "text-orange-500")}>
+                      {String(timeParts.tenths)}
+                    </span>
+                  )}
+                </>
+              )}
               {!state.isClockRunning && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-accent"
+                  className="h-6 w-6 text-muted-foreground hover:text-accent self-center ml-1"
                   onClick={() => handleTimeAdjust(1)} 
                   aria-label="Sumar 1 segundo al reloj"
+                  disabled={editingSegment !== null}
                 >
                   <Plus className="h-3 w-3" />
                 </Button>
               )}
             </div>
+
             <div className="relative mt-1 flex items-center justify-center gap-2">
                <Button 
                 onClick={handlePreviousPeriod} 
@@ -354,7 +510,7 @@ export function MiniScoreboard() {
                 size="icon" 
                 className="h-7 w-7 text-muted-foreground hover:text-primary-foreground"
                 aria-label="Período Anterior o Descanso"
-                disabled={isPreviousPeriodDisabled}
+                disabled={isPreviousPeriodDisabled || editingSegment !== null}
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
@@ -367,11 +523,11 @@ export function MiniScoreboard() {
                 size="icon" 
                 className="h-7 w-7 text-muted-foreground hover:text-primary-foreground"
                 aria-label="Siguiente Período o Descanso"
-                disabled={isNextActionDisabled}
+                disabled={isNextActionDisabled || editingSegment !== null}
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
-              {!state.isClockRunning && state.currentTime > 0 && !showNextActionButton && (
+              {!state.isClockRunning && state.currentTime > 0 && !showNextActionButton && editingSegment === null && (
                 <span className="absolute top-[-0.25rem] right-1 text-[0.6rem] font-normal text-muted-foreground normal-case px-1 rounded-sm bg-background/30">
                   Paused
                 </span>
