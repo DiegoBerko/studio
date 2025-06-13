@@ -23,9 +23,9 @@ if (typeof window !== 'undefined') {
 // Duraciones por defecto iniciales, se guardarán en centésimas de segundo
 const INITIAL_CONFIG_NAME = "Configuración Predeterminada";
 const INITIAL_WARM_UP_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND; // 5 minutos
-const INITIAL_PERIOD_DURATION = 20 * 60 * CENTISECONDS_PER_SECOND;
-const INITIAL_OT_PERIOD_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND;
-const INITIAL_BREAK_DURATION = 120 * CENTISECONDS_PER_SECOND;
+const INITIAL_PERIOD_DURATION = 20 * 60 * CENTISECONDS_PER_SECOND; // 20 minutos
+const INITIAL_OT_PERIOD_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND; // 5 minutos
+const INITIAL_BREAK_DURATION = 120 * CENTISECONDS_PER_SECOND; // 2 minutos
 const INITIAL_PRE_OT_BREAK_DURATION = 60 * CENTISECONDS_PER_SECOND;
 const INITIAL_TIMEOUT_DURATION = 30 * CENTISECONDS_PER_SECOND;
 const INITIAL_MAX_CONCURRENT_PENALTIES = 2;
@@ -33,8 +33,8 @@ const INITIAL_AUTO_START_WARM_UP = true;
 const INITIAL_AUTO_START_BREAKS = true;
 const INITIAL_AUTO_START_PRE_OT_BREAKS = false;
 const INITIAL_AUTO_START_TIMEOUTS = true;
-const INITIAL_NUMBER_OF_REGULAR_PERIODS = 3;
-const INITIAL_NUMBER_OF_OVERTIME_PERIODS = 1;
+const INITIAL_NUMBER_OF_REGULAR_PERIODS = 2; // Default 2 periods
+const INITIAL_NUMBER_OF_OVERTIME_PERIODS = 0; // Default 0 OT periods
 
 type PeriodDisplayOverrideType = "Warm-up" | "Break" | "Pre-OT Break" | "Time Out" | null;
 
@@ -980,7 +980,7 @@ export const formatTime = (
 
   if (displayTenthsWhenUnderMinute && totalCentiseconds < (60 * CENTISECONDS_PER_SECOND)) {
     const seconds = Math.floor(totalCentiseconds / CENTISECONDS_PER_SECOND);
-    const tenths = Math.floor((totalCentiseconds % CENTISECONDS_PER_SECOND) / 10);
+    const tenths = Math.floor((totalCentiseconds % CENTISECONDS_PER_SECOND) / 10); // Calculate tenths
     return `${seconds.toString().padStart(2, '0')}.${tenths.toString()}`;
   } else { 
     const totalSecondsOnly = Math.floor(totalCentiseconds / CENTISECONDS_PER_SECOND);
@@ -1010,8 +1010,11 @@ export const getPeriodText = (period: number, numRegPeriods: number): string => 
         return `${period}TH`; 
     }
     const overtimeNumber = period - numRegPeriods;
-    if (overtimeNumber === 1) return 'OT'; 
-    return `OT${overtimeNumber}`; 
+    if (overtimeNumber === 1 && numRegPeriods > 0) return 'OT'; // Only show OT if there were regular periods
+    if (overtimeNumber > 0 && numRegPeriods > 0) return `OT${overtimeNumber}`;
+    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT'; // Case for only OT periods
+    if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`;
+    return "---"; // Should not happen with valid inputs
 };
 
 
