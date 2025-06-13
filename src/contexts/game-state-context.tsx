@@ -9,7 +9,7 @@ import type { Penalty, Team } from '@/types';
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
 const LOCAL_STORAGE_KEY = 'icevision-game-state';
 const CENTISECONDS_PER_SECOND = 100;
-const TICK_INTERVAL_MS = 50; // For smoother centisecond updates
+const TICK_INTERVAL_MS = 50; 
 
 // TAB_ID: Generado una vez por pestaña/contexto del navegador.
 let TAB_ID: string;
@@ -24,17 +24,17 @@ if (typeof window !== 'undefined') {
 const INITIAL_CONFIG_NAME = "Configuración Predeterminada";
 const INITIAL_WARM_UP_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND; // 5 minutos
 const INITIAL_PERIOD_DURATION = 20 * 60 * CENTISECONDS_PER_SECOND; // 20 minutos
-const INITIAL_OT_PERIOD_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND; // 5 minutos
-const INITIAL_BREAK_DURATION = 120 * CENTISECONDS_PER_SECOND; // 2 minutos
-const INITIAL_PRE_OT_BREAK_DURATION = 60 * CENTISECONDS_PER_SECOND;
-const INITIAL_TIMEOUT_DURATION = 30 * CENTISECONDS_PER_SECOND;
+const INITIAL_OT_PERIOD_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND; // 5 minutos (default, aunque ahora numberOfOvertimePeriods es 0)
+const INITIAL_BREAK_DURATION = 2 * 60 * CENTISECONDS_PER_SECOND; // 2 minutos
+const INITIAL_PRE_OT_BREAK_DURATION = 60 * CENTISECONDS_PER_SECOND; // 1 minuto (default)
+const INITIAL_TIMEOUT_DURATION = 30 * CENTISECONDS_PER_SECOND; // 30 segundos
 const INITIAL_MAX_CONCURRENT_PENALTIES = 2;
 const INITIAL_AUTO_START_WARM_UP = true;
 const INITIAL_AUTO_START_BREAKS = true;
 const INITIAL_AUTO_START_PRE_OT_BREAKS = false;
 const INITIAL_AUTO_START_TIMEOUTS = true;
-const INITIAL_NUMBER_OF_REGULAR_PERIODS = 2; // Default 2 periods
-const INITIAL_NUMBER_OF_OVERTIME_PERIODS = 0; // Default 0 OT periods
+const INITIAL_NUMBER_OF_REGULAR_PERIODS = 2; 
+const INITIAL_NUMBER_OF_OVERTIME_PERIODS = 0; 
 
 type PeriodDisplayOverrideType = "Warm-up" | "Break" | "Pre-OT Break" | "Time Out" | null;
 
@@ -84,15 +84,15 @@ interface GameState extends ConfigFields {
 
 export type GameAction =
   | { type: 'TOGGLE_CLOCK' }
-  | { type: 'SET_TIME'; payload: { minutes: number; seconds: number } } // Input in M, S; converted to CS
-  | { type: 'ADJUST_TIME'; payload: number } // Payload in centiseconds
-  | { type: 'SET_PERIOD'; payload: number } // payload is the target period number
-  | { type: 'RESET_PERIOD_CLOCK' } // Resets clock for current period/override
+  | { type: 'SET_TIME'; payload: { minutes: number; seconds: number } } 
+  | { type: 'ADJUST_TIME'; payload: number } 
+  | { type: 'SET_PERIOD'; payload: number } 
+  | { type: 'RESET_PERIOD_CLOCK' } 
   | { type: 'SET_SCORE'; payload: { team: Team; score: number } }
   | { type: 'ADJUST_SCORE'; payload: { team: Team; delta: number } }
-  | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id' | '_status'> } } // Penalty duration in seconds
+  | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id' | '_status'> } } 
   | { type: 'REMOVE_PENALTY'; payload: { team: Team; penaltyId: string } }
-  | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } } // Delta in seconds
+  | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } } 
   | { type: 'REORDER_PENALTIES'; payload: { team: Team; startIndex: number; endIndex: number } }
   | { type: 'TICK' }
   | { type: 'SET_HOME_TEAM_NAME'; payload: string }
@@ -103,12 +103,12 @@ export type GameAction =
   | { type: 'START_TIMEOUT' }
   | { type: 'END_TIMEOUT' }
   | { type: 'SET_CONFIG_NAME'; payload: string }
-  | { type: 'SET_DEFAULT_WARM_UP_DURATION'; payload: number } // Payload in centiseconds
-  | { type: 'SET_DEFAULT_PERIOD_DURATION'; payload: number } // Payload in centiseconds
-  | { type: 'SET_DEFAULT_OT_PERIOD_DURATION'; payload: number } // Payload in centiseconds
-  | { type: 'SET_DEFAULT_BREAK_DURATION'; payload: number } // Payload in centiseconds
-  | { type: 'SET_DEFAULT_PRE_OT_BREAK_DURATION'; payload: number } // Payload in centiseconds
-  | { type: 'SET_DEFAULT_TIMEOUT_DURATION'; payload: number } // Payload in centiseconds
+  | { type: 'SET_DEFAULT_WARM_UP_DURATION'; payload: number } 
+  | { type: 'SET_DEFAULT_PERIOD_DURATION'; payload: number } 
+  | { type: 'SET_DEFAULT_OT_PERIOD_DURATION'; payload: number } 
+  | { type: 'SET_DEFAULT_BREAK_DURATION'; payload: number } 
+  | { type: 'SET_DEFAULT_PRE_OT_BREAK_DURATION'; payload: number } 
+  | { type: 'SET_DEFAULT_TIMEOUT_DURATION'; payload: number } 
   | { type: 'SET_MAX_CONCURRENT_PENALTIES'; payload: number }
   | { type: 'SET_NUMBER_OF_REGULAR_PERIODS'; payload: number }
   | { type: 'SET_NUMBER_OF_OVERTIME_PERIODS'; payload: number }
@@ -116,9 +116,10 @@ export type GameAction =
   | { type: 'SET_AUTO_START_BREAKS_VALUE'; payload: boolean }
   | { type: 'SET_AUTO_START_PRE_OT_BREAKS_VALUE'; payload: boolean }
   | { type: 'SET_AUTO_START_TIMEOUTS_VALUE'; payload: boolean }
-  | { type: 'LOAD_CONFIG_FROM_FILE'; payload: Partial<ConfigFields> } // Durations in file assumed to be in seconds, converted on load
-  | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> } // Durations from storage assumed to be in centiseconds
+  | { type: 'LOAD_CONFIG_FROM_FILE'; payload: Partial<ConfigFields> } 
+  | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> } 
   | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState }
+  | { type: 'RESET_CONFIG_TO_DEFAULTS' }
   | { type: 'RESET_GAME_STATE' };
 
 
@@ -248,10 +249,10 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
         clockStartTimeMs: (autoStartPreOTBreaks && defaultPreOTBreakDuration > 0) ? Date.now() : null,
         remainingTimeAtStartCs: (autoStartPreOTBreaks && defaultPreOTBreakDuration > 0) ? defaultPreOTBreakDuration : null,
       };
-    } else {
+    } else { // End of game
       newPartialState = { currentTime: 0, isClockRunning: false };
     }
-  } else {
+  } else { // Should not happen, but as a fallback
     newPartialState = { currentTime: 0, isClockRunning: false };
   }
 
@@ -402,7 +403,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
       break;
     }
-    case 'ADJUST_TIME': { // action.payload is in centiseconds
+    case 'ADJUST_TIME': { 
       let currentTimeSnapshotCs = state.currentTime;
       if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartCs !== null) {
         const elapsedMs = Date.now() - state.clockStartTimeMs;
@@ -494,11 +495,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newStateWithoutMeta = { ...state, [`${action.payload.team}Score`]: Math.max(0, currentScore + action.payload.delta) };
       break;
     }
-    case 'ADD_PENALTY': { // Penalty duration in seconds
+    case 'ADD_PENALTY': { 
       const newPenalty: Penalty = {
         ...action.payload.penalty,
-        initialDuration: action.payload.penalty.initialDuration, // Already in seconds
-        remainingTime: action.payload.penalty.remainingTime,     // Already in seconds
+        initialDuration: action.payload.penalty.initialDuration, 
+        remainingTime: action.payload.penalty.remainingTime,     
         id: (typeof window !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random().toString(36).slice(2))
       };
       const penalties = [...state[`${action.payload.team}Penalties`], newPenalty];
@@ -510,7 +511,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newStateWithoutMeta = { ...state, [`${action.payload.team}Penalties`]: penalties };
       break;
     }
-    case 'ADJUST_PENALTY_TIME': { // Delta in seconds
+    case 'ADJUST_PENALTY_TIME': { 
       const { team, penaltyId, delta } = action.payload;
       const updatedPenalties = state[`${team}Penalties`].map(p => {
         if (p.id === penaltyId) {
@@ -540,20 +541,20 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartCs !== null) {
         const elapsedMs = Date.now() - state.clockStartTimeMs;
-        const elapsedCs = Math.floor(elapsedMs / 10); // 10 ms per centisecond
+        const elapsedCs = Math.floor(elapsedMs / 10); 
         newCalculatedTimeCs = Math.max(0, state.remainingTimeAtStartCs - elapsedCs);
 
         const gameClockWasTickingForPenalties =
-          state.isClockRunning && // Clock was running before this tick
+          state.isClockRunning && 
           state.periodDisplayOverride === null &&
           state.currentPeriod > 0 &&
-          state.remainingTimeAtStartCs > 0; // Make sure it was not already 0
+          state.remainingTimeAtStartCs > 0; 
 
         if (gameClockWasTickingForPenalties) {
           const oldSecondBoundary = Math.floor(state.currentTime / CENTISECONDS_PER_SECOND);
           const newSecondBoundary = Math.floor(newCalculatedTimeCs / CENTISECONDS_PER_SECOND);
 
-          if (newSecondBoundary < oldSecondBoundary) { // A full second has passed
+          if (newSecondBoundary < oldSecondBoundary) { 
             const updatePenaltiesForOneSecondTick = (penalties: Penalty[], maxConcurrent: number): Penalty[] => {
               const resultPenalties: Penalty[] = [];
               const activePlayerTickets: Set<string> = new Set();
@@ -564,13 +565,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
                   continue; 
                 }
                 let status: Penalty['_status'] = undefined;
-                let newRemainingTimeForPenaltySec = p.remainingTime; // In seconds
+                let newRemainingTimeForPenaltySec = p.remainingTime; 
 
                 if (activePlayerTickets.has(p.playerNumber)) {
                   status = 'pending_player';
                 } else if (concurrentRunningCount < maxConcurrent) {
                   status = 'running';
-                  newRemainingTimeForPenaltySec = Math.max(0, p.remainingTime - 1); // Decrement 1 second
+                  newRemainingTimeForPenaltySec = Math.max(0, p.remainingTime - 1); 
                   if (newRemainingTimeForPenaltySec > 0) { 
                       activePlayerTickets.add(p.playerNumber);
                   }
@@ -590,7 +591,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           }
         }
       } else if (state.isClockRunning && state.currentTime <= 0) {
-         newCalculatedTimeCs = 0; // Ensure it's exactly 0 if it was running but at/below 0
+         newCalculatedTimeCs = 0; 
       }
 
 
@@ -612,7 +613,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           homePenalties: homePenaltiesResult,
           awayPenalties: awayPenaltiesResult,
         };
-        // If clock was running but became paused due to time reaching 0 manually (not via tick calculation above)
         if (state.isClockRunning && newCalculatedTimeCs <= 0) {
             newStateWithoutMeta.isClockRunning = false;
             newStateWithoutMeta.clockStartTimeMs = null;
@@ -732,7 +732,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           preTimeoutState: null,
         };
          if (shouldResumeClock && newStateWithoutMeta.clockStartTimeMs === preTimeoutClockStart) {
-            newStateWithoutMeta.clockStartTimeMs = Date.now(); // Re-anchor if reusing old start time
+            newStateWithoutMeta.clockStartTimeMs = Date.now(); 
             newStateWithoutMeta.remainingTimeAtStartCs = time;
         }
       } else {
@@ -742,22 +742,22 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_CONFIG_NAME':
       newStateWithoutMeta = { ...state, configName: action.payload || initialGlobalState.configName };
       break;
-    case 'SET_DEFAULT_WARM_UP_DURATION': // payload in centiseconds
+    case 'SET_DEFAULT_WARM_UP_DURATION': 
       newStateWithoutMeta = { ...state, defaultWarmUpDuration: Math.max(60 * CENTISECONDS_PER_SECOND, action.payload) };
       break;
-    case 'SET_DEFAULT_PERIOD_DURATION': // payload in centiseconds
+    case 'SET_DEFAULT_PERIOD_DURATION': 
       newStateWithoutMeta = { ...state, defaultPeriodDuration: Math.max(60 * CENTISECONDS_PER_SECOND, action.payload) };
       break;
-    case 'SET_DEFAULT_OT_PERIOD_DURATION': // payload in centiseconds
+    case 'SET_DEFAULT_OT_PERIOD_DURATION': 
       newStateWithoutMeta = { ...state, defaultOTPeriodDuration: Math.max(60 * CENTISECONDS_PER_SECOND, action.payload) };
       break;
-    case 'SET_DEFAULT_BREAK_DURATION': // payload in centiseconds
+    case 'SET_DEFAULT_BREAK_DURATION': 
       newStateWithoutMeta = { ...state, defaultBreakDuration: Math.max(1 * CENTISECONDS_PER_SECOND, action.payload) };
       break;
-    case 'SET_DEFAULT_PRE_OT_BREAK_DURATION': // payload in centiseconds
+    case 'SET_DEFAULT_PRE_OT_BREAK_DURATION': 
       newStateWithoutMeta = { ...state, defaultPreOTBreakDuration: Math.max(1 * CENTISECONDS_PER_SECOND, action.payload) };
       break;
-    case 'SET_DEFAULT_TIMEOUT_DURATION': // payload in centiseconds
+    case 'SET_DEFAULT_TIMEOUT_DURATION': 
       newStateWithoutMeta = { ...state, defaultTimeoutDuration: Math.max(1 * CENTISECONDS_PER_SECOND, action.payload) };
       break;
     case 'SET_MAX_CONCURRENT_PENALTIES':
@@ -781,18 +781,17 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_AUTO_START_TIMEOUTS_VALUE':
       newStateWithoutMeta = { ...state, autoStartTimeouts: action.payload };
       break;
-    case 'LOAD_CONFIG_FROM_FILE': { // Durations in file are seconds, convert to CS
+    case 'LOAD_CONFIG_FROM_FILE': { 
       const config = action.payload;
-      const toCs = (val?: number, multiplier: number = 1) => val !== undefined ? val * multiplier * CENTISECONDS_PER_SECOND : undefined;
       newStateWithoutMeta = {
         ...state,
         configName: config.configName ?? state.configName,
-        defaultWarmUpDuration: toCs(config.defaultWarmUpDuration, 60) ?? state.defaultWarmUpDuration,
-        defaultPeriodDuration: toCs(config.defaultPeriodDuration, 60) ?? state.defaultPeriodDuration,
-        defaultOTPeriodDuration: toCs(config.defaultOTPeriodDuration, 60) ?? state.defaultOTPeriodDuration,
-        defaultBreakDuration: toCs(config.defaultBreakDuration) ?? state.defaultBreakDuration,
-        defaultPreOTBreakDuration: toCs(config.defaultPreOTBreakDuration) ?? state.defaultPreOTBreakDuration,
-        defaultTimeoutDuration: toCs(config.defaultTimeoutDuration) ?? state.defaultTimeoutDuration,
+        defaultWarmUpDuration: config.defaultWarmUpDuration ?? state.defaultWarmUpDuration,
+        defaultPeriodDuration: config.defaultPeriodDuration ?? state.defaultPeriodDuration,
+        defaultOTPeriodDuration: config.defaultOTPeriodDuration ?? state.defaultOTPeriodDuration,
+        defaultBreakDuration: config.defaultBreakDuration ?? state.defaultBreakDuration,
+        defaultPreOTBreakDuration: config.defaultPreOTBreakDuration ?? state.defaultPreOTBreakDuration,
+        defaultTimeoutDuration: config.defaultTimeoutDuration ?? state.defaultTimeoutDuration,
         maxConcurrentPenalties: config.maxConcurrentPenalties ?? state.maxConcurrentPenalties,
         autoStartWarmUp: config.autoStartWarmUp ?? state.autoStartWarmUp,
         autoStartBreaks: config.autoStartBreaks ?? state.autoStartBreaks,
@@ -800,6 +799,26 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         autoStartTimeouts: config.autoStartTimeouts ?? state.autoStartTimeouts,
         numberOfRegularPeriods: config.numberOfRegularPeriods ?? state.numberOfRegularPeriods,
         numberOfOvertimePeriods: config.numberOfOvertimePeriods ?? state.numberOfOvertimePeriods,
+      };
+      break;
+    }
+    case 'RESET_CONFIG_TO_DEFAULTS': {
+      newStateWithoutMeta = {
+        ...state,
+        configName: INITIAL_CONFIG_NAME,
+        defaultWarmUpDuration: INITIAL_WARM_UP_DURATION,
+        defaultPeriodDuration: INITIAL_PERIOD_DURATION,
+        defaultOTPeriodDuration: INITIAL_OT_PERIOD_DURATION,
+        defaultBreakDuration: INITIAL_BREAK_DURATION,
+        defaultPreOTBreakDuration: INITIAL_PRE_OT_BREAK_DURATION,
+        defaultTimeoutDuration: INITIAL_TIMEOUT_DURATION,
+        maxConcurrentPenalties: INITIAL_MAX_CONCURRENT_PENALTIES,
+        autoStartWarmUp: INITIAL_AUTO_START_WARM_UP,
+        autoStartBreaks: INITIAL_AUTO_START_BREAKS,
+        autoStartPreOTBreaks: INITIAL_AUTO_START_PRE_OT_BREAKS,
+        autoStartTimeouts: INITIAL_AUTO_START_TIMEOUTS,
+        numberOfRegularPeriods: INITIAL_NUMBER_OF_REGULAR_PERIODS,
+        numberOfOvertimePeriods: INITIAL_NUMBER_OF_OVERTIME_PERIODS,
       };
       break;
     }
@@ -837,7 +856,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
   if (nonOriginatingActionTypes.includes(action.type)) {
     return { ...newStateWithoutMeta, _lastActionOriginator: undefined, _lastUpdatedTimestamp: (newStateWithoutMeta as GameState)._lastUpdatedTimestamp };
   } else if (action.type === 'TICK' && !state.isClockRunning && !newStateWithoutMeta.isClockRunning) {
-     // If TICK didn't change anything because clock was paused and remained paused
     if (state.currentTime === newStateWithoutMeta.currentTime && 
         JSON.stringify(state.homePenalties) === JSON.stringify(newStateWithoutMeta.homePenalties) &&
         JSON.stringify(state.awayPenalties) === JSON.stringify(newStateWithoutMeta.awayPenalties) ) {
@@ -888,7 +906,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       const rawStoredState = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (rawStoredState) {
         const parsedState = JSON.parse(rawStoredState) as Partial<GameState>;
-        // Ensure durations from storage are treated as centiseconds
         payloadForHydration = { ...parsedState };
       }
     } catch (error) {
@@ -980,7 +997,7 @@ export const formatTime = (
 
   if (displayTenthsWhenUnderMinute && totalCentiseconds < (60 * CENTISECONDS_PER_SECOND)) {
     const seconds = Math.floor(totalCentiseconds / CENTISECONDS_PER_SECOND);
-    const tenths = Math.floor((totalCentiseconds % CENTISECONDS_PER_SECOND) / 10); // Calculate tenths
+    const tenths = Math.floor((totalCentiseconds % CENTISECONDS_PER_SECOND) / 10); 
     return `${seconds.toString().padStart(2, '0')}.${tenths.toString()}`;
   } else { 
     const totalSecondsOnly = Math.floor(totalCentiseconds / CENTISECONDS_PER_SECOND);
@@ -1010,11 +1027,11 @@ export const getPeriodText = (period: number, numRegPeriods: number): string => 
         return `${period}TH`; 
     }
     const overtimeNumber = period - numRegPeriods;
-    if (overtimeNumber === 1 && numRegPeriods > 0) return 'OT'; // Only show OT if there were regular periods
+    if (overtimeNumber === 1 && numRegPeriods > 0) return 'OT'; 
     if (overtimeNumber > 0 && numRegPeriods > 0) return `OT${overtimeNumber}`;
-    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT'; // Case for only OT periods
+    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT'; 
     if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`;
-    return "---"; // Should not happen with valid inputs
+    return "---"; 
 };
 
 
@@ -1028,7 +1045,6 @@ export const secondsToMinutes = (seconds: number): string => {
   return Math.floor(seconds / 60).toString();
 };
 
-// Helper for config page inputs (durations in seconds or minutes for UI)
 export const centisecondsToDisplaySeconds = (centiseconds: number): string => {
   if (isNaN(centiseconds) || centiseconds < 0) return "0";
   return Math.floor(centiseconds / CENTISECONDS_PER_SECOND).toString();
@@ -1039,3 +1055,4 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 };
 
     
+

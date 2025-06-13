@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Undo2, Upload, Download } from 'lucide-react';
+import { Save, Undo2, Upload, Download, RotateCcw } from 'lucide-react';
 import { useGameState, type ConfigFields } from '@/contexts/game-state-context';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -36,6 +36,7 @@ export default function ConfigPage() {
 
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [currentExportFilename, setCurrentExportFilename] = useState('');
+  const [isResetConfigDialogOpen, setIsResetConfigDialogOpen] = useState(false);
 
   const pageIsDirty = isConfigNameDirty || isDurationDirty || isPenaltyDirty;
 
@@ -176,7 +177,7 @@ export default function ConfigPage() {
         const importedConfig = JSON.parse(text) as Partial<ConfigFields>;
 
         // Basic validation for a potentially valid config file
-        if (!importedConfig.configName && !importedConfig.defaultPeriodDuration && !importedConfig.defaultWarmUpDuration) {
+        if (!importedConfig.configName && importedConfig.defaultPeriodDuration === undefined && importedConfig.defaultWarmUpDuration === undefined) {
           throw new Error("Archivo de configuración no válido o formato incorrecto.");
         }
         
@@ -201,8 +202,7 @@ export default function ConfigPage() {
         
         durationSettingsRef.current?.handleDiscard(); 
         penaltySettingsRef.current?.handleDiscard(); 
-        setLocalConfigName((newConfigFromFile.configName || '')); 
-        setIsConfigNameDirty(false); 
+        setIsConfigNameDirty(false); // This will trigger useEffect to update localConfigName
 
         toast({
           title: "Configuración Importada",
@@ -222,6 +222,23 @@ export default function ConfigPage() {
       }
     };
     reader.readAsText(file);
+  };
+  
+  const handlePrepareResetConfig = () => {
+    setIsResetConfigDialogOpen(true);
+  };
+
+  const performConfigReset = () => {
+    dispatch({ type: 'RESET_CONFIG_TO_DEFAULTS' });
+    setIsConfigNameDirty(false); // This will trigger useEffect to update localConfigName from new state.configName
+    durationSettingsRef.current?.handleDiscard(); // Resets child card and its dirty state
+    penaltySettingsRef.current?.handleDiscard();  // Resets child card and its dirty state
+
+    toast({
+      title: "Configuración Restablecida",
+      description: "Todas las configuraciones han vuelto a sus valores predeterminados.",
+    });
+    setIsResetConfigDialogOpen(false);
   };
   
   useEffect(() => {
@@ -278,16 +295,16 @@ export default function ConfigPage() {
       <Separator className="my-10" />
 
       <div className="space-y-6 p-6 border rounded-md bg-card">
-        <h2 className="text-xl font-semibold text-primary-foreground">Importar / Exportar Configuración</h2>
-        <p className="text-sm text-muted-foreground">
-          Guarda tu configuración actual en un archivo o carga una configuración previamente guardada.
-        </p>
+        <h2 className="text-xl font-semibold text-primary-foreground">Acciones</h2>
         <div className="flex flex-col sm:flex-row gap-4">
           <Button onClick={prepareExportConfig} variant="outline" className="flex-1">
             <Download className="mr-2 h-4 w-4" /> Exportar Configuración
           </Button>
           <Button onClick={handleImportClick} variant="outline" className="flex-1">
             <Upload className="mr-2 h-4 w-4" /> Importar Configuración
+          </Button>
+          <Button onClick={handlePrepareResetConfig} variant="destructive" className="flex-1">
+            <RotateCcw className="mr-2 h-4 w-4" /> Restablecer Predeterminados
           </Button>
           <input
             type="file"
@@ -323,6 +340,26 @@ export default function ConfigPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {isResetConfigDialogOpen && (
+        <AlertDialog open={isResetConfigDialogOpen} onOpenChange={setIsResetConfigDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Restablecimiento</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esto restablecerá TODAS las configuraciones de esta página (nombre, duraciones, máximos, arranques automáticos, número de períodos) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer. ¿Estás seguro?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setIsResetConfigDialogOpen(false)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={performConfigReset}>
+                Restablecer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
+
