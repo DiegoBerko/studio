@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useGameState, formatTime, getActualPeriodText, getPeriodText, CENTISECONDS_PER_SECOND } from '@/contexts/game-state-context';
+import { useGameState, formatTime, getActualPeriodText, getPeriodText } from '@/contexts/game-state-context';
 import { cn } from '@/lib/utils';
 
 interface ClockDisplayProps {
@@ -11,11 +11,11 @@ interface ClockDisplayProps {
 export function ClockDisplay({ className }: ClockDisplayProps) {
   const { state } = useGameState();
 
-  const isMainClockLastMinute = state.currentTime < (60 * CENTISECONDS_PER_SECOND) && state.currentTime >= 0 && 
+  const isMainClockLastMinute = state.currentTime < 6000 && state.currentTime >= 0 &&
                                 (state.periodDisplayOverride !== null || state.currentPeriod >= 0);
 
   const preTimeoutTimeCs = state.preTimeoutState?.time;
-  const isPreTimeoutLastMinute = typeof preTimeoutTimeCs === 'number' && preTimeoutTimeCs < (60 * CENTISECONDS_PER_SECOND) && preTimeoutTimeCs >= 0;
+  const isPreTimeoutLastMinute = typeof preTimeoutTimeCs === 'number' && preTimeoutTimeCs < 6000 && preTimeoutTimeCs >= 0;
 
   return (
     <div className={cn("text-center", className)}>
@@ -31,9 +31,9 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
             {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods)}
           </span>
           {!state.isClockRunning && state.currentTime > 0 && (
-            <span 
+            <span
               className="absolute left-full top-1/2 transform -translate-y-1/2 ml-3 text-sm md:text-base font-normal text-muted-foreground normal-case tracking-normal px-2 py-1 bg-background/50 rounded-md whitespace-nowrap"
-              style={{ lineHeight: 'normal' }} 
+              style={{ lineHeight: 'normal' }}
             >
               Paused
             </span>

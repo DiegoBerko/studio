@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from 'react';
-import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes, CENTISECONDS_PER_SECOND } from '@/contexts/game-state-context';
+import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes } from '@/contexts/game-state-context';
 import type { Team } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -39,7 +39,7 @@ export function MiniScoreboard() {
   };
 
   const handleTimeAdjust = (deltaSeconds: number) => { // delta is in full seconds
-    dispatch({ type: 'ADJUST_TIME', payload: deltaSeconds * CENTISECONDS_PER_SECOND });
+    dispatch({ type: 'ADJUST_TIME', payload: deltaSeconds * 100 }); // Replaced CENTISECONDS_PER_SECOND
     toast({ 
       title: "Reloj Ajustado", 
       description: `Tiempo ajustado en ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds} segundo${Math.abs(deltaSeconds) === 1 ? '' : 's'}.` 
@@ -246,11 +246,11 @@ export function MiniScoreboard() {
     nextActionButtonText = "Iniciar 1er Período";
   }
 
-  const isMainClockLastMinute = state.currentTime < (60 * CENTISECONDS_PER_SECOND) && state.currentTime >= 0 &&
+  const isMainClockLastMinute = state.currentTime < 6000 && state.currentTime >= 0 && // Replaced (60 * CENTISECONDS_PER_SECOND)
                                (state.periodDisplayOverride !== null || state.currentPeriod >= 0);
                                
   const preTimeoutTimeCs = state.preTimeoutState?.time;
-  const isPreTimeoutLastMinute = typeof preTimeoutTimeCs === 'number' && preTimeoutTimeCs < (60 * CENTISECONDS_PER_SECOND) && preTimeoutTimeCs >= 0;
+  const isPreTimeoutLastMinute = typeof preTimeoutTimeCs === 'number' && preTimeoutTimeCs < 6000 && preTimeoutTimeCs >= 0; // Replaced (60 * CENTISECONDS_PER_SECOND)
 
 
   return (
@@ -331,7 +331,7 @@ export function MiniScoreboard() {
               )}
               <p className={cn(
                   "text-5xl font-bold tabular-nums",
-                  isMainClockLastMinute ? "text-orange-500" : "text-accent" // text-accent is red
+                  isMainClockLastMinute ? "text-orange-500" : "text-accent"
                 )}>
                 {formatTime(state.currentTime, isMainClockLastMinute)}
               </p>
@@ -445,3 +445,5 @@ export function MiniScoreboard() {
     </>
   );
 }
+
+    

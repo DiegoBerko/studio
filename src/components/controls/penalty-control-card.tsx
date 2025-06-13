@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useGameState, formatTime, CENTISECONDS_PER_SECOND } from '@/contexts/game-state-context';
+import { useGameState, formatTime } from '@/contexts/game-state-context';
 import type { Penalty, Team } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,7 +49,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
         penalty: { playerNumber: trimmedPlayerNumber, initialDuration: durationSec, remainingTime: durationSec },
       },
     });
-    toast({ title: "Penalidad Agregada", description: `Jugador ${trimmedPlayerNumber} de ${teamName} recibió una penalidad de ${formatTime(durationSec * CENTISECONDS_PER_SECOND)}.` });
+    toast({ title: "Penalidad Agregada", description: `Jugador ${trimmedPlayerNumber} de ${teamName} recibió una penalidad de ${formatTime(durationSec * 100)}.` });
     setPlayerNumber('');
     // setPenaltyDurationSeconds('120'); // Optionally reset duration
   };
@@ -184,7 +184,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                       <div className="flex items-center text-xs text-muted-foreground">
                         <Clock className="h-3 w-3 mr-1" />
                         {/* Format penalty time (stored in seconds) to MM:SS using centiseconds for formatTime */}
-                        <span>{formatTime(p.remainingTime * CENTISECONDS_PER_SECOND)} / {formatTime(p.initialDuration * CENTISECONDS_PER_SECOND)}</span>
+                        <span>{formatTime(p.remainingTime * 100)} / {formatTime(p.initialDuration * 100)}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 ml-2">
