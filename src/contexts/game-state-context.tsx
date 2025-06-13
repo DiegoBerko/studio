@@ -35,6 +35,7 @@ const INITIAL_AUTO_START_PRE_OT_BREAKS = false;
 const INITIAL_AUTO_START_TIMEOUTS = true;
 const INITIAL_NUMBER_OF_REGULAR_PERIODS = 2; 
 const INITIAL_NUMBER_OF_OVERTIME_PERIODS = 0; 
+const INITIAL_PLAYERS_PER_TEAM_ON_ICE = 5;
 
 type PeriodDisplayOverrideType = "Warm-up" | "Break" | "Pre-OT Break" | "Time Out" | null;
 
@@ -62,6 +63,7 @@ export interface ConfigFields {
   autoStartTimeouts: boolean;
   numberOfRegularPeriods: number;
   numberOfOvertimePeriods: number;
+  playersPerTeamOnIce: number;
 }
 
 interface GameState extends ConfigFields {
@@ -112,6 +114,7 @@ export type GameAction =
   | { type: 'SET_MAX_CONCURRENT_PENALTIES'; payload: number }
   | { type: 'SET_NUMBER_OF_REGULAR_PERIODS'; payload: number }
   | { type: 'SET_NUMBER_OF_OVERTIME_PERIODS'; payload: number }
+  | { type: 'SET_PLAYERS_PER_TEAM_ON_ICE'; payload: number }
   | { type: 'SET_AUTO_START_WARM_UP_VALUE'; payload: boolean }
   | { type: 'SET_AUTO_START_BREAKS_VALUE'; payload: boolean }
   | { type: 'SET_AUTO_START_PRE_OT_BREAKS_VALUE'; payload: boolean }
@@ -148,6 +151,7 @@ const initialGlobalState: GameState = {
   autoStartTimeouts: INITIAL_AUTO_START_TIMEOUTS,
   numberOfRegularPeriods: INITIAL_NUMBER_OF_REGULAR_PERIODS,
   numberOfOvertimePeriods: INITIAL_NUMBER_OF_OVERTIME_PERIODS,
+  playersPerTeamOnIce: INITIAL_PLAYERS_PER_TEAM_ON_ICE,
   preTimeoutState: null,
   clockStartTimeMs: null,
   remainingTimeAtStartCs: null,
@@ -769,6 +773,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_NUMBER_OF_OVERTIME_PERIODS':
       newStateWithoutMeta = { ...state, numberOfOvertimePeriods: Math.max(0, action.payload) };
       break;
+    case 'SET_PLAYERS_PER_TEAM_ON_ICE':
+      newStateWithoutMeta = { ...state, playersPerTeamOnIce: Math.max(1, action.payload) };
+      break;
     case 'SET_AUTO_START_WARM_UP_VALUE':
       newStateWithoutMeta = { ...state, autoStartWarmUp: action.payload };
       break;
@@ -799,6 +806,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         autoStartTimeouts: config.autoStartTimeouts ?? state.autoStartTimeouts,
         numberOfRegularPeriods: config.numberOfRegularPeriods ?? state.numberOfRegularPeriods,
         numberOfOvertimePeriods: config.numberOfOvertimePeriods ?? state.numberOfOvertimePeriods,
+        playersPerTeamOnIce: config.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
       };
       break;
     }
@@ -819,6 +827,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         autoStartTimeouts: INITIAL_AUTO_START_TIMEOUTS,
         numberOfRegularPeriods: INITIAL_NUMBER_OF_REGULAR_PERIODS,
         numberOfOvertimePeriods: INITIAL_NUMBER_OF_OVERTIME_PERIODS,
+        playersPerTeamOnIce: INITIAL_PLAYERS_PER_TEAM_ON_ICE,
       };
       break;
     }
@@ -1004,14 +1013,11 @@ export const formatTime = (
     const seconds = Math.floor(totalCentiseconds / 100);
     const tenths = Math.floor((totalCentiseconds % 100) / 10);
     if (options.includeMinutesForTenths) {
-      // Format MM:SS.D (e.g., 00:59.9)
       return `00:${seconds.toString().padStart(2, '0')}.${tenths.toString()}`;
     } else {
-      // Format SS.D (e.g., 59.9)
       return `${seconds.toString().padStart(2, '0')}.${tenths.toString()}`;
     }
   } else { 
-    // Format MM:SS for times >= 1 minute or when tenths are not shown
     const totalSecondsOnly = Math.floor(totalCentiseconds / 100);
     const minutes = Math.floor(totalSecondsOnly / 60);
     const seconds = totalSecondsOnly % 60;
@@ -1067,3 +1073,4 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 };
 
     
+

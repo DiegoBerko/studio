@@ -21,13 +21,15 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySet
   const { state, dispatch } = useGameState();
   
   const [localMaxPenaltiesInput, setLocalMaxPenaltiesInput] = useState(String(state.maxConcurrentPenalties));
+  const [localPlayersPerTeamInput, setLocalPlayersPerTeamInput] = useState(String(state.playersPerTeamOnIce));
   const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
     if (!isDirty) {
       setLocalMaxPenaltiesInput(String(state.maxConcurrentPenalties));
+      setLocalPlayersPerTeamInput(String(state.playersPerTeamOnIce));
     }
-  }, [state.maxConcurrentPenalties, isDirty]);
+  }, [state.maxConcurrentPenalties, state.playersPerTeamOnIce, isDirty]);
 
   useEffect(() => {
     onDirtyChange(isDirty);
@@ -41,24 +43,44 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySet
     handleSave: () => {
       if (!isDirty) return true;
 
-      const num = parseInt(localMaxPenaltiesInput, 10);
-      const finalMaxPenalties = (isNaN(num) || num < 1) ? 1 : num;
-      
+      const maxPenNum = parseInt(localMaxPenaltiesInput, 10);
+      const finalMaxPenalties = (isNaN(maxPenNum) || maxPenNum < 1) ? 1 : maxPenNum;
       dispatch({ type: "SET_MAX_CONCURRENT_PENALTIES", payload: finalMaxPenalties });
+
+      const playersNum = parseInt(localPlayersPerTeamInput, 10);
+      const finalPlayersPerTeam = (isNaN(playersNum) || playersNum < 1) ? 1 : playersNum;
+      dispatch({ type: "SET_PLAYERS_PER_TEAM_ON_ICE", payload: finalPlayersPerTeam });
+      
       setIsDirty(false);
       return true;
     },
     handleDiscard: () => {
       setLocalMaxPenaltiesInput(String(state.maxConcurrentPenalties));
+      setLocalPlayersPerTeamInput(String(state.playersPerTeamOnIce));
       setIsDirty(false);
     },
     getIsDirty: () => isDirty,
   }));
 
   return (
-    <ControlCardWrapper title="Configuración de Penalidades">
+    <ControlCardWrapper title="Formato de Juego y Penalidades">
       <div className="space-y-4">
         <div>
+          <Label htmlFor="playersPerTeam">Jugadores en Cancha (sin arquero)</Label>
+          <Input
+            id="playersPerTeam"
+            type="number"
+            value={localPlayersPerTeamInput}
+            onChange={(e) => { setLocalPlayersPerTeamInput(e.target.value); markDirty(); }}
+            className="mt-1"
+            placeholder="ej. 5"
+            min="1"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Número de jugadores de campo por equipo (excluyendo al arquero).
+          </p>
+        </div>
+        <div className="pt-2">
           <Label htmlFor="maxConcurrentPenalties">Máximo Penalidades Concurrentes por Equipo</Label>
           <Input
             id="maxConcurrentPenalties"
@@ -67,6 +89,7 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySet
             onChange={(e) => { setLocalMaxPenaltiesInput(e.target.value); markDirty(); }}
             className="mt-1"
             placeholder="ej. 2"
+            min="1"
           />
           <p className="text-xs text-muted-foreground mt-1">
             Define cuántas penalidades pueden correr su tiempo simultáneamente para un mismo equipo.

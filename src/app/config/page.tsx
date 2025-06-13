@@ -140,6 +140,7 @@ export default function ConfigPage() {
       autoStartTimeouts: state.autoStartTimeouts,
       numberOfRegularPeriods: state.numberOfRegularPeriods,
       numberOfOvertimePeriods: state.numberOfOvertimePeriods,
+      playersPerTeamOnIce: state.playersPerTeamOnIce,
     };
     const jsonString = JSON.stringify(configToExport, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
@@ -177,7 +178,7 @@ export default function ConfigPage() {
         const importedConfig = JSON.parse(text) as Partial<ConfigFields>;
 
         // Basic validation for a potentially valid config file
-        if (!importedConfig.configName && importedConfig.defaultPeriodDuration === undefined && importedConfig.defaultWarmUpDuration === undefined) {
+        if (!importedConfig.configName && importedConfig.defaultPeriodDuration === undefined && importedConfig.defaultWarmUpDuration === undefined && importedConfig.playersPerTeamOnIce === undefined) {
           throw new Error("Archivo de configuración no válido o formato incorrecto.");
         }
         
@@ -196,6 +197,7 @@ export default function ConfigPage() {
           autoStartTimeouts: importedConfig.autoStartTimeouts ?? state.autoStartTimeouts,
           numberOfRegularPeriods: importedConfig.numberOfRegularPeriods ?? state.numberOfRegularPeriods,
           numberOfOvertimePeriods: importedConfig.numberOfOvertimePeriods ?? state.numberOfOvertimePeriods,
+          playersPerTeamOnIce: importedConfig.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
         };
 
         dispatch({ type: 'LOAD_CONFIG_FROM_FILE', payload: newConfigFromFile });
@@ -245,7 +247,7 @@ export default function ConfigPage() {
     if (!isConfigNameDirty) { 
         setLocalConfigName(state.configName || ''); 
     }
-  }, [state.configName, state.defaultWarmUpDuration, state.defaultPeriodDuration, state.defaultOTPeriodDuration, state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration, state.maxConcurrentPenalties, state.autoStartWarmUp, state.autoStartBreaks, state.autoStartPreOTBreaks, state.autoStartTimeouts, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, isConfigNameDirty]);
+  }, [state.configName, state.defaultWarmUpDuration, state.defaultPeriodDuration, state.defaultOTPeriodDuration, state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration, state.maxConcurrentPenalties, state.autoStartWarmUp, state.autoStartBreaks, state.autoStartPreOTBreaks, state.autoStartTimeouts, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, state.playersPerTeamOnIce, isConfigNameDirty]);
 
 
   return (
@@ -350,7 +352,7 @@ export default function ConfigPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Restablecimiento</AlertDialogTitle>
               <AlertDialogDescription>
-                Esto restablecerá TODAS las configuraciones de esta página (nombre, duraciones, máximos, arranques automáticos, número de períodos) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer. ¿Estás seguro?
+                Esto restablecerá TODAS las configuraciones de esta página (nombre, duraciones, máximos, arranques automáticos, número de períodos, jugadores en cancha) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer. ¿Estás seguro?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -365,3 +367,4 @@ export default function ConfigPage() {
     </div>
   );
 }
+
