@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
-import type { Penalty, Team, TeamData, PlayerData, PlayerType } from '@/types';
+import type { Penalty, Team, TeamData, PlayerData, CategoryData } from '@/types';
 
 // --- Constantes para la sincronización local ---
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
@@ -47,6 +47,16 @@ const INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR = true;
 const INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST = true;
 const INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES = true;
 
+// Category Defaults
+const INITIAL_AVAILABLE_CATEGORIES: CategoryData[] = [
+  { id: 'A', name: 'A' },
+  { id: 'B', name: 'B' },
+  { id: 'C', name: 'C' },
+  { id: 'Menores', name: 'Menores' },
+  { id: 'Damas', name: 'Damas' },
+];
+const INITIAL_SELECTED_MATCH_CATEGORY = INITIAL_AVAILABLE_CATEGORIES[0]?.id || '';
+
 
 type PeriodDisplayOverrideType = "Warm-up" | "Break" | "Pre-OT Break" | "Time Out" | null;
 
@@ -83,6 +93,9 @@ export interface ConfigFields {
   showAliasInPenaltyPlayerSelector: boolean;
   showAliasInControlsPenaltyList: boolean;
   showAliasInScoreboardPenalties: boolean;
+  // Category config fields
+  availableCategories: CategoryData[];
+  selectedMatchCategory: string;
 }
 
 interface GameState extends ConfigFields {
@@ -148,6 +161,11 @@ export type GameAction =
   | { type: 'SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES'; payload: boolean }
+  // Category Actions
+  | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
+  | { type: 'ADD_CATEGORY'; payload: Pick<CategoryData, 'name'> }
+  | { type: 'REMOVE_CATEGORY'; payload: { categoryId: string } }
+  | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
   | { type: 'LOAD_CONFIG_FROM_FILE'; payload: Partial<ConfigFields> }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
   | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState }
@@ -155,7 +173,7 @@ export type GameAction =
   | { type: 'RESET_GAME_STATE' }
   // Team Actions
   | { type: 'ADD_TEAM'; payload: Omit<TeamData, 'id' | 'players'> }
-  | { type: 'UPDATE_TEAM_DETAILS'; payload: { teamId: string; name: string; logoDataUrl?: string | null } }
+  | { type: 'UPDATE_TEAM_DETAILS'; payload: { teamId: string; name: string; category: string; logoDataUrl?: string | null } }
   | { type: 'DELETE_TEAM'; payload: { teamId: string } }
   | { type: 'ADD_PLAYER_TO_TEAM'; payload: { teamId: string; player: Omit<PlayerData, 'id'> } }
   | { type: 'REMOVE_PLAYER_FROM_TEAM'; payload: { teamId: string; playerId: string } }
@@ -196,6 +214,9 @@ const initialGlobalState: GameState = {
   showAliasInPenaltyPlayerSelector: INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR,
   showAliasInControlsPenaltyList: INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
   showAliasInScoreboardPenalties: INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
+  // Category Defaults
+  availableCategories: INITIAL_AVAILABLE_CATEGORIES,
+  selectedMatchCategory: INITIAL_SELECTED_MATCH_CATEGORY,
   preTimeoutState: null,
   clockStartTimeMs: null,
   remainingTimeAtStartCs: null,
@@ -229,13 +250,13 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     homePenalties,
     awayPenalties,
     playHornTrigger,
-    teams, // Pass teams through
-    // Pass new config fields through
+    teams,
+    availableCategories, // Pass categories through
+    selectedMatchCategory, // Pass selected match category
     configName, defaultWarmUpDuration, autoStartWarmUp, autoStartTimeouts, defaultTimeoutDuration,
     maxConcurrentPenalties, playersPerTeamOnIce, playSoundAtPeriodEnd, customHornSoundDataUrl,
     enableTeamSelectionInMiniScoreboard, enablePlayerSelectionForPenalties,
     showAliasInPenaltyPlayerSelector, showAliasInControlsPenaltyList, showAliasInScoreboardPenalties,
-    // score and team names also
     homeScore, awayScore, homeTeamName, awayTeamName,
     isClockRunning, currentTime, clockStartTimeMs, remainingTimeAtStartCs, 
   } = currentState;
@@ -243,7 +264,7 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
   let newPartialState: Partial<GameState> = {};
   const numRegPeriods = numberOfRegularPeriods;
   const totalGamePeriods = numRegPeriods + numberOfOvertimePeriods;
-  let shouldTriggerHorn = true; // Horn sounds by default on auto-transition unless it's end of game with no next period
+  let shouldTriggerHorn = true;
 
   if (periodDisplayOverride === 'Warm-up') {
     newPartialState = {
@@ -282,10 +303,10 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
         remainingTimeAtStartCs: shouldResumeClock ? time : null,
         preTimeoutState: null,
       };
-    } else { // Should not happen if timeout ends naturally, but as a fallback
+    } else { 
       newPartialState = { currentTime: currentState.currentTime, isClockRunning: false, periodDisplayOverride: currentState.periodDisplayOverride };
     }
-  } else if (periodDisplayOverride === null) { // Game Period Ended
+  } else if (periodDisplayOverride === null) { 
     if (currentPeriod < numRegPeriods) {
       newPartialState = {
         currentTime: defaultBreakDuration,
@@ -310,12 +331,12 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
         clockStartTimeMs: (autoStartPreOTBreaks && defaultPreOTBreakDuration > 0) ? Date.now() : null,
         remainingTimeAtStartCs: (autoStartPreOTBreaks && defaultPreOTBreakDuration > 0) ? defaultPreOTBreakDuration : null,
       };
-    } else { // End of game
+    } else { 
       newPartialState = { currentTime: 0, isClockRunning: false };
-      if (currentPeriod >= totalGamePeriods) shouldTriggerHorn = true; // Still sound horn for final period end
-      else shouldTriggerHorn = false; // No next period, no sound for "transition" to nothing
+      if (currentPeriod >= totalGamePeriods) shouldTriggerHorn = true; 
+      else shouldTriggerHorn = false; 
     }
-  } else { // Should not happen, but as a fallback
+  } else { 
     newPartialState = { currentTime: 0, isClockRunning: false };
     shouldTriggerHorn = false;
   }
@@ -325,12 +346,12 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     newPartialState.remainingTimeAtStartCs = null;
   }
   
-  // Ensure all existing state fields are carried over if not explicitly changed
   const baseStateForTransition = {
     homeScore, awayScore, homeTeamName, awayTeamName,
-    isClockRunning: currentState.isClockRunning, // use currentState's isClockRunning before newPartialState applies
-    currentTime: currentState.currentTime,     // use currentState's currentTime before newPartialState applies
+    isClockRunning: currentState.isClockRunning, 
+    currentTime: currentState.currentTime,     
     teams, homePenalties, awayPenalties,
+    availableCategories, selectedMatchCategory, // Carry over category state
     configName, defaultWarmUpDuration, defaultPeriodDuration, defaultOTPeriodDuration,
     defaultBreakDuration, defaultPreOTBreakDuration, defaultTimeoutDuration,
     maxConcurrentPenalties, autoStartWarmUp, autoStartBreaks, autoStartPreOTBreaks,
@@ -338,17 +359,17 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     playSoundAtPeriodEnd, customHornSoundDataUrl,
     enableTeamSelectionInMiniScoreboard, enablePlayerSelectionForPenalties,
     showAliasInPenaltyPlayerSelector, showAliasInControlsPenaltyList, showAliasInScoreboardPenalties,
-    clockStartTimeMs: currentState.clockStartTimeMs, // Use current ones before newPartialState applies
+    clockStartTimeMs: currentState.clockStartTimeMs, 
     remainingTimeAtStartCs: currentState.remainingTimeAtStartCs,
-    preTimeoutState: currentState.preTimeoutState, // carry over preTimeoutState, newPartialState might nullify it
-    currentPeriod: currentState.currentPeriod, // carry over currentPeriod
-    periodDisplayOverride: currentState.periodDisplayOverride, // carry over periodDisplayOverride
+    preTimeoutState: currentState.preTimeoutState, 
+    currentPeriod: currentState.currentPeriod, 
+    periodDisplayOverride: currentState.periodDisplayOverride, 
   };
 
 
   return {
-    ...baseStateForTransition, // Spread all fields from currentState
-    ...newPartialState,        // Override with calculated changes
+    ...baseStateForTransition, 
+    ...newPartialState,        
     newPlayHornTrigger: shouldTriggerHorn ? playHornTrigger + 1 : playHornTrigger,
   };
 };
@@ -361,7 +382,6 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
 
   for (const p of penalties) {
     let currentStatus: Penalty['_status'] = undefined;
-    // Penalties with no time left don't need a status related to running/pending
     if (p.remainingTime <= 0) {
       newPenalties.push({ ...p, _status: undefined });
       continue;
@@ -371,8 +391,6 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
       currentStatus = 'pending_player';
     } else if (concurrentRunningCount < maxConcurrent) {
       currentStatus = 'running';
-      // Add to activePlayerTickets only if it's actually running and has time.
-      // This ensures a player with multiple penalties serves them one by one.
       activePlayerTickets.add(p.playerNumber);
       concurrentRunningCount++;
     } else {
@@ -390,15 +408,14 @@ const statusOrderValues: Record<NonNullable<Penalty['_status']>, number> = {
 };
 
 const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
-  const penaltiesToSort = [...penalties]; // Create a shallow copy to sort
+  const penaltiesToSort = [...penalties]; 
   return penaltiesToSort.sort((a, b) => {
-    const aStatusVal = a._status ? (statusOrderValues[a._status] ?? 4) : 4; // Penalties with undefined status (e.g., expired) go last
+    const aStatusVal = a._status ? (statusOrderValues[a._status] ?? 4) : 4; 
     const bStatusVal = b._status ? (statusOrderValues[b._status] ?? 4) : 4;
 
     if (aStatusVal !== bStatusVal) {
       return aStatusVal - bStatusVal;
     }
-    // If statuses are the same, maintain original relative order (relies on stable sort)
     return 0;
   });
 };
@@ -418,8 +435,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
        const hydratedBase: GameState = {
         ...initialGlobalState,
         ...(action.payload ?? {}),
-        playHornTrigger: initialGlobalState.playHornTrigger, // Do not hydrate trigger
-        teams: action.payload?.teams || [], // Hydrate teams
+        playHornTrigger: initialGlobalState.playHornTrigger, 
+        teams: action.payload?.teams || [], 
+        availableCategories: action.payload?.availableCategories || initialGlobalState.availableCategories,
+        selectedMatchCategory: action.payload?.selectedMatchCategory || initialGlobalState.selectedMatchCategory,
       };
 
       hydratedBase.isClockRunning = false;
@@ -477,7 +496,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         hydratedBase.isClockRunning = false;
       }
       
-      // Ensure new config fields are hydrated or defaulted
       hydratedBase.enableTeamSelectionInMiniScoreboard = action.payload?.enableTeamSelectionInMiniScoreboard ?? initialGlobalState.enableTeamSelectionInMiniScoreboard;
       hydratedBase.enablePlayerSelectionForPenalties = action.payload?.enablePlayerSelectionForPenalties ?? initialGlobalState.enablePlayerSelectionForPenalties;
       hydratedBase.showAliasInPenaltyPlayerSelector = action.payload?.showAliasInPenaltyPlayerSelector ?? initialGlobalState.showAliasInPenaltyPlayerSelector;
@@ -489,6 +507,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         hydratedBase.showAliasInPenaltyPlayerSelector = false;
         hydratedBase.showAliasInControlsPenaltyList = false;
         hydratedBase.showAliasInScoreboardPenalties = false;
+      }
+
+      if (!hydratedBase.availableCategories || hydratedBase.availableCategories.length === 0) {
+        hydratedBase.availableCategories = INITIAL_AVAILABLE_CATEGORIES;
+      }
+      if (!hydratedBase.selectedMatchCategory || !hydratedBase.availableCategories.find(c => c.id === hydratedBase.selectedMatchCategory)) {
+        hydratedBase.selectedMatchCategory = hydratedBase.availableCategories[0]?.id || '';
       }
 
 
@@ -509,9 +534,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       const { _lastActionOriginator, playHornTrigger: receivedPlayHornTrigger, ...restOfPayload } = action.payload;
       newStateWithoutMeta = restOfPayload;
-      // Preserve local playHornTrigger unless the received one is explicitly different due to a sound-triggering action
-      // For most state syncs, we don't want to re-trigger sounds.
-      // If a sound-triggering action from another tab caused this broadcast, playHornTrigger would be different.
       newPlayHornTrigger = receivedPlayHornTrigger !== state.playHornTrigger ? receivedPlayHornTrigger : state.playHornTrigger;
       return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, _lastActionOriginator: undefined, _lastUpdatedTimestamp: incomingTimestamp };
     }
@@ -521,7 +543,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       let newClockStartTimeMs = state.clockStartTimeMs;
       let newRemainingTimeAtStartCs = state.remainingTimeAtStartCs;
 
-      if (state.isClockRunning) { // Pausing
+      if (state.isClockRunning) { 
         if (state.clockStartTimeMs && state.remainingTimeAtStartCs !== null) {
           const elapsedMs = Date.now() - state.clockStartTimeMs;
           const elapsedCs = Math.floor(elapsedMs / 10);
@@ -530,10 +552,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         newIsClockRunning = false;
         newClockStartTimeMs = null;
         newRemainingTimeAtStartCs = null;
-        if (newCurrentTimeCs <= 0) { // If pausing made time run out
+        if (newCurrentTimeCs <= 0) { 
             newPlayHornTrigger = state.playHornTrigger + 1;
         }
-      } else { // Starting
+      } else { 
         if (state.currentTime > 0) {
           newIsClockRunning = true;
           newClockStartTimeMs = Date.now();
@@ -563,7 +585,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         clockStartTimeMs: newIsClockRunning ? Date.now() : null,
         remainingTimeAtStartCs: newIsClockRunning ? newTimeCs : null,
        };
-      if (!newIsClockRunning && newTimeCs <=0 && state.currentTime > 0) { // Time set to 0 manually
+      if (!newIsClockRunning && newTimeCs <=0 && state.currentTime > 0) { 
         newPlayHornTrigger = state.playHornTrigger + 1;
       } else if (!newIsClockRunning) {
         newStateWithoutMeta.clockStartTimeMs = null;
@@ -588,7 +610,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         clockStartTimeMs: newIsClockRunning ? Date.now() : null,
         remainingTimeAtStartCs: newIsClockRunning ? newAdjustedTimeCs : null,
       };
-       if (!newIsClockRunning && newAdjustedTimeCs <=0 && state.currentTime > 0) { // Time adjusted to 0
+       if (!newIsClockRunning && newAdjustedTimeCs <=0 && state.currentTime > 0) { 
         newPlayHornTrigger = state.playHornTrigger + 1;
       } else if (!newIsClockRunning) {
         newStateWithoutMeta.clockStartTimeMs = null;
@@ -740,11 +762,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
               for (const p of penalties) {
                 if (p.remainingTime <= 0) {
-                  // Only add if it was just about to expire and was running, to keep it for one last render if needed.
-                  // Or, if it's a newly expired one due to this tick.
                    if (p._status === 'running' && p.remainingTime <= 0) {
                        resultPenalties.push({ ...p, remainingTime: 0, _status: undefined});
-                   } else if (p.remainingTime > 0) { // Keep non-expired penalties for further status update
+                   } else if (p.remainingTime > 0) { 
                        resultPenalties.push({...p});
                    }
                   continue;
@@ -764,10 +784,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
                 } else {
                   status = 'pending_concurrent';
                 }
-                // Add to result if it still has time or just expired while running
                 if (newRemainingTimeForPenaltySec > 0 || (status === 'running' && newRemainingTimeForPenaltySec === 0 && p.remainingTime > 0)) {
                    resultPenalties.push({ ...p, remainingTime: newRemainingTimeForPenaltySec, _status: status });
-                } else if (p.remainingTime > 0) { // Keep if it was pending and still has time
+                } else if (p.remainingTime > 0) { 
                     resultPenalties.push({ ...p, _status: status});
                 }
               }
@@ -779,11 +798,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
             awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
           }
-        } else if (state.isClockRunning) { // For non-game clock scenarios (warm-up, break, timeout)
+        } else if (state.isClockRunning) { 
             homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
             awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
         }
-      } else if (state.isClockRunning && state.currentTime <= 0) { // Clock running but time is already zero (should ideally be handled by transition)
+      } else if (state.isClockRunning && state.currentTime <= 0) { 
          newCalculatedTimeCs = 0;
          homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
          awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
@@ -947,7 +966,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         newStateWithoutMeta = state;
       }
       break;
-    // Config settings
     case 'SET_CONFIG_NAME':
       newStateWithoutMeta = { ...state, configName: action.payload || initialGlobalState.configName };
       break;
@@ -1005,9 +1023,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_CUSTOM_HORN_SOUND_DATA_URL':
       newStateWithoutMeta = { ...state, customHornSoundDataUrl: action.payload };
       break;
-    // New Team Config Reducer Cases
-    case 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD': // This is now the "Enable Team Usage" master switch
-      if (!action.payload) { // If master switch is turned OFF
+    case 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD': 
+      if (!action.payload) { 
         newStateWithoutMeta = {
           ...state,
           enableTeamSelectionInMiniScoreboard: false,
@@ -1016,13 +1033,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           showAliasInControlsPenaltyList: false,
           showAliasInScoreboardPenalties: false,
         };
-      } else { // If master switch is turned ON (dependent states remain as they were or user can enable them)
+      } else { 
         newStateWithoutMeta = { ...state, enableTeamSelectionInMiniScoreboard: true };
       }
       break;
     case 'SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES':
       newStateWithoutMeta = { ...state, enablePlayerSelectionForPenalties: action.payload };
-      if (!action.payload) { // If player selection is off, alias selection related to it should also be off
+      if (!action.payload) { 
         newStateWithoutMeta.showAliasInPenaltyPlayerSelector = false;
         newStateWithoutMeta.showAliasInControlsPenaltyList = false;
       }
@@ -1035,6 +1052,45 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     case 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES':
       newStateWithoutMeta = { ...state, showAliasInScoreboardPenalties: action.payload };
+      break;
+    case 'SET_AVAILABLE_CATEGORIES':
+      newStateWithoutMeta = { ...state, availableCategories: action.payload };
+      // If current selectedMatchCategory is no longer valid, reset it
+      if (!action.payload.find(c => c.id === state.selectedMatchCategory) && action.payload.length > 0) {
+        newStateWithoutMeta.selectedMatchCategory = action.payload[0].id;
+      } else if (action.payload.length === 0) {
+        newStateWithoutMeta.selectedMatchCategory = '';
+      }
+      break;
+    case 'ADD_CATEGORY': {
+      const newCategoryName = action.payload.name.trim();
+      if (newCategoryName && !state.availableCategories.find(c => c.name.toLowerCase() === newCategoryName.toLowerCase())) {
+        // For simplicity, using name as ID if it's unique, otherwise need UUID. Here using name as ID.
+        const newCategory: CategoryData = { id: newCategoryName, name: newCategoryName };
+        const updatedCategories = [...state.availableCategories, newCategory];
+        newStateWithoutMeta = { ...state, availableCategories: updatedCategories };
+        if (state.selectedMatchCategory === '' && updatedCategories.length === 1) {
+          newStateWithoutMeta.selectedMatchCategory = newCategory.id;
+        }
+      } else {
+        newStateWithoutMeta = state; // No change if name is empty or already exists
+      }
+      break;
+    }
+    case 'REMOVE_CATEGORY': {
+      const updatedCategories = state.availableCategories.filter(c => c.id !== action.payload.categoryId);
+      newStateWithoutMeta = { ...state, availableCategories: updatedCategories };
+      if (state.selectedMatchCategory === action.payload.categoryId) {
+        newStateWithoutMeta.selectedMatchCategory = updatedCategories.length > 0 ? updatedCategories[0].id : '';
+      }
+      // Also update teams that might have this category
+      newStateWithoutMeta.teams = state.teams.map(team => 
+        team.category === action.payload.categoryId ? { ...team, category: updatedCategories.length > 0 ? updatedCategories[0].id : '' } : team
+      );
+      break;
+    }
+    case 'SET_SELECTED_MATCH_CATEGORY':
+      newStateWithoutMeta = { ...state, selectedMatchCategory: action.payload };
       break;
     case 'LOAD_CONFIG_FROM_FILE': {
       const config = action.payload;
@@ -1055,9 +1111,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInControls = false;
       }
 
+      const importedCategories = config.availableCategories ?? state.availableCategories;
+      let importedSelectedMatchCategory = config.selectedMatchCategory ?? state.selectedMatchCategory;
+      if (!importedCategories.find(c => c.id === importedSelectedMatchCategory) && importedCategories.length > 0) {
+        importedSelectedMatchCategory = importedCategories[0].id;
+      } else if (importedCategories.length === 0) {
+        importedSelectedMatchCategory = '';
+      }
 
       newStateWithoutMeta = {
-        ...state, // Keep existing teams
+        ...state, 
         configName: config.configName ?? state.configName,
         defaultWarmUpDuration: config.defaultWarmUpDuration ?? state.defaultWarmUpDuration,
         defaultPeriodDuration: config.defaultPeriodDuration ?? state.defaultPeriodDuration,
@@ -1075,12 +1138,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         playersPerTeamOnIce: config.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
         playSoundAtPeriodEnd: config.playSoundAtPeriodEnd ?? state.playSoundAtPeriodEnd,
         customHornSoundDataUrl: config.customHornSoundDataUrl === undefined ? state.customHornSoundDataUrl : config.customHornSoundDataUrl,
-        // Load new team config fields respecting dependencies
         enableTeamSelectionInMiniScoreboard: enableTeamUsage,
         enablePlayerSelectionForPenalties: enablePlayerSelection,
         showAliasInPenaltyPlayerSelector: showAliasInSelector,
         showAliasInControlsPenaltyList: showAliasInControls,
         showAliasInScoreboardPenalties: showAliasInScoreboard,
+        availableCategories: importedCategories,
+        selectedMatchCategory: importedSelectedMatchCategory,
       };
       const newMaxPen = newStateWithoutMeta.maxConcurrentPenalties;
       newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, newMaxPen));
@@ -1089,7 +1153,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
     case 'RESET_CONFIG_TO_DEFAULTS': {
       newStateWithoutMeta = {
-        ...state, // Keep existing teams
+        ...state, 
         configName: INITIAL_CONFIG_NAME,
         defaultWarmUpDuration: INITIAL_WARM_UP_DURATION,
         defaultPeriodDuration: INITIAL_PERIOD_DURATION,
@@ -1107,12 +1171,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         playersPerTeamOnIce: INITIAL_PLAYERS_PER_TEAM_ON_ICE,
         playSoundAtPeriodEnd: INITIAL_PLAY_SOUND_AT_PERIOD_END,
         customHornSoundDataUrl: INITIAL_CUSTOM_HORN_SOUND_DATA_URL,
-        // Reset new team config fields
         enableTeamSelectionInMiniScoreboard: INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD,
         enablePlayerSelectionForPenalties: INITIAL_ENABLE_PLAYER_SELECTION_FOR_PENALTIES,
         showAliasInPenaltyPlayerSelector: INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR,
         showAliasInControlsPenaltyList: INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
         showAliasInScoreboardPenalties: INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
+        availableCategories: INITIAL_AVAILABLE_CATEGORIES,
+        selectedMatchCategory: INITIAL_SELECTED_MATCH_CATEGORY,
       };
       const initialMaxPen = INITIAL_MAX_CONCURRENT_PENALTIES;
       newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, initialMaxPen));
@@ -1126,7 +1191,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const autoStartWarmUp = state.autoStartWarmUp ?? initialsToKeepConfigAndTeams.autoStartWarmUp;
 
       newStateWithoutMeta = {
-        ...state, // Keeps current config values AND teams
+        ...state, // Keeps current config values, teams, availableCategories, selectedMatchCategory
         homeScore: initialsToKeepConfigAndTeams.homeScore,
         awayScore: initialsToKeepConfigAndTeams.awayScore,
         currentPeriod: 0,
@@ -1141,13 +1206,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         clockStartTimeMs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? Date.now() : null,
         remainingTimeAtStartCs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? initialWarmUpDurationCs : null,
       };
-      newPlayHornTrigger = state.playHornTrigger; // Don't change horn trigger on game reset
+      newPlayHornTrigger = state.playHornTrigger; 
       break;
     }
-    // Team Management Cases
     case 'ADD_TEAM': {
       const newTeam: TeamData = {
-        ...action.payload,
+        ...action.payload, // Contains name and category, optional logo
         id: crypto.randomUUID(),
         players: [],
       };
@@ -1162,7 +1226,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         teams: state.teams.map(team =>
           team.id === action.payload.teamId
-            ? { ...team, name: action.payload.name, logoDataUrl: action.payload.logoDataUrl }
+            ? { ...team, name: action.payload.name, category: action.payload.category, logoDataUrl: action.payload.logoDataUrl }
             : team
         ),
       };
@@ -1202,12 +1266,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     case 'LOAD_TEAMS_FROM_FILE':
-      newStateWithoutMeta = { ...state, teams: action.payload };
+      const validTeams = action.payload.map(team => ({
+        ...team,
+        category: team.category || (state.availableCategories[0]?.id || '') // Ensure category exists
+      }));
+      newStateWithoutMeta = { ...state, teams: validTeams };
       break;
     default:
       newStateWithoutMeta = state;
       newTimestamp = state._lastUpdatedTimestamp || Date.now();
-      newPlayHornTrigger = state.playHornTrigger; // Default to no change
+      newPlayHornTrigger = state.playHornTrigger; 
       break;
   }
 
@@ -1306,8 +1374,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       const stateForStorage: GameState = { ...state };
       stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
       stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
-      // No special cleaning needed for teams as it's already in a good format for JSON.
-
+      
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
 
       if (channelRef.current) {
@@ -1397,8 +1464,8 @@ export const getPeriodText = (period: number, numRegPeriods: number): string => 
     const overtimeNumber = period - numRegPeriods;
     if (overtimeNumber === 1 && numRegPeriods > 0) return 'OT';
     if (overtimeNumber > 0 && numRegPeriods > 0) return `OT${overtimeNumber}`;
-    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT'; // Case for 0 regular periods, first OT is just OT
-    if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`; // Subsequent OTs if 0 regular periods
+    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT'; 
+    if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`; 
     return "---";
 };
 
@@ -1424,3 +1491,7 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 
 export const DEFAULT_SOUND_PATH = DEFAULT_HORN_SOUND_FILE_PATH;
 
+export const getCategoryNameById = (categoryId: string, availableCategories: CategoryData[]): string => {
+  const category = availableCategories.find(cat => cat.id === categoryId);
+  return category ? category.name : categoryId; // Fallback to ID if name not found
+};

@@ -1,17 +1,19 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
 import { DurationSettingsCard, type DurationSettingsCardRef } from "@/components/config/duration-settings-card";
 import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/config/penalty-settings-card";
 import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card";
-import { TeamSettingsCard, type TeamSettingsCardRef } from "@/components/config/team-settings-card"; // Import new card
+import { TeamSettingsCard, type TeamSettingsCardRef } from "@/components/config/team-settings-card";
+import { CategorySettingsCard, type CategorySettingsCardRef } from "@/components/config/category-settings-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Undo2, Upload, Download, RotateCcw } from 'lucide-react';
 import { useGameState, type ConfigFields } from '@/contexts/game-state-context';
-import { Separator } from '@/components/ui/separator';
+import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +31,8 @@ export default function ConfigPage() {
   const durationSettingsRef = useRef<DurationSettingsCardRef>(null);
   const penaltySettingsRef = useRef<PenaltySettingsCardRef>(null);
   const soundSettingsRef = useRef<SoundSettingsCardRef>(null);
-  const teamSettingsRef = useRef<TeamSettingsCardRef>(null); // Ref for new card
+  const teamSettingsRef = useRef<TeamSettingsCardRef>(null);
+  const categorySettingsRef = useRef<CategorySettingsCardRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [localConfigName, setLocalConfigName] = useState(state.configName || '');
@@ -37,13 +40,14 @@ export default function ConfigPage() {
   const [isDurationDirty, setIsDurationDirty] = useState(false);
   const [isPenaltyDirty, setIsPenaltyDirty] = useState(false);
   const [isSoundDirty, setIsSoundDirty] = useState(false);
-  const [isTeamSettingsDirty, setIsTeamSettingsDirty] = useState(false); // Dirty state for new card
+  const [isTeamSettingsDirty, setIsTeamSettingsDirty] = useState(false);
+  const [isCategorySettingsDirty, setIsCategorySettingsDirty] = useState(false);
 
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [currentExportFilename, setCurrentExportFilename] = useState('');
   const [isResetConfigDialogOpen, setIsResetConfigDialogOpen] = useState(false);
 
-  const pageIsDirty = isConfigNameDirty || isDurationDirty || isPenaltyDirty || isSoundDirty || isTeamSettingsDirty;
+  const pageIsDirty = isConfigNameDirty || isDurationDirty || isPenaltyDirty || isSoundDirty || isTeamSettingsDirty || isCategorySettingsDirty;
 
   useEffect(() => {
     if (!isConfigNameDirty) {
@@ -56,7 +60,8 @@ export default function ConfigPage() {
     let durationSaveSuccess = true;
     let penaltySaveSuccess = true;
     let soundSaveSuccess = true;
-    let teamSettingsSaveSuccess = true; // Save success for new card
+    let teamSettingsSaveSuccess = true;
+    let categorySettingsSaveSuccess = true;
 
     if (isConfigNameDirty) {
       if (localConfigName.trim() === "") {
@@ -78,15 +83,18 @@ export default function ConfigPage() {
     if (penaltySettingsRef.current?.getIsDirty()) {
       penaltySaveSuccess = penaltySettingsRef.current.handleSave();
     }
-    if (soundSettingsRef.current?.getIsDirty()) { 
+    if (soundSettingsRef.current?.getIsDirty()) {
       soundSaveSuccess = soundSettingsRef.current.handleSave();
     }
-    if (teamSettingsRef.current?.getIsDirty()) { // Save team settings
+    if (teamSettingsRef.current?.getIsDirty()) {
       teamSettingsSaveSuccess = teamSettingsRef.current.handleSave();
+    }
+    if (categorySettingsRef.current?.getIsDirty()) {
+      categorySettingsSaveSuccess = categorySettingsRef.current.handleSave();
     }
 
 
-    if (configNameSaveSuccess && durationSaveSuccess && penaltySaveSuccess && soundSaveSuccess && teamSettingsSaveSuccess) {
+    if (configNameSaveSuccess && durationSaveSuccess && penaltySaveSuccess && soundSaveSuccess && teamSettingsSaveSuccess && categorySettingsSaveSuccess) {
       toast({
         title: "Configuración Guardada",
         description: "Todos los cambios han sido guardados exitosamente.",
@@ -114,11 +122,14 @@ export default function ConfigPage() {
     if (penaltySettingsRef.current?.getIsDirty()) {
       penaltySettingsRef.current.handleDiscard();
     }
-    if (soundSettingsRef.current?.getIsDirty()) { 
+    if (soundSettingsRef.current?.getIsDirty()) {
       soundSettingsRef.current.handleDiscard();
     }
-    if (teamSettingsRef.current?.getIsDirty()) { // Discard team settings
+    if (teamSettingsRef.current?.getIsDirty()) {
       teamSettingsRef.current.handleDiscard();
+    }
+    if (categorySettingsRef.current?.getIsDirty()) {
+      categorySettingsRef.current.handleDiscard();
     }
     toast({
       title: "Cambios Descartados",
@@ -163,12 +174,13 @@ export default function ConfigPage() {
       playersPerTeamOnIce: state.playersPerTeamOnIce,
       playSoundAtPeriodEnd: state.playSoundAtPeriodEnd,
       customHornSoundDataUrl: state.customHornSoundDataUrl,
-      // New team config fields for export
       enableTeamSelectionInMiniScoreboard: state.enableTeamSelectionInMiniScoreboard,
       enablePlayerSelectionForPenalties: state.enablePlayerSelectionForPenalties,
       showAliasInPenaltyPlayerSelector: state.showAliasInPenaltyPlayerSelector,
       showAliasInControlsPenaltyList: state.showAliasInControlsPenaltyList,
       showAliasInScoreboardPenalties: state.showAliasInScoreboardPenalties,
+      availableCategories: state.availableCategories,
+      selectedMatchCategory: state.selectedMatchCategory,
     };
     const jsonString = JSON.stringify(configToExport, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
@@ -205,12 +217,12 @@ export default function ConfigPage() {
         if (typeof text !== 'string') throw new Error("Error al leer el archivo.");
         const importedConfig = JSON.parse(text) as Partial<ConfigFields>;
 
-        // Basic validation for a potentially valid config file
-        if (!importedConfig.configName && 
-            importedConfig.defaultPeriodDuration === undefined && 
-            importedConfig.playersPerTeamOnIce === undefined && 
+        if (!importedConfig.configName &&
+            importedConfig.defaultPeriodDuration === undefined &&
+            importedConfig.playersPerTeamOnIce === undefined &&
             importedConfig.playSoundAtPeriodEnd === undefined &&
-            importedConfig.enablePlayerSelectionForPenalties === undefined // Check one of the new fields
+            importedConfig.enablePlayerSelectionForPenalties === undefined &&
+            importedConfig.availableCategories === undefined
            ) {
           throw new Error("Archivo de configuración no válido o formato incorrecto.");
         }
@@ -233,12 +245,13 @@ export default function ConfigPage() {
           playersPerTeamOnIce: importedConfig.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
           playSoundAtPeriodEnd: importedConfig.playSoundAtPeriodEnd ?? state.playSoundAtPeriodEnd,
           customHornSoundDataUrl: importedConfig.customHornSoundDataUrl === undefined ? state.customHornSoundDataUrl : importedConfig.customHornSoundDataUrl,
-          // Import new team config fields
           enableTeamSelectionInMiniScoreboard: importedConfig.enableTeamSelectionInMiniScoreboard ?? state.enableTeamSelectionInMiniScoreboard,
           enablePlayerSelectionForPenalties: importedConfig.enablePlayerSelectionForPenalties ?? state.enablePlayerSelectionForPenalties,
           showAliasInPenaltyPlayerSelector: importedConfig.showAliasInPenaltyPlayerSelector ?? state.showAliasInPenaltyPlayerSelector,
           showAliasInControlsPenaltyList: importedConfig.showAliasInControlsPenaltyList ?? state.showAliasInControlsPenaltyList,
           showAliasInScoreboardPenalties: importedConfig.showAliasInScoreboardPenalties ?? state.showAliasInScoreboardPenalties,
+          availableCategories: importedConfig.availableCategories ?? state.availableCategories,
+          selectedMatchCategory: importedConfig.selectedMatchCategory ?? state.selectedMatchCategory,
         };
 
         dispatch({ type: 'LOAD_CONFIG_FROM_FILE', payload: newConfigFromFile });
@@ -246,8 +259,9 @@ export default function ConfigPage() {
         durationSettingsRef.current?.handleDiscard();
         penaltySettingsRef.current?.handleDiscard();
         soundSettingsRef.current?.handleDiscard();
-        teamSettingsRef.current?.handleDiscard(); // Discard team settings card
-        setIsConfigNameDirty(false); // This will trigger useEffect to update localConfigName
+        teamSettingsRef.current?.handleDiscard();
+        categorySettingsRef.current?.handleDiscard();
+        setIsConfigNameDirty(false);
 
         toast({
           title: "Configuración Importada",
@@ -279,7 +293,8 @@ export default function ConfigPage() {
     durationSettingsRef.current?.handleDiscard();
     penaltySettingsRef.current?.handleDiscard();
     soundSettingsRef.current?.handleDiscard();
-    teamSettingsRef.current?.handleDiscard(); // Reset team settings card
+    teamSettingsRef.current?.handleDiscard();
+    categorySettingsRef.current?.handleDiscard();
 
     toast({
       title: "Configuración Restablecida",
@@ -293,13 +308,14 @@ export default function ConfigPage() {
         setLocalConfigName(state.configName || '');
     }
   }, [
-    state.configName, state.defaultWarmUpDuration, state.defaultPeriodDuration, state.defaultOTPeriodDuration, 
-    state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration, 
-    state.maxConcurrentPenalties, state.autoStartWarmUp, state.autoStartBreaks, state.autoStartPreOTBreaks, 
-    state.autoStartTimeouts, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, state.playersPerTeamOnIce, 
+    state.configName, state.defaultWarmUpDuration, state.defaultPeriodDuration, state.defaultOTPeriodDuration,
+    state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration,
+    state.maxConcurrentPenalties, state.autoStartWarmUp, state.autoStartBreaks, state.autoStartPreOTBreaks,
+    state.autoStartTimeouts, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, state.playersPerTeamOnIce,
     state.playSoundAtPeriodEnd, state.customHornSoundDataUrl,
     state.enableTeamSelectionInMiniScoreboard, state.enablePlayerSelectionForPenalties,
     state.showAliasInPenaltyPlayerSelector, state.showAliasInControlsPenaltyList, state.showAliasInScoreboardPenalties,
+    state.availableCategories, state.selectedMatchCategory,
     isConfigNameDirty
   ]);
 
@@ -337,7 +353,8 @@ export default function ConfigPage() {
       <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
       <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} />
       <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
-      <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty} /> {/* Add new card */}
+      <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty} />
+      <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
 
 
       {pageIsDirty && (
@@ -409,7 +426,7 @@ export default function ConfigPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Restablecimiento</AlertDialogTitle>
               <AlertDialogDescription>
-                Esto restablecerá TODAS las configuraciones de esta página (nombre, duraciones, máximos, arranques automáticos, número de períodos, jugadores en cancha, sonido y configuraciones de equipo/alias) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer. ¿Estás seguro?
+                Esto restablecerá TODAS las configuraciones de esta página (nombre, duraciones, máximos, arranques automáticos, número de períodos, jugadores en cancha, sonido, configuraciones de equipo/alias y categorías) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer. ¿Estás seguro?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -424,3 +441,5 @@ export default function ConfigPage() {
     </div>
   );
 }
+
+    

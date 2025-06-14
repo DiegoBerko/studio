@@ -24,4 +24,11 @@ export interface TeamData {
   name: string;
   logoDataUrl?: string | null; // Optional: string (Data URL) or null
   players: PlayerData[];
+  category: string; // New mandatory field for team category
+}
+
+// For category management
+export interface CategoryData {
+  id: string; // Could be same as name if names are unique, or a separate UUID
+  name: string;
 }

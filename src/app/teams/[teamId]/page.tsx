@@ -4,9 +4,9 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import { useGameState } from "@/contexts/game-state-context";
+import { useGameState, getCategoryNameById } from "@/contexts/game-state-context";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit, Trash2, Users, Info } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Users, Info, ListFilter } from "lucide-react";
 import { AddPlayerForm } from "@/components/teams/add-player-form";
 import { PlayerListItem } from "@/components/teams/player-list-item";
 import { DefaultTeamLogo } from "@/components/teams/default-team-logo";
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import type { PlayerData } from "@/types";
+import { Badge } from "@/components/ui/badge";
 
 export default function ManageTeamPage() {
   const params = useParams();
@@ -46,16 +47,14 @@ export default function ManageTeamPage() {
   const sortedPlayers = useMemo(() => {
     if (!team?.players) return [];
     return [...team.players].sort((a: PlayerData, b: PlayerData) => {
-      // Goalkeepers first
       if (a.type === 'goalkeeper' && b.type !== 'goalkeeper') return -1;
       if (a.type !== 'goalkeeper' && b.type === 'goalkeeper') return 1;
 
-      // Then sort by number (ensure numbers are treated as numbers)
       const numA = parseInt(a.number, 10);
       const numB = parseInt(b.number, 10);
-      if (isNaN(numA) && isNaN(numB)) return 0; // Both not numbers, keep order
-      if (isNaN(numA)) return 1; // a is not a number, b is, b comes first
-      if (isNaN(numB)) return -1; // b is not a number, a is, a comes first
+      if (isNaN(numA) && isNaN(numB)) return 0; 
+      if (isNaN(numA)) return 1; 
+      if (isNaN(numB)) return -1; 
       return numA - numB;
     });
   }, [team?.players]);
@@ -96,6 +95,8 @@ export default function ManageTeamPage() {
     });
     router.push('/teams');
   };
+  
+  const categoryName = getCategoryNameById(team.category, state.availableCategories);
 
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8">
@@ -117,6 +118,11 @@ export default function ManageTeamPage() {
         )}
         <div className="flex-grow text-center sm:text-left">
           <h1 className="text-3xl sm:text-4xl font-bold text-primary-foreground">{team.name}</h1>
+          {categoryName && (
+            <Badge variant="outline" className="mt-1.5 mb-1 text-sm">
+                <ListFilter className="mr-1.5 h-3.5 w-3.5" /> {categoryName}
+            </Badge>
+          )}
           <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 text-muted-foreground">
             <Users className="h-5 w-5" />
             <span>{team.players.length} Jugador{team.players.length !== 1 ? 'es' : ''}</span>
@@ -183,5 +189,3 @@ export default function ManageTeamPage() {
     </div>
   );
 }
-
-    

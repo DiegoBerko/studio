@@ -106,7 +106,12 @@ export default function TeamsPage() {
         if (typeof text !== 'string') throw new Error("Error al leer el archivo.");
         const importedData = JSON.parse(text);
 
-        if (!Array.isArray(importedData) || !importedData.every(item => item && typeof item.id === 'string' && typeof item.name === 'string' && Array.isArray(item.players))) {
+        if (!Array.isArray(importedData) || !importedData.every(item => 
+            item && typeof item.id === 'string' && 
+            typeof item.name === 'string' && 
+            (typeof item.category === 'string' || item.category === undefined) && // Category can be undefined in old files
+            Array.isArray(item.players))
+           ) {
           throw new Error("Archivo de equipos no válido o formato incorrecto. Se esperaba un array de equipos.");
         }
         
@@ -114,6 +119,7 @@ export default function TeamsPage() {
           id: team.id,
           name: team.name,
           logoDataUrl: team.logoDataUrl || null,
+          category: team.category || (state.availableCategories.length > 0 ? state.availableCategories[0].id : ''), // Default to first available category or empty
           players: Array.isArray(team.players) ? team.players.map((player: any) => ({
             id: player.id || crypto.randomUUID(),
             number: String(player.number || '0'),
@@ -288,6 +294,3 @@ export default function TeamsPage() {
     </div>
   );
 }
-
-
-    

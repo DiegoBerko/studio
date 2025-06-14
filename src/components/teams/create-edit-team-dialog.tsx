@@ -15,10 +15,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useGameState } from "@/contexts/game-state-context";
 import type { TeamData } from "@/types";
-import { UploadCloud, XCircle, Image as ImageIcon } from "lucide-react";
+import { UploadCloud, XCircle, Image as ImageIcon, ListFilter } from "lucide-react";
 import { DefaultTeamLogo } from "./default-team-logo";
 
 interface CreateEditTeamDialogProps {
@@ -34,27 +35,33 @@ export function CreateEditTeamDialog({
   teamToEdit,
   onTeamSaved,
 }: CreateEditTeamDialogProps) {
-  const { dispatch } = useGameState();
+  const { state, dispatch } = useGameState();
   const { toast } = useToast();
   const [teamName, setTeamName] = useState("");
+  const [teamCategory, setTeamCategory] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isEditing = !!teamToEdit;
+  const { availableCategories } = state;
 
   useEffect(() => {
-    if (isEditing && teamToEdit) {
-      setTeamName(teamToEdit.name);
-      setLogoPreview(teamToEdit.logoDataUrl || null);
-      setLogoFile(null); // Reset file input on edit
-    } else {
-      // Reset for new team
-      setTeamName("");
-      setLogoPreview(null);
-      setLogoFile(null);
+    if (isOpen) {
+      if (isEditing && teamToEdit) {
+        setTeamName(teamToEdit.name);
+        setTeamCategory(teamToEdit.category || (availableCategories.length > 0 ? availableCategories[0].id : ""));
+        setLogoPreview(teamToEdit.logoDataUrl || null);
+        setLogoFile(null); 
+      } else {
+        // Reset for new team
+        setTeamName("");
+        setTeamCategory(availableCategories.length > 0 ? availableCategories[0].id : "");
+        setLogoPreview(null);
+        setLogoFile(null);
+      }
     }
-  }, [isOpen, teamToEdit, isEditing]);
+  }, [isOpen, teamToEdit, isEditing, availableCategories]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -85,7 +92,7 @@ export function CreateEditTeamDialog({
       setLogoPreview(e.target?.result as string);
     };
     reader.readAsDataURL(file);
-    setLogoFile(file); // Store the file itself if needed for upload, or process directly
+    setLogoFile(file); 
   };
 
   const handleClearLogo = () => {
@@ -103,10 +110,28 @@ export function CreateEditTeamDialog({
       });
       return;
     }
+    if (!teamCategory && availableCategories.length > 0) {
+      toast({
+        title: "Categoría Requerida",
+        description: "Debes seleccionar una categoría para el equipo.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (availableCategories.length === 0) {
+        toast({
+            title: "No hay Categorías",
+            description: "No hay categorías definidas. Por favor, añade categorías en la página de Configuración antes de crear un equipo.",
+            variant: "destructive",
+        });
+        return;
+    }
+
 
     const teamPayload = {
       name: teamName.trim(),
-      logoDataUrl: logoPreview, // This is the Data URL
+      category: teamCategory,
+      logoDataUrl: logoPreview,
     };
 
     if (isEditing && teamToEdit) {
@@ -120,7 +145,7 @@ export function CreateEditTeamDialog({
       });
       onTeamSaved(teamToEdit.id);
     } else {
-      const newTeamId = crypto.randomUUID(); // Generate ID client-side for immediate use
+      const newTeamId = crypto.randomUUID(); 
       dispatch({
         type: "ADD_TEAM",
         payload: { id: newTeamId, ...teamPayload, players: [] },
@@ -131,7 +156,7 @@ export function CreateEditTeamDialog({
       });
       onTeamSaved(newTeamId);
     }
-    onOpenChange(false); // Close dialog
+    onOpenChange(false); 
   };
 
   return (
@@ -157,6 +182,30 @@ export function CreateEditTeamDialog({
               className="col-span-3"
               placeholder="Nombre del Equipo"
             />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="teamCategory" className="text-right">
+              Categoría
+            </Label>
+            <Select
+              value={teamCategory}
+              onValueChange={setTeamCategory}
+              disabled={availableCategories.length === 0}
+            >
+              <SelectTrigger id="teamCategory" className="col-span-3">
+                <SelectValue placeholder="Seleccionar categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+                {availableCategories.length === 0 && (
+                  <SelectItem value="" disabled>No hay categorías disponibles</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="teamLogo" className="text-right pt-2">
@@ -211,7 +260,7 @@ export function CreateEditTeamDialog({
               Cancelar
             </Button>
           </DialogClose>
-          <Button type="button" onClick={handleSubmit}>
+          <Button type="button" onClick={handleSubmit} disabled={availableCategories.length === 0 && !isEditing}>
             {isEditing ? "Guardar Cambios" : "Crear Equipo"}
           </Button>
         </DialogFooter>

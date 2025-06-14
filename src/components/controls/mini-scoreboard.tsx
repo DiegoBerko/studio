@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes } from '@/contexts/game-state-context';
+import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes, getCategoryNameById } from '@/contexts/game-state-context';
 import type { Team } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,8 +20,15 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight, User, Search, Check } from 'lucide-react';
+import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight, User, Search, Check, ListFilter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -43,12 +50,10 @@ export function MiniScoreboard() {
   const [editValue, setEditValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Home Team Name State
   const [localHomeTeamName, setLocalHomeTeamName] = useState(state.homeTeamName);
   const [isHomePopoverOpen, setIsHomePopoverOpen] = useState(false);
   const [homeSearchTerm, setHomeSearchTerm] = useState("");
 
-  // Away Team Name State
   const [localAwayTeamName, setLocalAwayTeamName] = useState(state.awayTeamName);
   const [isAwayPopoverOpen, setIsAwayPopoverOpen] = useState(false);
   const [awaySearchTerm, setAwaySearchTerm] = useState("");
@@ -307,7 +312,6 @@ export function MiniScoreboard() {
   }
 
 
-
   const isMainClockLastMinute = state.currentTime < 6000 && state.currentTime >= 0 &&
                                (state.periodDisplayOverride !== null || state.currentPeriod >= 0);
 
@@ -393,9 +397,41 @@ export function MiniScoreboard() {
     );
   }, [state.teams, awaySearchTerm]);
 
+  const handleMatchCategoryChange = (categoryId: string) => {
+    dispatch({ type: 'SET_SELECTED_MATCH_CATEGORY', payload: categoryId });
+    toast({ title: "Categoría del Partido Actualizada" });
+  };
+
+  const currentCategoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories);
+
 
   return (
     <>
+      <div className="absolute top-0 left-0 p-2 sm:p-3 md:p-4 z-10">
+        {state.availableCategories.length > 0 ? (
+            <Select value={state.selectedMatchCategory} onValueChange={handleMatchCategoryChange}>
+                <SelectTrigger className="w-auto min-w-[120px] max-w-[200px] h-8 text-xs bg-card/80 border-border/50 backdrop-blur-sm">
+                    <div className="flex items-center gap-1.5 truncate">
+                        <ListFilter className="h-3.5 w-3.5 text-muted-foreground" />
+                        <SelectValue placeholder="Categoría" />
+                    </div>
+                </SelectTrigger>
+                <SelectContent>
+                    {state.availableCategories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.id} className="text-xs">
+                            {cat.name}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        ) : (
+            <div className="flex items-center gap-1.5 h-8 px-3 text-xs bg-card/80 border-border/50 rounded-md text-muted-foreground">
+                <ListFilter className="h-3.5 w-3.5" />
+                <span>Sin categorías</span>
+            </div>
+        )}
+      </div>
+
       <Card className="mb-8 bg-card shadow-lg">
         <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8 py-6">
           {/* Home Team Section */}
@@ -434,7 +470,7 @@ export function MiniScoreboard() {
                       onOpenChange={(isOpen) => {
                           setIsHomePopoverOpen(isOpen);
                           if (isOpen) {
-                            setHomeSearchTerm(""); 
+                            setHomeSearchTerm(""); // Clear search on open
                           }
                       }}
                   >
@@ -450,6 +486,7 @@ export function MiniScoreboard() {
                           value={homeSearchTerm}
                           onValueChange={setHomeSearchTerm}
                           className="text-sm h-9"
+                          autoComplete="off"
                         />
                         <CommandList>
                           <CommandEmpty>
@@ -713,7 +750,7 @@ export function MiniScoreboard() {
                       onOpenChange={(isOpen) => {
                           setIsAwayPopoverOpen(isOpen);
                           if (isOpen) {
-                              setAwaySearchTerm(""); 
+                              setAwaySearchTerm(""); // Clear search on open
                           }
                       }}
                   >
@@ -729,6 +766,7 @@ export function MiniScoreboard() {
                           value={awaySearchTerm}
                           onValueChange={setAwaySearchTerm}
                           className="text-sm h-9"
+                          autoComplete="off"
                         />
                         <CommandList>
                           <CommandEmpty>
