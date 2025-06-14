@@ -55,9 +55,23 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
 
   const filteredPlayers = useMemo(() => {
     if (!matchedTeam || !teamHasPlayers) return [];
+    
+    let playersToFilter = [...matchedTeam.players]; // Create a copy to sort
+
+    // Sort players by number (numerically)
+    playersToFilter.sort((a, b) => {
+      const numA = parseInt(a.number, 10);
+      const numB = parseInt(b.number, 10);
+      if (isNaN(numA) && isNaN(numB)) return 0;
+      if (isNaN(numA)) return 1;
+      if (isNaN(numB)) return -1;
+      return numA - numB;
+    });
+    
     const searchTermLower = playerSearchTerm.toLowerCase();
-    if (!searchTermLower.trim()) return matchedTeam.players;
-    return matchedTeam.players.filter(
+    if (!searchTermLower.trim()) return playersToFilter;
+    
+    return playersToFilter.filter(
       (player: PlayerData) =>
         player.number.toLowerCase().includes(searchTermLower) ||
         player.name.toLowerCase().includes(searchTermLower)
@@ -183,14 +197,14 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                 ? (() => {
                     const selectedPlayer = matchedTeam.players.find(p => p.number === playerNumber);
                     return selectedPlayer ? (
-                      <span className="truncate">
-                        <span className="text-xs text-muted-foreground">#</span>
+                      <span className="truncate flex items-baseline">
+                        <span className="text-xs text-muted-foreground mr-0.5">#</span>
                         <span className="font-semibold">{selectedPlayer.number}</span>
-                        <span className="text-xs text-muted-foreground"> - {selectedPlayer.name}</span>
+                        <span className="text-xs text-muted-foreground ml-1 truncate"> - {selectedPlayer.name}</span>
                       </span>
                     ) : (
-                      <span className="truncate">
-                        <span className="text-xs text-muted-foreground">#</span>
+                      <span className="truncate flex items-baseline">
+                        <span className="text-xs text-muted-foreground mr-0.5">#</span>
                         <span className="font-semibold">{playerNumber.toUpperCase()}</span>
                       </span>
                     );
@@ -213,13 +227,12 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                              if (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
                                 setPlayerNumber(trimmedSearch);
                             } else {
-                                // If invalid typed text on enter, try to find best match or clear
                                 const firstMatch = filteredPlayers[0];
                                 if(firstMatch) setPlayerNumber(firstMatch.number);
-                                else setPlayerNumber(''); // Or clear if no match
+                                else setPlayerNumber('');
                             }
                         } else {
-                            setPlayerNumber(''); // Clear if input is empty on enter
+                            setPlayerNumber('');
                         }
                         setIsPlayerPopoverOpen(false);
                     }
