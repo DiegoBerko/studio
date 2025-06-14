@@ -56,14 +56,13 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   const filteredPlayers = useMemo(() => {
     if (!matchedTeam || !teamHasPlayers) return [];
     
-    let playersToFilter = [...matchedTeam.players]; // Create a copy to sort
+    let playersToFilter = [...matchedTeam.players]; 
 
-    // Sort players by number (numerically)
     playersToFilter.sort((a, b) => {
       const numA = parseInt(a.number, 10);
       const numB = parseInt(b.number, 10);
-      if (isNaN(numA) && isNaN(numB)) return 0;
-      if (isNaN(numA)) return 1;
+      if (isNaN(numA) && isNaN(numB)) return a.number.localeCompare(b.number); // Sort non-numeric as strings
+      if (isNaN(numA)) return 1; 
       if (isNaN(numB)) return -1;
       return numA - numB;
     });
@@ -177,6 +176,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                     justSelectedPlayerRef.current = false; 
                     setPlayerSearchTerm(''); 
                 } else {
+                    // If popover closes without selection, and search term is a valid number, set it
                     if (!justSelectedPlayerRef.current && playerSearchTerm.trim()) {
                         const trimmedSearch = playerSearchTerm.trim().toUpperCase();
                         if (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
@@ -209,12 +209,18 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                       </span>
                     );
                   })()
-                : "Nº Jugador / Seleccionar..."}
+                : (
+                    <span className="truncate">
+                        <span className="text-muted-foreground">Nº Jugador</span>
+                        <span className="text-foreground/70"> / Seleccionar...</span>
+                    </span>
+                  )
+              }
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-            <Command shouldFilter={false}>
+            <Command shouldFilter={false}> {/* Manual filtering via filteredPlayers */}
               <CommandInput 
                 placeholder="Buscar Nº o Nombre..." 
                 value={playerSearchTerm} 
@@ -222,17 +228,13 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        if (playerSearchTerm.trim()) {
-                            const trimmedSearch = playerSearchTerm.trim().toUpperCase();
-                             if (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
-                                setPlayerNumber(trimmedSearch);
-                            } else {
-                                const firstMatch = filteredPlayers[0];
-                                if(firstMatch) setPlayerNumber(firstMatch.number);
-                                else setPlayerNumber('');
-                            }
+                        const trimmedSearch = playerSearchTerm.trim().toUpperCase();
+                        if (trimmedSearch && (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch))) {
+                            setPlayerNumber(trimmedSearch);
                         } else {
-                            setPlayerNumber('');
+                             const firstMatch = filteredPlayers[0];
+                             if(firstMatch) setPlayerNumber(firstMatch.number);
+                             // else keep playerNumber as is or clear it, depending on desired behavior
                         }
                         setIsPlayerPopoverOpen(false);
                     }
@@ -242,19 +244,21 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                 <CommandEmpty>
                   {playerSearchTerm.trim() && (/^\d+$/.test(playerSearchTerm.trim()) || /^\d+[A-Za-z]*$/.test(playerSearchTerm.trim()))
                     ? (
-                        <div 
-                            className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
-                            onClick={() => {
+                        <CommandItem
+                            key={`typed-${playerSearchTerm.trim()}`}
+                            value={`typed-${playerSearchTerm.trim()}`}
+                            onSelect={() => {
                                 const typedNum = playerSearchTerm.trim().toUpperCase();
                                 setPlayerNumber(typedNum);
                                 justSelectedPlayerRef.current = true; 
                                 setIsPlayerPopoverOpen(false);
                             }}
+                            className="flex items-baseline"
                         >
-                          Usar número tipeado: 
+                          <span className="text-muted-foreground text-xs">Usar número tipeado:</span>
                           <span className="text-xs text-muted-foreground ml-1 mr-0.5">#</span>
                           <span className="font-semibold text-sm">{playerSearchTerm.trim().toUpperCase()}</span>
-                        </div>
+                        </CommandItem>
                       )
                     : "No se encontró jugador."
                   }
@@ -270,7 +274,6 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                         justSelectedPlayerRef.current = true; 
                         setIsPlayerPopoverOpen(false);
                       }}
-                      className="flex items-baseline"
                     >
                       <Check
                         className={cn(
