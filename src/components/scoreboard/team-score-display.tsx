@@ -38,7 +38,7 @@ export function TeamScoreDisplay({ teamActualName, teamDisplayName, score, playe
         )}
       </div>
       <h2 className="text-xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground uppercase tracking-wide truncate w-full px-1">{teamActualName}</h2>
-      <p className="text-xs md:text-sm lg:text-base text-muted-foreground -mt-0.5 md:-mt-1 mb-1 md:mb-1.5">({teamDisplayName})</p>
+      <p className="text-sm md:text-base lg:text-lg text-muted-foreground -mt-0.5 md:-mt-1 mb-1 md:mb-1.5">({teamDisplayName})</p>
       <div 
         className={cn(
             "text-5xl md:text-7xl lg:text-8xl xl:text-9xl font-bold font-headline text-accent tabular-nums tracking-tighter",
@@ -50,3 +50,4 @@ export function TeamScoreDisplay({ teamActualName, teamDisplayName, score, playe
     </div>
   );
 }
+

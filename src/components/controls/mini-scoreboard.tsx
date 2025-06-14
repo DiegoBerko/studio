@@ -365,7 +365,7 @@ export function MiniScoreboard() {
               placeholder="Nombre Local"
               aria-label="Nombre del equipo local"
             />
-            <p className="text-xs text-muted-foreground -mt-1">(Local)</p>
+            <p className="text-sm text-muted-foreground -mt-1">(Local)</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               <Button 
                 variant="ghost" 
@@ -576,7 +576,7 @@ export function MiniScoreboard() {
               placeholder="Nombre Visitante"
               aria-label="Nombre del equipo visitante"
             />
-             <p className="text-xs text-muted-foreground -mt-1">(Visitante)</p>
+             <p className="text-sm text-muted-foreground -mt-1">(Visitante)</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               <Button 
                 variant="ghost" 
