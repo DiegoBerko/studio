@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useGameState, formatTime } from '@/contexts/game-state-context';
 import type { Penalty, Team, PlayerData } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,8 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
 
   const [isPlayerPopoverOpen, setIsPlayerPopoverOpen] = useState(false);
   const [playerSearchTerm, setPlayerSearchTerm] = useState('');
+  const justSelectedPlayerRef = useRef(false);
+
 
   const penalties = team === 'home' ? state.homePenalties : state.awayPenalties;
 
@@ -81,12 +83,12 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
       type: 'ADD_PENALTY',
       payload: {
         team,
-        penalty: { playerNumber: trimmedPlayerNumber, initialDuration: durationSec, remainingTime: durationSec },
+        penalty: { playerNumber: trimmedPlayerNumber.toUpperCase(), initialDuration: durationSec, remainingTime: durationSec },
       },
     });
-    toast({ title: "Penalidad Agregada", description: `Jugador ${trimmedPlayerNumber} de ${teamName} recibió una penalidad de ${formatTime(durationSec * 100)}.` });
+    toast({ title: "Penalidad Agregada", description: `Jugador ${trimmedPlayerNumber.toUpperCase()} de ${teamName} recibió una penalidad de ${formatTime(durationSec * 100)}.` });
     setPlayerNumber('');
-    setPlayerSearchTerm('');
+    setPlayerSearchTerm(''); 
   };
 
   const handleRemovePenalty = (penaltyId: string) => {
@@ -153,12 +155,24 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   const renderPlayerNumberInput = () => {
     if (teamHasPlayers && matchedTeam) {
       return (
-        <Popover open={isPlayerPopoverOpen} onOpenChange={(isOpen) => {
-            setIsPlayerPopoverOpen(isOpen);
-            if (isOpen) {
-                setPlayerSearchTerm(''); // Clear search on open
-            }
-        }}>
+        <Popover 
+            open={isPlayerPopoverOpen} 
+            onOpenChange={(isOpen) => {
+                setIsPlayerPopoverOpen(isOpen);
+                if (isOpen) {
+                    justSelectedPlayerRef.current = false; // Reset flag when popover opens
+                    setPlayerSearchTerm(''); // Clear search term on open
+                } else {
+                    // Popover is closing
+                    if (!justSelectedPlayerRef.current && playerSearchTerm.trim()) {
+                        const trimmedSearch = playerSearchTerm.trim().toUpperCase();
+                        if (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
+                            setPlayerNumber(trimmedSearch);
+                        }
+                    }
+                }
+            }}
+        >
           <PopoverTrigger asChild>
             <Button
               variant="outline"
@@ -169,7 +183,13 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
               {playerNumber
                 ? (() => {
                     const selectedPlayer = matchedTeam.players.find(p => p.number === playerNumber);
-                    return selectedPlayer ? `#${selectedPlayer.number} - ${selectedPlayer.name}` : `#${playerNumber}`;
+                    return selectedPlayer ? (
+                      <span className="truncate">
+                        <span className="text-xs text-muted-foreground">#</span>
+                        <span className="font-semibold">{selectedPlayer.number}</span>
+                        <span className="text-xs text-muted-foreground"> - {selectedPlayer.name}</span>
+                      </span>
+                    ) : `#${playerNumber.toUpperCase()}`;
                   })()
                 : "Nº Jugador / Seleccionar..."}
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -181,27 +201,48 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                 placeholder="Buscar Nº o Nombre..." 
                 value={playerSearchTerm} 
                 onValueChange={setPlayerSearchTerm}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (playerSearchTerm.trim()) {
+                            const trimmedSearch = playerSearchTerm.trim().toUpperCase();
+                             if (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
+                                setPlayerNumber(trimmedSearch);
+                            }
+                        }
+                        setIsPlayerPopoverOpen(false);
+                    }
+                }}
               />
               <CommandList>
-                <CommandEmpty>No se encontró jugador.</CommandEmpty>
+                <CommandEmpty>
+                  {playerSearchTerm.trim() && (/^\d+$/.test(playerSearchTerm.trim()) || /^\d+[A-Za-z]*$/.test(playerSearchTerm.trim()))
+                    ? `Usar número tipeado: "${playerSearchTerm.trim().toUpperCase()}"`
+                    : "No se encontró jugador."
+                  }
+                </CommandEmpty>
                 <CommandGroup>
                   {filteredPlayers.map((player: PlayerData) => (
                     <CommandItem
                       key={player.id}
-                      value={`#${player.number} - ${player.name}`}
+                      value={`${player.number} - ${player.name}`} // Value for CMDK filtering
                       onSelect={() => {
                         setPlayerNumber(player.number);
+                        setPlayerSearchTerm(''); // Clear search after selection
+                        justSelectedPlayerRef.current = true; // Mark that selection happened
                         setIsPlayerPopoverOpen(false);
-                        setPlayerSearchTerm('');
                       }}
+                      className="flex items-baseline"
                     >
                       <Check
                         className={cn(
-                          "mr-2 h-4 w-4",
+                          "mr-2 h-4 w-4 shrink-0",
                           playerNumber === player.number ? "opacity-100" : "opacity-0"
                         )}
                       />
-                      #{player.number} - {player.name}
+                      <span className="text-xs text-muted-foreground mr-0.5">#</span>
+                      <span className="font-semibold text-sm mr-1">{player.number}</span>
+                      <span className="text-xs text-muted-foreground truncate">{player.name}</span>
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -215,7 +256,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
       <Input
         id={`${team}-playerNumber`}
         value={playerNumber}
-        onChange={(e) => setPlayerNumber(e.target.value)}
+        onChange={(e) => setPlayerNumber(e.target.value.toUpperCase())}
         placeholder="ej., 99 o 15A"
         required
       />
@@ -227,11 +268,11 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     <ControlCardWrapper title={`Penalidades ${teamName}`}>
       <form onSubmit={handleAddPenalty} className="space-y-4 mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
-          <div>
+          <div className="sm:col-span-1">
             <Label htmlFor={`${team}-playerNumber`}>Jugador #</Label>
             {renderPlayerNumberInput()}
           </div>
-          <div>
+          <div className="sm:col-span-1">
             <Label htmlFor={`${team}-penaltyDuration`}>Duración (segundos)</Label>
             <Select value={penaltyDurationSeconds} onValueChange={setPenaltyDurationSeconds}>
               <SelectTrigger id={`${team}-penaltyDuration`}>
@@ -246,7 +287,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" className="w-full sm:w-auto" aria-label={`Agregar penalidad para ${teamName}`}>
+          <Button type="submit" className="w-full sm:w-auto sm:self-end" aria-label={`Agregar penalidad para ${teamName}`}>
             <UserPlus className="mr-2 h-4 w-4" /> Agregar
           </Button>
         </div>
@@ -334,3 +375,5 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   );
 }
 
+
+    
