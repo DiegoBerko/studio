@@ -17,23 +17,22 @@ const CagedUserIcon = ({ className }: { className?: string }) => (
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
     fill="none"
-    stroke="currentColor" // Default stroke for player parts
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}
   >
-    {/* User Icon Parts - these will inherit stroke="currentColor" from the svg tag */}
-    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" strokeWidth="2" />
-    <circle cx="12" cy="7" r="4" strokeWidth="2" />
+    {/* User Icon Parts - explicitly set to red (destructive color) */}
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" strokeWidth="2" stroke="hsl(var(--destructive))" />
+    <circle cx="12" cy="7" r="4" strokeWidth="2" stroke="hsl(var(--destructive))" />
 
     {/* Cage Bars - drawn AFTER player, with explicit grey stroke */}
-    {/* Bar 1 (leftmost) */}
+    {/* Bar 1 */}
     <line x1="6" y1="2" x2="6" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
     {/* Bar 2 */}
     <line x1="10" y1="2" x2="10" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
     {/* Bar 3 */}
     <line x1="14" y1="2" x2="14" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
-    {/* Bar 4 (rightmost) */}
+    {/* Bar 4 */}
     <line x1="18" y1="2" x2="18" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
   </svg>
 );
@@ -51,6 +50,7 @@ export function PenaltyCard({ penalty }: PenaltyCardProps) {
       <CardContent className="p-3 md:p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
+            {/* The className prop for CagedUserIcon is still passed but its stroke effect on player parts is overridden */}
             <CagedUserIcon className="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10 text-primary-foreground" />
             <span className="font-semibold text-3xl md:text-4xl lg:text-5xl xl:text-6xl">{penalty.playerNumber}</span>
           </div>
@@ -73,4 +73,3 @@ export function PenaltyCard({ penalty }: PenaltyCardProps) {
     </Card>
   );
 }
-
