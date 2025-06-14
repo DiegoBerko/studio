@@ -24,9 +24,20 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
   const [playerName, setPlayerName] = useState("");
   const [playerType, setPlayerType] = useState<PlayerType>("player");
 
+  const handlePlayerNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Allow only digits
+    if (/^\d*$/.test(value)) {
+      setPlayerNumber(value);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!playerNumber.trim() || !playerName.trim()) {
+    const trimmedPlayerNumber = playerNumber.trim();
+    const trimmedPlayerName = playerName.trim();
+
+    if (!trimmedPlayerNumber || !trimmedPlayerName) {
       toast({
         title: "Campos Requeridos",
         description: "El número y el nombre/apodo del jugador son obligatorios.",
@@ -35,13 +46,23 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
       return;
     }
 
+    if (!/^\d+$/.test(trimmedPlayerNumber)) {
+        toast({
+            title: "Número de Jugador Inválido",
+            description: "El número del jugador solo debe contener dígitos.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+
     dispatch({
       type: "ADD_PLAYER_TO_TEAM",
       payload: {
         teamId,
         player: {
-          number: playerNumber.trim(),
-          name: playerName.trim(),
+          number: trimmedPlayerNumber,
+          name: trimmedPlayerName,
           type: playerType,
         },
       },
@@ -49,7 +70,7 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
 
     toast({
       title: "Jugador Añadido",
-      description: `Jugador #${playerNumber.trim()} ${playerName.trim()} añadido al equipo.`,
+      description: `Jugador #${trimmedPlayerNumber} ${trimmedPlayerName} añadido al equipo.`,
     });
 
     // Reset form
@@ -70,8 +91,10 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
               <Label htmlFor="playerNumber">Número</Label>
               <Input
                 id="playerNumber"
+                type="text" 
+                inputMode="numeric"
                 value={playerNumber}
-                onChange={(e) => setPlayerNumber(e.target.value)}
+                onChange={handlePlayerNumberChange}
                 placeholder="Ej: 10"
                 required
               />
@@ -82,7 +105,7 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
                 id="playerName"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="Ej: Messi / Lionel Messi"
+                placeholder="Oyarzún / Carlos Oyarzún / Tachuela"
                 required
               />
             </div>
@@ -114,3 +137,5 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
     </Card>
   );
 }
+
+    

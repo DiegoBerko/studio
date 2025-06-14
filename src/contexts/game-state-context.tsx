@@ -139,7 +139,8 @@ export type GameAction =
   | { type: 'UPDATE_TEAM_DETAILS'; payload: { teamId: string; name: string; logoDataUrl?: string | null } }
   | { type: 'DELETE_TEAM'; payload: { teamId: string } }
   | { type: 'ADD_PLAYER_TO_TEAM'; payload: { teamId: string; player: Omit<PlayerData, 'id'> } }
-  | { type: 'REMOVE_PLAYER_FROM_TEAM'; payload: { teamId: string; playerId: string } };
+  | { type: 'REMOVE_PLAYER_FROM_TEAM'; payload: { teamId: string; playerId: string } }
+  | { type: 'LOAD_TEAMS_FROM_FILE'; payload: TeamData[] };
 
 
 const initialGlobalState: GameState = {
@@ -1072,6 +1073,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
       break;
     }
+    case 'LOAD_TEAMS_FROM_FILE':
+      newStateWithoutMeta = { ...state, teams: action.payload };
+      break;
     default:
       newStateWithoutMeta = state;
       newTimestamp = state._lastUpdatedTimestamp || Date.now();
@@ -1292,3 +1296,5 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 
 export const DEFAULT_SOUND_PATH = DEFAULT_HORN_SOUND_FILE_PATH;
 
+
+    

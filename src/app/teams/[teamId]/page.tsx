@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useGameState } from "@/contexts/game-state-context";
@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
+import type { PlayerData } from "@/types";
 
 export default function ManageTeamPage() {
   const params = useParams();
@@ -41,6 +42,23 @@ export default function ManageTeamPage() {
       setTeam(state.teams.find(t => t.id === teamId));
     }
   }, [teamId, state.teams]);
+
+  const sortedPlayers = useMemo(() => {
+    if (!team?.players) return [];
+    return [...team.players].sort((a: PlayerData, b: PlayerData) => {
+      // Goalkeepers first
+      if (a.type === 'goalkeeper' && b.type !== 'goalkeeper') return -1;
+      if (a.type !== 'goalkeeper' && b.type === 'goalkeeper') return 1;
+
+      // Then sort by number (ensure numbers are treated as numbers)
+      const numA = parseInt(a.number, 10);
+      const numB = parseInt(b.number, 10);
+      if (isNaN(numA) && isNaN(numB)) return 0; // Both not numbers, keep order
+      if (isNaN(numA)) return 1; // a is not a number, b is, b comes first
+      if (isNaN(numB)) return -1; // b is not a number, a is, a comes first
+      return numA - numB;
+    });
+  }, [team?.players]);
 
   if (isLoading) {
     return <div className="text-center text-muted-foreground py-10">Cargando datos del equipo...</div>;
@@ -122,9 +140,9 @@ export default function ManageTeamPage() {
       
       <div>
         <h2 className="text-2xl font-semibold text-primary-foreground mb-4">Lista de Jugadores</h2>
-        {team.players.length > 0 ? (
+        {sortedPlayers.length > 0 ? (
           <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-            {team.players.map(player => (
+            {sortedPlayers.map(player => (
               <PlayerListItem key={player.id} player={player} onRemovePlayer={handleRemovePlayer} />
             ))}
           </div>
@@ -165,3 +183,5 @@ export default function ManageTeamPage() {
     </div>
   );
 }
+
+    
