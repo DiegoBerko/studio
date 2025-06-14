@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes } from '@/contexts/game-state-context';
-import type { Team, TeamData } from '@/types';
+import type { Team } from '@/types'; // TeamData removed as it's not directly used here for props
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input'; // Still used for time editing
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -41,29 +41,31 @@ export function MiniScoreboard() {
 
   const [editingSegment, setEditingSegment] = useState<EditingSegment | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-  const inputRef = useRef<HTMLInputElement>(null); // For time editing input
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // --- State for Home Team Combobox ---
   const [currentHomeTeamName, setCurrentHomeTeamName] = useState(state.homeTeamName);
   const [isHomePopoverOpen, setIsHomePopoverOpen] = useState(false);
   const homeTriggerRef = useRef<HTMLButtonElement>(null);
 
+  // Effect to update local combobox display name if global name changes externally AND popover is closed.
   useEffect(() => {
-    if (!isHomePopoverOpen || currentHomeTeamName === state.homeTeamName) {
+    if (!isHomePopoverOpen) {
       setCurrentHomeTeamName(state.homeTeamName);
     }
-  }, [state.homeTeamName, isHomePopoverOpen, currentHomeTeamName]);
+  }, [state.homeTeamName, isHomePopoverOpen]);
 
   // --- State for Away Team Combobox ---
   const [currentAwayTeamName, setCurrentAwayTeamName] = useState(state.awayTeamName);
   const [isAwayPopoverOpen, setIsAwayPopoverOpen] = useState(false);
   const awayTriggerRef = useRef<HTMLButtonElement>(null);
 
+  // Effect to update local combobox display name if global name changes externally AND popover is closed.
   useEffect(() => {
-    if (!isAwayPopoverOpen || currentAwayTeamName === state.awayTeamName) {
+    if (!isAwayPopoverOpen) {
       setCurrentAwayTeamName(state.awayTeamName);
     }
-  }, [state.awayTeamName, isAwayPopoverOpen, currentAwayTeamName]);
+  }, [state.awayTeamName, isAwayPopoverOpen]);
 
 
   const getTimeParts = useCallback((timeCs: number) => {
@@ -99,7 +101,7 @@ export function MiniScoreboard() {
   };
 
   const handleToggleClock = () => {
-    setEditingSegment(null); // Cancel any ongoing edit
+    setEditingSegment(null);
     const isFirstGameAction = state.currentPeriod === 0 &&
                               state.periodDisplayOverride === 'Warm-up' &&
                               state.currentTime === state.defaultWarmUpDuration;
@@ -339,7 +341,7 @@ export function MiniScoreboard() {
         newTimeCs = (currentMins * 60 * 100) + (newSeconds * 100) + (currentTenths * 10);
         break;
       case 'tenths':
-        if (isMainClockLastMinute) { // Only edit tenths if relevant
+        if (isMainClockLastMinute) {
           const newTenthsVal = Math.max(0, Math.min(value, 9));
           newTimeCs = (currentMins * 60 * 100) + (currentSecs * 100) + (newTenthsVal * 10);
         }
@@ -390,14 +392,19 @@ export function MiniScoreboard() {
             </div>
             <Popover open={isHomePopoverOpen} onOpenChange={(open) => {
                 setIsHomePopoverOpen(open);
-                if (!open) { // When popover closes
+                if (open) {
+                    // When popover opens, ensure its input value is the current global team name.
+                    setCurrentHomeTeamName(state.homeTeamName);
+                } else {
+                    // When popover closes (either by selection or click-away),
+                    // commit the current input value to global state.
                     dispatch({ type: 'SET_HOME_TEAM_NAME', payload: currentHomeTeamName.trim() || 'Local' });
                 }
             }}>
                 <PopoverTrigger asChild>
                     <Button
                         ref={homeTriggerRef}
-                        variant="ghost" // Use ghost to remove default button styling
+                        variant="ghost"
                         role="combobox"
                         aria-expanded={isHomePopoverOpen}
                         className={cn(teamNameTriggerClasses, "hover:bg-muted/10")}
@@ -435,8 +442,7 @@ export function MiniScoreboard() {
                                         value={team.name}
                                         onSelect={() => {
                                             setCurrentHomeTeamName(team.name);
-                                            // Dispatch happens when popover closes
-                                            setIsHomePopoverOpen(false);
+                                            setIsHomePopoverOpen(false); // Triggers onOpenChange(false) to dispatch
                                         }}
                                         className="text-sm"
                                     >
@@ -658,7 +664,11 @@ export function MiniScoreboard() {
             </div>
              <Popover open={isAwayPopoverOpen} onOpenChange={(open) => {
                 setIsAwayPopoverOpen(open);
-                if (!open) { // When popover closes
+                 if (open) {
+                    // When popover opens, ensure its input value is the current global team name.
+                    setCurrentAwayTeamName(state.awayTeamName);
+                } else {
+                    // When popover closes, commit the current input value to global state.
                     dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: currentAwayTeamName.trim() || 'Visitante' });
                 }
             }}>
@@ -703,7 +713,7 @@ export function MiniScoreboard() {
                                         value={team.name}
                                         onSelect={() => {
                                             setCurrentAwayTeamName(team.name);
-                                            setIsAwayPopoverOpen(false);
+                                            setIsAwayPopoverOpen(false); // Triggers onOpenChange(false) to dispatch
                                         }}
                                         className="text-sm"
                                     >
