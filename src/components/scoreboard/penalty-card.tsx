@@ -60,7 +60,11 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
   const renderPlayerAlias = () => {
     if (!matchedPlayer) return null;
     const name = matchedPlayer.name;
-    const displayName = name.length > 10 ? name.substring(0, 7) + "..." : name;
+    let displayName = name;
+    if (name.length > 10) {
+      displayName = name.substring(0, 8) + "..";
+    }
+    
     return (
       <>
         {'\u00A0\u00A0\u00A0'} {/* Three non-breaking spaces for separation */}
@@ -104,3 +108,4 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
     </Card>
   );
 }
+
