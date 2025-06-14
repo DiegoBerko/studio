@@ -160,10 +160,9 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
             onOpenChange={(isOpen) => {
                 setIsPlayerPopoverOpen(isOpen);
                 if (isOpen) {
-                    justSelectedPlayerRef.current = false; // Reset flag when popover opens
-                    setPlayerSearchTerm(''); // Clear search term on open
+                    justSelectedPlayerRef.current = false; 
+                    setPlayerSearchTerm(''); 
                 } else {
-                    // Popover is closing
                     if (!justSelectedPlayerRef.current && playerSearchTerm.trim()) {
                         const trimmedSearch = playerSearchTerm.trim().toUpperCase();
                         if (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
@@ -189,7 +188,12 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                         <span className="font-semibold">{selectedPlayer.number}</span>
                         <span className="text-xs text-muted-foreground"> - {selectedPlayer.name}</span>
                       </span>
-                    ) : `#${playerNumber.toUpperCase()}`;
+                    ) : (
+                      <span className="truncate">
+                        <span className="text-xs text-muted-foreground">#</span>
+                        <span className="font-semibold">{playerNumber.toUpperCase()}</span>
+                      </span>
+                    );
                   })()
                 : "Nº Jugador / Seleccionar..."}
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -208,7 +212,14 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                             const trimmedSearch = playerSearchTerm.trim().toUpperCase();
                              if (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
                                 setPlayerNumber(trimmedSearch);
+                            } else {
+                                // If invalid typed text on enter, try to find best match or clear
+                                const firstMatch = filteredPlayers[0];
+                                if(firstMatch) setPlayerNumber(firstMatch.number);
+                                else setPlayerNumber(''); // Or clear if no match
                             }
+                        } else {
+                            setPlayerNumber(''); // Clear if input is empty on enter
                         }
                         setIsPlayerPopoverOpen(false);
                     }
@@ -217,7 +228,21 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
               <CommandList>
                 <CommandEmpty>
                   {playerSearchTerm.trim() && (/^\d+$/.test(playerSearchTerm.trim()) || /^\d+[A-Za-z]*$/.test(playerSearchTerm.trim()))
-                    ? `Usar número tipeado: "${playerSearchTerm.trim().toUpperCase()}"`
+                    ? (
+                        <div 
+                            className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
+                            onClick={() => {
+                                const typedNum = playerSearchTerm.trim().toUpperCase();
+                                setPlayerNumber(typedNum);
+                                justSelectedPlayerRef.current = true; 
+                                setIsPlayerPopoverOpen(false);
+                            }}
+                        >
+                          Usar número tipeado: 
+                          <span className="text-xs text-muted-foreground ml-1 mr-0.5">#</span>
+                          <span className="font-semibold text-sm">{playerSearchTerm.trim().toUpperCase()}</span>
+                        </div>
+                      )
                     : "No se encontró jugador."
                   }
                 </CommandEmpty>
@@ -225,11 +250,11 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                   {filteredPlayers.map((player: PlayerData) => (
                     <CommandItem
                       key={player.id}
-                      value={`${player.number} - ${player.name}`} // Value for CMDK filtering
+                      value={`${player.number} - ${player.name}`} 
                       onSelect={() => {
                         setPlayerNumber(player.number);
-                        setPlayerSearchTerm(''); // Clear search after selection
-                        justSelectedPlayerRef.current = true; // Mark that selection happened
+                        setPlayerSearchTerm(''); 
+                        justSelectedPlayerRef.current = true; 
                         setIsPlayerPopoverOpen(false);
                       }}
                       className="flex items-baseline"
@@ -304,6 +329,9 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
             {penalties.map((p) => {
               const isWaiting = p._status === 'pending_player' || p._status === 'pending_concurrent';
               const statusText = getStatusText(p._status);
+              const matchedTeamForPenaltyDisplay = state.teams.find(t => t.name === teamName);
+              const matchedPlayerForPenaltyDisplay = matchedTeamForPenaltyDisplay?.players.find(pData => pData.number === p.playerNumber);
+
               return (
                 <Card 
                   key={p.id} 
@@ -323,7 +351,14 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                 >
                   <div className="flex justify-between items-center w-full">
                     <div className="flex-1">
-                      <p className="font-semibold">Jugador {p.playerNumber}</p>
+                      <p className="font-semibold text-card-foreground">
+                        Jugador {p.playerNumber}
+                        {matchedPlayerForPenaltyDisplay && (
+                          <span className="ml-1 text-xs text-muted-foreground font-normal">
+                             - {matchedPlayerForPenaltyDisplay.name}
+                          </span>
+                        )}
+                      </p>
                       <div className="flex items-center text-xs text-muted-foreground">
                         <Clock className="h-3 w-3 mr-1" />
                         <span>{formatTime(p.remainingTime * 100)} / {formatTime(p.initialDuration * 100)}</span>
@@ -374,6 +409,4 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     </ControlCardWrapper>
   );
 }
-
-
     
