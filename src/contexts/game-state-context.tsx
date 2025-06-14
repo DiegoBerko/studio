@@ -158,8 +158,6 @@ export type GameAction =
   | { type: 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES'; payload: boolean }
   // Category Actions
   | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
-  // | { type: 'ADD_CATEGORY'; payload: Pick<CategoryData, 'name'> } // No longer needed from card
-  // | { type: 'REMOVE_CATEGORY'; payload: { categoryId: string } } // No longer needed from card
   | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
   | { type: 'LOAD_CONFIG_FROM_FILE'; payload: Partial<ConfigFields> }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
@@ -246,14 +244,14 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     awayPenalties,
     playHornTrigger,
     teams,
-    availableCategories, // Pass categories through
-    selectedMatchCategory, // Pass selected match category
+    availableCategories, 
+    selectedMatchCategory, 
     configName, defaultWarmUpDuration, autoStartWarmUp, autoStartTimeouts, defaultTimeoutDuration,
     maxConcurrentPenalties, playersPerTeamOnIce, playSoundAtPeriodEnd, customHornSoundDataUrl,
     enableTeamSelectionInMiniScoreboard, enablePlayerSelectionForPenalties,
     showAliasInPenaltyPlayerSelector, showAliasInControlsPenaltyList, showAliasInScoreboardPenalties,
     homeScore, awayScore, homeTeamName, awayTeamName,
-    isClockRunning, currentTime, clockStartTimeMs, remainingTimeAtStartCs, 
+    isClockRunning, currentTime, clockStartTimeMs, remainingTimeAtStartCs,
   } = currentState;
 
   let newPartialState: Partial<GameState> = {};
@@ -298,10 +296,10 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
         remainingTimeAtStartCs: shouldResumeClock ? time : null,
         preTimeoutState: null,
       };
-    } else { 
+    } else {
       newPartialState = { currentTime: currentState.currentTime, isClockRunning: false, periodDisplayOverride: currentState.periodDisplayOverride };
     }
-  } else if (periodDisplayOverride === null) { 
+  } else if (periodDisplayOverride === null) {
     if (currentPeriod < numRegPeriods) {
       newPartialState = {
         currentTime: defaultBreakDuration,
@@ -326,12 +324,12 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
         clockStartTimeMs: (autoStartPreOTBreaks && defaultPreOTBreakDuration > 0) ? Date.now() : null,
         remainingTimeAtStartCs: (autoStartPreOTBreaks && defaultPreOTBreakDuration > 0) ? defaultPreOTBreakDuration : null,
       };
-    } else { 
+    } else {
       newPartialState = { currentTime: 0, isClockRunning: false };
-      if (currentPeriod >= totalGamePeriods) shouldTriggerHorn = true; 
-      else shouldTriggerHorn = false; 
+      if (currentPeriod >= totalGamePeriods) shouldTriggerHorn = true;
+      else shouldTriggerHorn = false;
     }
-  } else { 
+  } else {
     newPartialState = { currentTime: 0, isClockRunning: false };
     shouldTriggerHorn = false;
   }
@@ -340,11 +338,11 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     newPartialState.clockStartTimeMs = null;
     newPartialState.remainingTimeAtStartCs = null;
   }
-  
+
   const baseStateForTransition = {
     homeScore, awayScore, homeTeamName, awayTeamName,
-    isClockRunning: currentState.isClockRunning, 
-    currentTime: currentState.currentTime,     
+    isClockRunning: currentState.isClockRunning,
+    currentTime: currentState.currentTime,
     teams, homePenalties, awayPenalties,
     availableCategories, selectedMatchCategory, // Carry over category state
     configName, defaultWarmUpDuration, defaultPeriodDuration, defaultOTPeriodDuration,
@@ -354,17 +352,17 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     playSoundAtPeriodEnd, customHornSoundDataUrl,
     enableTeamSelectionInMiniScoreboard, enablePlayerSelectionForPenalties,
     showAliasInPenaltyPlayerSelector, showAliasInControlsPenaltyList, showAliasInScoreboardPenalties,
-    clockStartTimeMs: currentState.clockStartTimeMs, 
+    clockStartTimeMs: currentState.clockStartTimeMs,
     remainingTimeAtStartCs: currentState.remainingTimeAtStartCs,
-    preTimeoutState: currentState.preTimeoutState, 
-    currentPeriod: currentState.currentPeriod, 
-    periodDisplayOverride: currentState.periodDisplayOverride, 
+    preTimeoutState: currentState.preTimeoutState,
+    currentPeriod: currentState.currentPeriod,
+    periodDisplayOverride: currentState.periodDisplayOverride,
   };
 
 
   return {
-    ...baseStateForTransition, 
-    ...newPartialState,        
+    ...baseStateForTransition,
+    ...newPartialState,
     newPlayHornTrigger: shouldTriggerHorn ? playHornTrigger + 1 : playHornTrigger,
   };
 };
@@ -403,9 +401,9 @@ const statusOrderValues: Record<NonNullable<Penalty['_status']>, number> = {
 };
 
 const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
-  const penaltiesToSort = [...penalties]; 
+  const penaltiesToSort = [...penalties];
   return penaltiesToSort.sort((a, b) => {
-    const aStatusVal = a._status ? (statusOrderValues[a._status] ?? 4) : 4; 
+    const aStatusVal = a._status ? (statusOrderValues[a._status] ?? 4) : 4;
     const bStatusVal = b._status ? (statusOrderValues[b._status] ?? 4) : 4;
 
     if (aStatusVal !== bStatusVal) {
@@ -427,14 +425,41 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
   switch (action.type) {
     case 'HYDRATE_FROM_STORAGE': {
-       const hydratedBase: GameState = {
-        ...initialGlobalState,
+      const hydratedBasePartial: Partial<GameState> = {
         ...(action.payload ?? {}),
-        playHornTrigger: initialGlobalState.playHornTrigger, 
-        teams: action.payload?.teams || [], 
-        availableCategories: action.payload?.availableCategories?.length ? action.payload.availableCategories : initialGlobalState.availableCategories,
-        selectedMatchCategory: action.payload?.selectedMatchCategory || initialGlobalState.selectedMatchCategory,
       };
+
+      // Robust handling for availableCategories
+      let hydratedCategories: CategoryData[];
+      const storedCategories = action.payload?.availableCategories;
+
+      if (Array.isArray(storedCategories) && storedCategories.length > 0) {
+        if (typeof storedCategories[0] === 'string') {
+          hydratedCategories = (storedCategories as string[]).map(name => ({ id: name, name: name }));
+        } else if (typeof storedCategories[0] === 'object' && storedCategories[0] !== null && 'id' in storedCategories[0] && 'name' in storedCategories[0]) {
+          hydratedCategories = storedCategories as CategoryData[];
+        } else {
+          hydratedCategories = initialGlobalState.availableCategories;
+        }
+      } else {
+        hydratedCategories = initialGlobalState.availableCategories;
+      }
+      
+      const hydratedBase: GameState = {
+        ...initialGlobalState,
+        ...hydratedBasePartial,
+        availableCategories: hydratedCategories, // Use robustly hydrated categories
+        teams: action.payload?.teams || [],
+        playHornTrigger: initialGlobalState.playHornTrigger, // Reset playHornTrigger on hydration
+      };
+      
+      // Ensure selectedMatchCategory is valid against the (potentially converted) hydratedCategories
+      if (!hydratedBase.availableCategories.find(c => c.id === hydratedBase.selectedMatchCategory) && hydratedBase.availableCategories.length > 0) {
+        hydratedBase.selectedMatchCategory = hydratedBase.availableCategories[0].id;
+      } else if (hydratedBase.availableCategories.length === 0) {
+        hydratedBase.selectedMatchCategory = ''; // Fallback if no categories
+      }
+
 
       hydratedBase.isClockRunning = false;
       hydratedBase.clockStartTimeMs = null;
@@ -490,7 +515,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       } else if (hydratedBase.periodDisplayOverride === 'Time Out' && hydratedBase.currentTime <= 0) {
         hydratedBase.isClockRunning = false;
       }
-      
+
       hydratedBase.enableTeamSelectionInMiniScoreboard = action.payload?.enableTeamSelectionInMiniScoreboard ?? initialGlobalState.enableTeamSelectionInMiniScoreboard;
       hydratedBase.enablePlayerSelectionForPenalties = action.payload?.enablePlayerSelectionForPenalties ?? initialGlobalState.enablePlayerSelectionForPenalties;
       hydratedBase.showAliasInPenaltyPlayerSelector = action.payload?.showAliasInPenaltyPlayerSelector ?? initialGlobalState.showAliasInPenaltyPlayerSelector;
@@ -502,13 +527,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         hydratedBase.showAliasInPenaltyPlayerSelector = false;
         hydratedBase.showAliasInControlsPenaltyList = false;
         hydratedBase.showAliasInScoreboardPenalties = false;
-      }
-
-      if (!hydratedBase.availableCategories || hydratedBase.availableCategories.length === 0) {
-        hydratedBase.availableCategories = INITIAL_AVAILABLE_CATEGORIES;
-      }
-      if (!hydratedBase.selectedMatchCategory || !hydratedBase.availableCategories.find(c => c.id === hydratedBase.selectedMatchCategory)) {
-        hydratedBase.selectedMatchCategory = hydratedBase.availableCategories[0]?.id || '';
       }
 
 
@@ -538,7 +556,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       let newClockStartTimeMs = state.clockStartTimeMs;
       let newRemainingTimeAtStartCs = state.remainingTimeAtStartCs;
 
-      if (state.isClockRunning) { 
+      if (state.isClockRunning) {
         if (state.clockStartTimeMs && state.remainingTimeAtStartCs !== null) {
           const elapsedMs = Date.now() - state.clockStartTimeMs;
           const elapsedCs = Math.floor(elapsedMs / 10);
@@ -547,10 +565,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         newIsClockRunning = false;
         newClockStartTimeMs = null;
         newRemainingTimeAtStartCs = null;
-        if (newCurrentTimeCs <= 0) { 
+        if (newCurrentTimeCs <= 0) {
             newPlayHornTrigger = state.playHornTrigger + 1;
         }
-      } else { 
+      } else {
         if (state.currentTime > 0) {
           newIsClockRunning = true;
           newClockStartTimeMs = Date.now();
@@ -580,7 +598,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         clockStartTimeMs: newIsClockRunning ? Date.now() : null,
         remainingTimeAtStartCs: newIsClockRunning ? newTimeCs : null,
        };
-      if (!newIsClockRunning && newTimeCs <=0 && state.currentTime > 0) { 
+      if (!newIsClockRunning && newTimeCs <=0 && state.currentTime > 0) {
         newPlayHornTrigger = state.playHornTrigger + 1;
       } else if (!newIsClockRunning) {
         newStateWithoutMeta.clockStartTimeMs = null;
@@ -605,7 +623,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         clockStartTimeMs: newIsClockRunning ? Date.now() : null,
         remainingTimeAtStartCs: newIsClockRunning ? newAdjustedTimeCs : null,
       };
-       if (!newIsClockRunning && newAdjustedTimeCs <=0 && state.currentTime > 0) { 
+       if (!newIsClockRunning && newAdjustedTimeCs <=0 && state.currentTime > 0) {
         newPlayHornTrigger = state.playHornTrigger + 1;
       } else if (!newIsClockRunning) {
         newStateWithoutMeta.clockStartTimeMs = null;
@@ -759,7 +777,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
                 if (p.remainingTime <= 0) {
                    if (p._status === 'running' && p.remainingTime <= 0) {
                        resultPenalties.push({ ...p, remainingTime: 0, _status: undefined});
-                   } else if (p.remainingTime > 0) { 
+                   } else if (p.remainingTime > 0) {
                        resultPenalties.push({...p});
                    }
                   continue;
@@ -781,7 +799,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
                 }
                 if (newRemainingTimeForPenaltySec > 0 || (status === 'running' && newRemainingTimeForPenaltySec === 0 && p.remainingTime > 0)) {
                    resultPenalties.push({ ...p, remainingTime: newRemainingTimeForPenaltySec, _status: status });
-                } else if (p.remainingTime > 0) { 
+                } else if (p.remainingTime > 0) {
                     resultPenalties.push({ ...p, _status: status});
                 }
               }
@@ -793,11 +811,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
             awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
           }
-        } else if (state.isClockRunning) { 
+        } else if (state.isClockRunning) {
             homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
             awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
         }
-      } else if (state.isClockRunning && state.currentTime <= 0) { 
+      } else if (state.isClockRunning && state.currentTime <= 0) {
          newCalculatedTimeCs = 0;
          homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
          awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
@@ -1018,8 +1036,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_CUSTOM_HORN_SOUND_DATA_URL':
       newStateWithoutMeta = { ...state, customHornSoundDataUrl: action.payload };
       break;
-    case 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD': 
-      if (!action.payload) { 
+    case 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD':
+      if (!action.payload) {
         newStateWithoutMeta = {
           ...state,
           enableTeamSelectionInMiniScoreboard: false,
@@ -1028,13 +1046,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           showAliasInControlsPenaltyList: false,
           showAliasInScoreboardPenalties: false,
         };
-      } else { 
+      } else {
         newStateWithoutMeta = { ...state, enableTeamSelectionInMiniScoreboard: true };
       }
       break;
     case 'SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES':
       newStateWithoutMeta = { ...state, enablePlayerSelectionForPenalties: action.payload };
-      if (!action.payload) { 
+      if (!action.payload) {
         newStateWithoutMeta.showAliasInPenaltyPlayerSelector = false;
         newStateWithoutMeta.showAliasInControlsPenaltyList = false;
       }
@@ -1050,14 +1068,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     case 'SET_AVAILABLE_CATEGORIES':
       newStateWithoutMeta = { ...state, availableCategories: action.payload };
-      // If current selectedMatchCategory is no longer valid, reset it
       if (!action.payload.find(c => c.id === state.selectedMatchCategory) && action.payload.length > 0) {
         newStateWithoutMeta.selectedMatchCategory = action.payload[0].id;
       } else if (action.payload.length === 0) {
         newStateWithoutMeta.selectedMatchCategory = '';
       }
       break;
-    // ADD_CATEGORY and REMOVE_CATEGORY are removed as direct actions from UI; managed by SET_AVAILABLE_CATEGORIES
     case 'SET_SELECTED_MATCH_CATEGORY':
       newStateWithoutMeta = { ...state, selectedMatchCategory: action.payload };
       break;
@@ -1080,18 +1096,30 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInControls = false;
       }
 
-      const importedCategories = config.availableCategories?.length ? config.availableCategories : state.availableCategories;
+      // Robust category handling from file
+      let importedCategoriesFromFile: CategoryData[];
+      const fileCategories = config.availableCategories;
+      if (Array.isArray(fileCategories) && fileCategories.length > 0) {
+        if (typeof fileCategories[0] === 'string') {
+          importedCategoriesFromFile = (fileCategories as string[]).map(name => ({ id: name, name: name }));
+        } else if (typeof fileCategories[0] === 'object' && fileCategories[0] !== null && 'id' in fileCategories[0] && 'name' in fileCategories[0]) {
+          importedCategoriesFromFile = fileCategories as CategoryData[];
+        } else {
+          importedCategoriesFromFile = state.availableCategories; // Fallback to current state's if format is unknown
+        }
+      } else {
+        importedCategoriesFromFile = state.availableCategories; // Fallback if not in file or empty
+      }
+
       let importedSelectedMatchCategory = config.selectedMatchCategory ?? state.selectedMatchCategory;
-      
-      if (!importedCategories.find(c => c.id === importedSelectedMatchCategory) && importedCategories.length > 0) {
-        importedSelectedMatchCategory = importedCategories[0].id;
-      } else if (importedCategories.length === 0) {
+      if (!importedCategoriesFromFile.find(c => c.id === importedSelectedMatchCategory) && importedCategoriesFromFile.length > 0) {
+        importedSelectedMatchCategory = importedCategoriesFromFile[0].id;
+      } else if (importedCategoriesFromFile.length === 0) {
         importedSelectedMatchCategory = '';
       }
 
-
       newStateWithoutMeta = {
-        ...state, 
+        ...state,
         configName: config.configName ?? state.configName,
         defaultWarmUpDuration: config.defaultWarmUpDuration ?? state.defaultWarmUpDuration,
         defaultPeriodDuration: config.defaultPeriodDuration ?? state.defaultPeriodDuration,
@@ -1114,7 +1142,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInPenaltyPlayerSelector: showAliasInSelector,
         showAliasInControlsPenaltyList: showAliasInControls,
         showAliasInScoreboardPenalties: showAliasInScoreboard,
-        availableCategories: importedCategories,
+        availableCategories: importedCategoriesFromFile,
         selectedMatchCategory: importedSelectedMatchCategory,
       };
       const newMaxPen = newStateWithoutMeta.maxConcurrentPenalties;
@@ -1124,7 +1152,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
     case 'RESET_CONFIG_TO_DEFAULTS': {
       newStateWithoutMeta = {
-        ...state, 
+        ...state,
         configName: INITIAL_CONFIG_NAME,
         defaultWarmUpDuration: INITIAL_WARM_UP_DURATION,
         defaultPeriodDuration: INITIAL_PERIOD_DURATION,
@@ -1177,12 +1205,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         clockStartTimeMs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? Date.now() : null,
         remainingTimeAtStartCs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? initialWarmUpDurationCs : null,
       };
-      newPlayHornTrigger = state.playHornTrigger; 
+      newPlayHornTrigger = state.playHornTrigger;
       break;
     }
     case 'ADD_TEAM': {
       const newTeam: TeamData = {
-        ...action.payload, // Contains name and category, optional logo
+        ...action.payload,
         id: crypto.randomUUID(),
         players: [],
       };
@@ -1239,14 +1267,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'LOAD_TEAMS_FROM_FILE':
       const validTeams = action.payload.map(team => ({
         ...team,
-        category: team.category || (state.availableCategories[0]?.id || '') // Ensure category exists
+        category: team.category || (state.availableCategories[0]?.id || '')
       }));
       newStateWithoutMeta = { ...state, teams: validTeams };
       break;
     default:
       newStateWithoutMeta = state;
       newTimestamp = state._lastUpdatedTimestamp || Date.now();
-      newPlayHornTrigger = state.playHornTrigger; 
+      newPlayHornTrigger = state.playHornTrigger;
       break;
   }
 
@@ -1345,7 +1373,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       const stateForStorage: GameState = { ...state };
       stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
       stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
-      
+
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
 
       if (channelRef.current) {
@@ -1435,8 +1463,8 @@ export const getPeriodText = (period: number, numRegPeriods: number): string => 
     const overtimeNumber = period - numRegPeriods;
     if (overtimeNumber === 1 && numRegPeriods > 0) return 'OT';
     if (overtimeNumber > 0 && numRegPeriods > 0) return `OT${overtimeNumber}`;
-    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT'; 
-    if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`; 
+    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT';
+    if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`;
     return "---";
 };
 
@@ -1463,6 +1491,8 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 export const DEFAULT_SOUND_PATH = DEFAULT_HORN_SOUND_FILE_PATH;
 
 export const getCategoryNameById = (categoryId: string, availableCategories: CategoryData[]): string | undefined => {
-  const category = availableCategories.find(cat => cat.id === categoryId);
-  return category ? category.name : undefined; 
+  if (!Array.isArray(availableCategories)) return undefined; // Guard against non-array
+  const category = availableCategories.find(cat => cat && typeof cat === 'object' && cat.id === categoryId);
+  return category ? category.name : undefined;
 };
+
