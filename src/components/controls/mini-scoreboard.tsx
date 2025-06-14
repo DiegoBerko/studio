@@ -84,15 +84,6 @@ export function MiniScoreboard() {
     }
   }, [editingSegment]);
 
-  // handleNameChange is now handled by Popover's onOpenChange
-  // const handleNameChange = (team: Team, name: string) => {
-  //   if (team === 'home') {
-  //     dispatch({ type: 'SET_HOME_TEAM_NAME', payload: name });
-  //   } else {
-  //     dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: name });
-  //   }
-  // };
-
   const handleScoreAdjust = (team: Team, delta: number) => {
     dispatch({ type: 'ADJUST_SCORE', payload: { team, delta } });
     const teamName = team === 'home' ? state.homeTeamName : state.awayTeamName;
@@ -776,3 +767,5 @@ export function MiniScoreboard() {
     </>
   );
 }
+
+    
