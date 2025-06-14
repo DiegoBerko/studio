@@ -26,7 +26,7 @@ export function CompactHeaderScoreboard() {
             <span className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold">{matchCategoryName}</span>
         </div>
       )}
-      <CardContent className="p-4 md:p-6 grid grid-cols-[auto_1fr_auto] items-center gap-x-4 md:gap-x-6 lg:gap-x-8">
+      <CardContent className="p-4 md:p-6 grid grid-cols-[auto_1fr_auto] items-center gap-x-6 md:gap-x-8 lg:gap-x-10">
         <TeamScoreDisplay 
           teamActualName={state.homeTeamName} 
           teamDisplayName="Local" 
