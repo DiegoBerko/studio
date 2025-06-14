@@ -30,9 +30,15 @@ export function SoundPlayer() {
           if (!audioRef.current) {
             audioRef.current = new Audio(soundSrc);
             audioRef.current.onerror = () => {
+              let description = `No se pudo cargar el archivo de sonido. Verifique la configuración.`;
+              if (soundSrc === DEFAULT_SOUND_PATH && !state.customHornSoundDataUrl) {
+                description = `No se pudo cargar el sonido predeterminado: ${DEFAULT_SOUND_PATH}. Asegúrate de que el archivo exista en la carpeta 'public/audio'.`;
+              } else if (soundSrc.startsWith('data:')) { // Custom sound was from Data URL
+                description = `No se pudo cargar el sonido personalizado. Verifica el archivo cargado.`;
+              }
               toast({
                 title: "Error de Sonido",
-                description: `No se pudo cargar el archivo de sonido: ${soundSrc.startsWith('data:') ? 'Sonido personalizado' : soundSrc}. Verifique la configuración.`,
+                description: description,
                 variant: "destructive",
               });
               console.error("Error loading audio:", soundSrc);
@@ -59,7 +65,7 @@ export function SoundPlayer() {
         }
       }
     }
-  }, [state.playHornTrigger, state.playSoundAtPeriodEnd, state.customHornSoundDataUrl, state.isLoading, toast]);
+  }, [state.playHornTrigger, state.playSoundAtPeriodEnd, state.customHornSoundDataUrl, state.isLoading, toast, DEFAULT_SOUND_PATH]);
 
   // Cleanup audio element on component unmount
   useEffect(() => {
