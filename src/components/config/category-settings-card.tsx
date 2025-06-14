@@ -2,12 +2,12 @@
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
-import { useGameState, type CategoryData } from "@/contexts/game-state-context";
+import { useGameState, type CategoryData, getCategoryNameById } from "@/contexts/game-state-context";
 import { ControlCardWrapper } from "@/components/controls/control-card-wrapper";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// Select components are no longer needed for selectedMatchCategory here
 import { useToast } from "@/hooks/use-toast";
 import { PlusCircle, Trash2, ListFilter } from "lucide-react";
 import {
@@ -36,7 +36,7 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
   const { toast } = useToast();
 
   const [localAvailableCategories, setLocalAvailableCategories] = useState<CategoryData[]>(state.availableCategories);
-  const [localSelectedMatchCategory, setLocalSelectedMatchCategory] = useState<string>(state.selectedMatchCategory);
+  // localSelectedMatchCategory is removed as it's now controlled from MiniScoreboard
   const [newCategoryName, setNewCategoryName] = useState("");
   const [categoryToDelete, setCategoryToDelete] = useState<CategoryData | null>(null);
   
@@ -45,9 +45,9 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
   useEffect(() => {
     if (!isDirty) {
       setLocalAvailableCategories(state.availableCategories);
-      setLocalSelectedMatchCategory(state.selectedMatchCategory);
+      // No need to set localSelectedMatchCategory from state here
     }
-  }, [state.availableCategories, state.selectedMatchCategory, isDirty]);
+  }, [state.availableCategories, state.selectedMatchCategory, isDirty]); // state.selectedMatchCategory dependency is kept for potential re-renders if needed
 
   useEffect(() => {
     onDirtyChange(isDirty);
@@ -61,7 +61,6 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
     handleSave: () => {
       if (!isDirty) return true;
 
-      // Validate no empty category names before saving
       if (localAvailableCategories.some(cat => cat.name.trim() === "")) {
         toast({
             title: "Error en Categorías",
@@ -70,7 +69,6 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
         });
         return false;
       }
-       // Validate unique category names (case-insensitive)
       const categoryNames = localAvailableCategories.map(cat => cat.name.trim().toLowerCase());
       const uniqueCategoryNames = new Set(categoryNames);
       if (categoryNames.length !== uniqueCategoryNames.size) {
@@ -82,16 +80,15 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
         return false;
       }
 
-
       dispatch({ type: "SET_AVAILABLE_CATEGORIES", payload: localAvailableCategories });
-      dispatch({ type: "SET_SELECTED_MATCH_CATEGORY", payload: localSelectedMatchCategory });
+      // SET_SELECTED_MATCH_CATEGORY is no longer dispatched from here
       
       setIsDirty(false);
       return true; 
     },
     handleDiscard: () => {
       setLocalAvailableCategories(state.availableCategories);
-      setLocalSelectedMatchCategory(state.selectedMatchCategory);
+      // No need to discard localSelectedMatchCategory
       setNewCategoryName("");
       setIsDirty(false);
     },
@@ -108,8 +105,7 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
       toast({ title: "Categoría Duplicada", description: "Ya existe una categoría con este nombre.", variant: "destructive" });
       return;
     }
-    // For simplicity, using trimmedName as ID, assuming it will be unique after trim and validation
-    setLocalAvailableCategories([...localAvailableCategories, { id: trimmedName, name: trimmedName }]);
+    setLocalAvailableCategories([...localAvailableCategories, { id: crypto.randomUUID(), name: trimmedName }]);
     setNewCategoryName("");
     markDirty();
   };
@@ -125,38 +121,28 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
     if (categoryToDelete) {
         const updatedCategories = localAvailableCategories.filter(c => c.id !== categoryToDelete.id);
         setLocalAvailableCategories(updatedCategories);
-        if (localSelectedMatchCategory === categoryToDelete.id) {
-            setLocalSelectedMatchCategory(updatedCategories.length > 0 ? updatedCategories[0].id : "");
-        }
+        // If the removed category was the globally selected one, the global state's reducer
+        // (in GameStateContext) will handle resetting selectedMatchCategory if needed.
+        // This card doesn't directly manage selectedMatchCategory anymore.
         markDirty();
         toast({ title: "Categoría Eliminada", description: `Categoría "${categoryToDelete.name}" eliminada.` });
         setCategoryToDelete(null);
     }
   };
 
+  const currentMatchCategoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories);
+
   return (
     <ControlCardWrapper title="Configuración de Categorías">
       <div className="space-y-6">
-        {/* Match Category Selection */}
+        {/* Match Category Display (no longer a selector) */}
         <div className="space-y-2 p-4 border rounded-md bg-muted/20">
-          <Label htmlFor="selectedMatchCategory" className="text-base font-medium">Categoría del Partido Actual</Label>
-          <Select
-            value={localSelectedMatchCategory}
-            onValueChange={(value) => { setLocalSelectedMatchCategory(value); markDirty(); }}
-            disabled={localAvailableCategories.length === 0}
-          >
-            <SelectTrigger id="selectedMatchCategory">
-              <SelectValue placeholder="Seleccionar categoría del partido" />
-            </SelectTrigger>
-            <SelectContent>
-              {localAvailableCategories.map(cat => (
-                <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-              ))}
-              {localAvailableCategories.length === 0 && <SelectItem value="" disabled>No hay categorías definidas</SelectItem>}
-            </SelectContent>
-          </Select>
+          <Label className="text-base font-medium">Categoría del Partido Actual</Label>
+          <p className="text-sm text-card-foreground h-9 flex items-center px-3">
+            {currentMatchCategoryName || (state.availableCategories.length > 0 ? "Ninguna seleccionada" : "No hay categorías definidas")}
+          </p>
           <p className="text-xs text-muted-foreground">
-            Selecciona la categoría que se mostrará en el marcador principal y controles.
+            Esta categoría se selecciona desde el Mini Marcador en la página de Controles.
           </p>
         </div>
 

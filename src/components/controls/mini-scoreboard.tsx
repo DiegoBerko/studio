@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight, User, Search, Check, ListFilter } from 'lucide-react';
+import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight, User, Search, Check, ListFilter, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -402,8 +402,6 @@ export function MiniScoreboard() {
     toast({ title: "Categoría del Partido Actualizada" });
   };
 
-  const currentCategoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories);
-
 
   return (
     <>
@@ -432,7 +430,7 @@ export function MiniScoreboard() {
         )}
       </div>
 
-      <Card className="mb-8 bg-card shadow-lg">
+      <Card className="mb-8 bg-card shadow-lg pt-8 sm:pt-6"> {/* Added padding-top to avoid overlap with absolute positioned selector */}
         <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8 py-6">
           {/* Home Team Section */}
           <div className="flex-1 space-y-1 w-full sm:w-auto">
@@ -470,7 +468,7 @@ export function MiniScoreboard() {
                       onOpenChange={(isOpen) => {
                           setIsHomePopoverOpen(isOpen);
                           if (isOpen) {
-                            setHomeSearchTerm(""); // Clear search on open
+                            setHomeSearchTerm(""); 
                           }
                       }}
                   >
@@ -750,7 +748,7 @@ export function MiniScoreboard() {
                       onOpenChange={(isOpen) => {
                           setIsAwayPopoverOpen(isOpen);
                           if (isOpen) {
-                              setAwaySearchTerm(""); // Clear search on open
+                              setAwaySearchTerm(""); 
                           }
                       }}
                   >
@@ -845,3 +843,4 @@ export function MiniScoreboard() {
     </>
   );
 }
+
