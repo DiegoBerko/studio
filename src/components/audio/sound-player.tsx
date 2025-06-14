@@ -18,6 +18,9 @@ export function SoundPlayer() {
       lastPlayedTriggerRef.current = state.playHornTrigger;
 
       if (state.playSoundAtPeriodEnd) {
+        // DEFAULT_SOUND_PATH is a constant. Its potential undefined state during SSR vs
+        // defined state on client might cause hydration diff issues if included in deps.
+        // As a constant, omitting it from deps is safe.
         const soundSrc = state.customHornSoundDataUrl || DEFAULT_SOUND_PATH;
         
         if (soundSrc) {
@@ -50,7 +53,6 @@ export function SoundPlayer() {
                     console.warn("Playback prevented:", error);
                     // This can happen if the user hasn't interacted with the page yet.
                     // Browsers often block auto-play in such cases.
-                    // A toast here might be too intrusive.
                 });
             };
           } else {
@@ -60,12 +62,12 @@ export function SoundPlayer() {
                 console.warn("Playback prevented:", error);
             });
           }
-        } else {
-            // console.log("Sound play skipped: No sound source defined (custom or default).");
         }
       }
     }
-  }, [state.playHornTrigger, state.playSoundAtPeriodEnd, state.customHornSoundDataUrl, state.isLoading, toast, DEFAULT_SOUND_PATH]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.playHornTrigger, state.playSoundAtPeriodEnd, state.customHornSoundDataUrl, state.isLoading, toast]);
+  // Removed DEFAULT_SOUND_PATH from deps as it's a constant and was likely causing hydration issues.
 
   // Cleanup audio element on component unmount
   useEffect(() => {
