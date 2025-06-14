@@ -26,7 +26,11 @@ export function TeamScoreDisplay({ teamActualName, teamDisplayName, score, playe
       return () => clearTimeout(timer);
     }
   }, [score, prevScore]);
-  
+
+  const displayTeamName = teamActualName.length > 10
+    ? `${teamActualName.substring(0, 8)}...`
+    : teamActualName;
+
   return (
     <div className={cn("flex flex-col items-center text-center", className)}>
       <div className="flex justify-center items-center gap-1 mb-1 h-5 md:h-6 lg:h-7">
@@ -37,9 +41,14 @@ export function TeamScoreDisplay({ teamActualName, teamDisplayName, score, playe
           <span className="text-sm md:text-base lg:text-lg text-destructive animate-pulse">0 JUGADORES</span>
         )}
       </div>
-      <h2 className="text-xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground uppercase tracking-wide truncate w-full px-1">{teamActualName}</h2>
+      <h2
+        className="text-xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground uppercase tracking-wide truncate w-full px-1"
+        title={teamActualName} // Show full name on hover
+      >
+        {displayTeamName}
+      </h2>
       <p className="text-sm md:text-base lg:text-lg text-muted-foreground -mt-0.5 md:-mt-1 mb-1 md:mb-1.5">({teamDisplayName})</p>
-      <div 
+      <div
         className={cn(
             "text-5xl md:text-7xl lg:text-8xl xl:text-9xl font-bold font-headline text-accent tabular-nums tracking-tighter",
             flash && "animate-score-flash"

@@ -60,13 +60,13 @@ export function MiniScoreboard() {
 
 
   useEffect(() => {
-    if (!isHomePopoverOpen) { 
+    if (!isHomePopoverOpen) {
         setLocalHomeTeamName(state.homeTeamName);
     }
   }, [state.homeTeamName, isHomePopoverOpen]);
 
   useEffect(() => {
-    if (!isAwayPopoverOpen) { 
+    if (!isAwayPopoverOpen) {
         setLocalAwayTeamName(state.awayTeamName);
     }
   }, [state.awayTeamName, isAwayPopoverOpen]);
@@ -293,7 +293,7 @@ export function MiniScoreboard() {
   let isNextActionDisabled = false;
   if (state.periodDisplayOverride === "Time Out" && state.currentTime > 0) {
       isNextActionDisabled = true;
-  } else if (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && state.currentTime <= 0) { 
+  } else if (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && state.currentTime <= 0) {
       isNextActionDisabled = true;
   }
 
@@ -385,14 +385,14 @@ export function MiniScoreboard() {
 
   const filteredHomeTeams = useMemo(() => {
     if (!homeSearchTerm.trim()) return state.teams;
-    return state.teams.filter(team => 
+    return state.teams.filter(team =>
         team.name.toLowerCase().includes(homeSearchTerm.toLowerCase())
     );
   }, [state.teams, homeSearchTerm]);
 
   const filteredAwayTeams = useMemo(() => {
     if (!awaySearchTerm.trim()) return state.teams;
-    return state.teams.filter(team => 
+    return state.teams.filter(team =>
         team.name.toLowerCase().includes(awaySearchTerm.toLowerCase())
     );
   }, [state.teams, awaySearchTerm]);
@@ -404,7 +404,7 @@ export function MiniScoreboard() {
 
 
   return (
-    <>
+    <div className="relative"> {/* Added relative positioning here */}
       <div className="absolute top-0 left-0 p-2 sm:p-3 md:p-4 z-20">
         {state.availableCategories.length > 0 ? (
             <Select value={state.selectedMatchCategory} onValueChange={handleMatchCategoryChange}>
@@ -430,7 +430,7 @@ export function MiniScoreboard() {
         )}
       </div>
 
-      <Card className="mb-8 bg-card shadow-lg pt-10 sm:pt-8 md:pt-10"> {/* Increased padding-top */}
+      <Card className="mb-8 bg-card shadow-lg pt-10 sm:pt-8 md:pt-10">
         <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8 py-6">
           {/* Home Team Section */}
           <div className="flex-1 space-y-1 w-full sm:w-auto">
@@ -463,12 +463,12 @@ export function MiniScoreboard() {
               />
               {state.enableTeamSelectionInMiniScoreboard && (
                 <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
-                  <Popover 
-                      open={isHomePopoverOpen} 
+                  <Popover
+                      open={isHomePopoverOpen}
                       onOpenChange={(isOpen) => {
                           setIsHomePopoverOpen(isOpen);
                           if (isOpen) {
-                            setHomeSearchTerm(""); 
+                            setHomeSearchTerm("");
                           }
                       }}
                   >
@@ -478,7 +478,7 @@ export function MiniScoreboard() {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="p-0 w-[250px]" align="start">
-                      <Command shouldFilter={false}> 
+                      <Command shouldFilter={false}>
                         <CommandInput
                           placeholder="Buscar equipo..."
                           value={homeSearchTerm}
@@ -497,10 +497,10 @@ export function MiniScoreboard() {
                                 value={team.name}
                                 onSelect={() => {
                                   const newName = team.name.trim() || 'Local';
-                                  setLocalHomeTeamName(newName); 
-                                  dispatch({ type: 'SET_HOME_TEAM_NAME', payload: newName }); 
-                                  setHomeSearchTerm(newName); 
-                                  setIsHomePopoverOpen(false); 
+                                  setLocalHomeTeamName(newName);
+                                  dispatch({ type: 'SET_HOME_TEAM_NAME', payload: newName });
+                                  setHomeSearchTerm(newName);
+                                  setIsHomePopoverOpen(false);
                                 }}
                                 className="text-sm"
                               >
@@ -594,7 +594,7 @@ export function MiniScoreboard() {
                     if (e.key === 'Enter') handleTimeEditConfirm();
                     if (e.key === 'Escape') setEditingSegment(null);
                   }}
-                  className={cn(commonInputClass, "w-[60px] px-0")} 
+                  className={cn(commonInputClass, "w-[60px] px-0")}
                   maxLength={2}
                   autoComplete="off"
                 />
@@ -743,12 +743,12 @@ export function MiniScoreboard() {
               />
               {state.enableTeamSelectionInMiniScoreboard && (
                 <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
-                  <Popover 
-                      open={isAwayPopoverOpen} 
+                  <Popover
+                      open={isAwayPopoverOpen}
                       onOpenChange={(isOpen) => {
                           setIsAwayPopoverOpen(isOpen);
                           if (isOpen) {
-                              setAwaySearchTerm(""); 
+                              setAwaySearchTerm("");
                           }
                       }}
                   >
@@ -758,7 +758,7 @@ export function MiniScoreboard() {
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="p-0 w-[250px]" align="start">
-                      <Command shouldFilter={false}> 
+                      <Command shouldFilter={false}>
                         <CommandInput
                           placeholder="Buscar equipo..."
                           value={awaySearchTerm}
@@ -779,7 +779,7 @@ export function MiniScoreboard() {
                                   const newName = team.name.trim() || 'Visitante';
                                   setLocalAwayTeamName(newName);
                                   dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: newName });
-                                  setAwaySearchTerm(newName); 
+                                  setAwaySearchTerm(newName);
                                   setIsAwayPopoverOpen(false);
                                 }}
                                 className="text-sm"
@@ -840,6 +840,7 @@ export function MiniScoreboard() {
           </AlertDialogContent>
         </AlertDialog>
       )}
-    </>
+    </div>
   );
 }
+
