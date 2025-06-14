@@ -48,13 +48,8 @@ const INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST = true;
 const INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES = true;
 
 // Category Defaults
-const INITIAL_AVAILABLE_CATEGORIES: CategoryData[] = [
-  { id: 'A', name: 'A' },
-  { id: 'B', name: 'B' },
-  { id: 'C', name: 'C' },
-  { id: 'Menores', name: 'Menores' },
-  { id: 'Damas', name: 'Damas' },
-];
+const INITIAL_AVAILABLE_CATEGORIES_RAW = ['A', 'B', 'C', 'Menores', 'Damas'];
+const INITIAL_AVAILABLE_CATEGORIES: CategoryData[] = INITIAL_AVAILABLE_CATEGORIES_RAW.map(name => ({ id: name, name: name }));
 const INITIAL_SELECTED_MATCH_CATEGORY = INITIAL_AVAILABLE_CATEGORIES[0]?.id || '';
 
 
@@ -163,8 +158,8 @@ export type GameAction =
   | { type: 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES'; payload: boolean }
   // Category Actions
   | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
-  | { type: 'ADD_CATEGORY'; payload: Pick<CategoryData, 'name'> }
-  | { type: 'REMOVE_CATEGORY'; payload: { categoryId: string } }
+  // | { type: 'ADD_CATEGORY'; payload: Pick<CategoryData, 'name'> } // No longer needed from card
+  // | { type: 'REMOVE_CATEGORY'; payload: { categoryId: string } } // No longer needed from card
   | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
   | { type: 'LOAD_CONFIG_FROM_FILE'; payload: Partial<ConfigFields> }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
@@ -437,7 +432,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...(action.payload ?? {}),
         playHornTrigger: initialGlobalState.playHornTrigger, 
         teams: action.payload?.teams || [], 
-        availableCategories: action.payload?.availableCategories || initialGlobalState.availableCategories,
+        availableCategories: action.payload?.availableCategories?.length ? action.payload.availableCategories : initialGlobalState.availableCategories,
         selectedMatchCategory: action.payload?.selectedMatchCategory || initialGlobalState.selectedMatchCategory,
       };
 
@@ -1062,33 +1057,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         newStateWithoutMeta.selectedMatchCategory = '';
       }
       break;
-    case 'ADD_CATEGORY': {
-      const newCategoryName = action.payload.name.trim();
-      if (newCategoryName && !state.availableCategories.find(c => c.name.toLowerCase() === newCategoryName.toLowerCase())) {
-        // For simplicity, using name as ID if it's unique, otherwise need UUID. Here using name as ID.
-        const newCategory: CategoryData = { id: newCategoryName, name: newCategoryName };
-        const updatedCategories = [...state.availableCategories, newCategory];
-        newStateWithoutMeta = { ...state, availableCategories: updatedCategories };
-        if (state.selectedMatchCategory === '' && updatedCategories.length === 1) {
-          newStateWithoutMeta.selectedMatchCategory = newCategory.id;
-        }
-      } else {
-        newStateWithoutMeta = state; // No change if name is empty or already exists
-      }
-      break;
-    }
-    case 'REMOVE_CATEGORY': {
-      const updatedCategories = state.availableCategories.filter(c => c.id !== action.payload.categoryId);
-      newStateWithoutMeta = { ...state, availableCategories: updatedCategories };
-      if (state.selectedMatchCategory === action.payload.categoryId) {
-        newStateWithoutMeta.selectedMatchCategory = updatedCategories.length > 0 ? updatedCategories[0].id : '';
-      }
-      // Also update teams that might have this category
-      newStateWithoutMeta.teams = state.teams.map(team => 
-        team.category === action.payload.categoryId ? { ...team, category: updatedCategories.length > 0 ? updatedCategories[0].id : '' } : team
-      );
-      break;
-    }
+    // ADD_CATEGORY and REMOVE_CATEGORY are removed as direct actions from UI; managed by SET_AVAILABLE_CATEGORIES
     case 'SET_SELECTED_MATCH_CATEGORY':
       newStateWithoutMeta = { ...state, selectedMatchCategory: action.payload };
       break;
@@ -1111,13 +1080,15 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInControls = false;
       }
 
-      const importedCategories = config.availableCategories ?? state.availableCategories;
+      const importedCategories = config.availableCategories?.length ? config.availableCategories : state.availableCategories;
       let importedSelectedMatchCategory = config.selectedMatchCategory ?? state.selectedMatchCategory;
+      
       if (!importedCategories.find(c => c.id === importedSelectedMatchCategory) && importedCategories.length > 0) {
         importedSelectedMatchCategory = importedCategories[0].id;
       } else if (importedCategories.length === 0) {
         importedSelectedMatchCategory = '';
       }
+
 
       newStateWithoutMeta = {
         ...state, 
@@ -1491,7 +1462,7 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 
 export const DEFAULT_SOUND_PATH = DEFAULT_HORN_SOUND_FILE_PATH;
 
-export const getCategoryNameById = (categoryId: string, availableCategories: CategoryData[]): string => {
+export const getCategoryNameById = (categoryId: string, availableCategories: CategoryData[]): string | undefined => {
   const category = availableCategories.find(cat => cat.id === categoryId);
-  return category ? category.name : categoryId; // Fallback to ID if name not found
+  return category ? category.name : undefined; 
 };
