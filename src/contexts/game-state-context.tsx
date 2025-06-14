@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ReactNode } from 'react';
@@ -40,7 +41,7 @@ const INITIAL_PLAY_SOUND_AT_PERIOD_END = true;
 const INITIAL_CUSTOM_HORN_SOUND_DATA_URL = null;
 
 // New Team and Alias Config Defaults
-const INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD = true;
+const INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD = true; // This will be "Enable Team Usage"
 const INITIAL_ENABLE_PLAYER_SELECTION_FOR_PENALTIES = true;
 const INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR = true;
 const INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST = true;
@@ -77,7 +78,7 @@ export interface ConfigFields {
   playSoundAtPeriodEnd: boolean;
   customHornSoundDataUrl: string | null;
   // New team config fields
-  enableTeamSelectionInMiniScoreboard: boolean;
+  enableTeamSelectionInMiniScoreboard: boolean; // Master "Enable Team Usage" switch
   enablePlayerSelectionForPenalties: boolean;
   showAliasInPenaltyPlayerSelector: boolean;
   showAliasInControlsPenaltyList: boolean;
@@ -142,7 +143,7 @@ export type GameAction =
   | { type: 'SET_PLAY_SOUND_AT_PERIOD_END'; payload: boolean }
   | { type: 'SET_CUSTOM_HORN_SOUND_DATA_URL'; payload: string | null }
   // New Team Config Actions
-  | { type: 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD'; payload: boolean }
+  | { type: 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD'; payload: boolean } // Master "Enable Team Usage"
   | { type: 'SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST'; payload: boolean }
@@ -482,6 +483,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       hydratedBase.showAliasInPenaltyPlayerSelector = action.payload?.showAliasInPenaltyPlayerSelector ?? initialGlobalState.showAliasInPenaltyPlayerSelector;
       hydratedBase.showAliasInControlsPenaltyList = action.payload?.showAliasInControlsPenaltyList ?? initialGlobalState.showAliasInControlsPenaltyList;
       hydratedBase.showAliasInScoreboardPenalties = action.payload?.showAliasInScoreboardPenalties ?? initialGlobalState.showAliasInScoreboardPenalties;
+
+      if (!hydratedBase.enableTeamSelectionInMiniScoreboard) {
+        hydratedBase.enablePlayerSelectionForPenalties = false;
+        hydratedBase.showAliasInPenaltyPlayerSelector = false;
+        hydratedBase.showAliasInControlsPenaltyList = false;
+        hydratedBase.showAliasInScoreboardPenalties = false;
+      }
 
 
       const { _lastActionOriginator, _lastUpdatedTimestamp, playHornTrigger: hydratedHornTrigger, ...restOfHydrated } = hydratedBase;
@@ -998,11 +1006,26 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newStateWithoutMeta = { ...state, customHornSoundDataUrl: action.payload };
       break;
     // New Team Config Reducer Cases
-    case 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD':
-      newStateWithoutMeta = { ...state, enableTeamSelectionInMiniScoreboard: action.payload };
+    case 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD': // This is now the "Enable Team Usage" master switch
+      if (!action.payload) { // If master switch is turned OFF
+        newStateWithoutMeta = {
+          ...state,
+          enableTeamSelectionInMiniScoreboard: false,
+          enablePlayerSelectionForPenalties: false,
+          showAliasInPenaltyPlayerSelector: false,
+          showAliasInControlsPenaltyList: false,
+          showAliasInScoreboardPenalties: false,
+        };
+      } else { // If master switch is turned ON (dependent states remain as they were or user can enable them)
+        newStateWithoutMeta = { ...state, enableTeamSelectionInMiniScoreboard: true };
+      }
       break;
     case 'SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES':
       newStateWithoutMeta = { ...state, enablePlayerSelectionForPenalties: action.payload };
+      if (!action.payload) { // If player selection is off, alias selection related to it should also be off
+        newStateWithoutMeta.showAliasInPenaltyPlayerSelector = false;
+        newStateWithoutMeta.showAliasInControlsPenaltyList = false;
+      }
       break;
     case 'SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR':
       newStateWithoutMeta = { ...state, showAliasInPenaltyPlayerSelector: action.payload };
@@ -1015,6 +1038,24 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     case 'LOAD_CONFIG_FROM_FILE': {
       const config = action.payload;
+      let enableTeamUsage = config.enableTeamSelectionInMiniScoreboard ?? state.enableTeamSelectionInMiniScoreboard;
+      let enablePlayerSelection = config.enablePlayerSelectionForPenalties ?? state.enablePlayerSelectionForPenalties;
+      let showAliasInSelector = config.showAliasInPenaltyPlayerSelector ?? state.showAliasInPenaltyPlayerSelector;
+      let showAliasInControls = config.showAliasInControlsPenaltyList ?? state.showAliasInControlsPenaltyList;
+      let showAliasInScoreboard = config.showAliasInScoreboardPenalties ?? state.showAliasInScoreboardPenalties;
+
+      if (!enableTeamUsage) {
+        enablePlayerSelection = false;
+        showAliasInSelector = false;
+        showAliasInControls = false;
+        showAliasInScoreboard = false;
+      }
+      if (!enablePlayerSelection){
+        showAliasInSelector = false;
+        showAliasInControls = false;
+      }
+
+
       newStateWithoutMeta = {
         ...state, // Keep existing teams
         configName: config.configName ?? state.configName,
@@ -1034,12 +1075,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         playersPerTeamOnIce: config.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
         playSoundAtPeriodEnd: config.playSoundAtPeriodEnd ?? state.playSoundAtPeriodEnd,
         customHornSoundDataUrl: config.customHornSoundDataUrl === undefined ? state.customHornSoundDataUrl : config.customHornSoundDataUrl,
-        // Load new team config fields
-        enableTeamSelectionInMiniScoreboard: config.enableTeamSelectionInMiniScoreboard ?? state.enableTeamSelectionInMiniScoreboard,
-        enablePlayerSelectionForPenalties: config.enablePlayerSelectionForPenalties ?? state.enablePlayerSelectionForPenalties,
-        showAliasInPenaltyPlayerSelector: config.showAliasInPenaltyPlayerSelector ?? state.showAliasInPenaltyPlayerSelector,
-        showAliasInControlsPenaltyList: config.showAliasInControlsPenaltyList ?? state.showAliasInControlsPenaltyList,
-        showAliasInScoreboardPenalties: config.showAliasInScoreboardPenalties ?? state.showAliasInScoreboardPenalties,
+        // Load new team config fields respecting dependencies
+        enableTeamSelectionInMiniScoreboard: enableTeamUsage,
+        enablePlayerSelectionForPenalties: enablePlayerSelection,
+        showAliasInPenaltyPlayerSelector: showAliasInSelector,
+        showAliasInControlsPenaltyList: showAliasInControls,
+        showAliasInScoreboardPenalties: showAliasInScoreboard,
       };
       const newMaxPen = newStateWithoutMeta.maxConcurrentPenalties;
       newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, newMaxPen));
@@ -1382,3 +1423,4 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 };
 
 export const DEFAULT_SOUND_PATH = DEFAULT_HORN_SOUND_FILE_PATH;
+
