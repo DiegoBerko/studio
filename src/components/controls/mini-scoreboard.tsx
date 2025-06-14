@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -421,10 +422,10 @@ export function MiniScoreboard() {
                 }}
                 placeholder="Nombre Local"
                 className={cn(
-                    "w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                    state.enableTeamSelectionInMiniScoreboard ? "px-8" : "px-1" 
+                    "w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-8"
                 )}
                 aria-label="Nombre del equipo local"
+                autoComplete="off"
               />
               {state.enableTeamSelectionInMiniScoreboard && (
                 <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
@@ -433,7 +434,7 @@ export function MiniScoreboard() {
                       onOpenChange={(isOpen) => {
                           setIsHomePopoverOpen(isOpen);
                           if (isOpen) {
-                            setHomeSearchTerm(""); // Reset search term when opening
+                            setHomeSearchTerm(""); 
                           }
                       }}
                   >
@@ -560,6 +561,7 @@ export function MiniScoreboard() {
                   }}
                   className={cn(commonInputClass, "w-[60px] px-0")} 
                   maxLength={2}
+                  autoComplete="off"
                 />
               ) : (
                 <span onClick={() => handleSegmentClick('minutes')} className={commonSpanClass}>
@@ -584,6 +586,7 @@ export function MiniScoreboard() {
                   }}
                   className={cn(commonInputClass, "w-[60px] px-0")}
                   maxLength={2}
+                  autoComplete="off"
                 />
               ) : (
                 <span onClick={() => handleSegmentClick('seconds')} className={commonSpanClass}>
@@ -610,6 +613,7 @@ export function MiniScoreboard() {
                       }}
                       className={cn(commonInputClass, "w-[30px] text-orange-500 px-0")}
                       maxLength={1}
+                      autoComplete="off"
                     />
                   ) : (
                     <span onClick={() => handleSegmentClick('tenths')} className={cn(commonSpanClass, "text-orange-500")}>
@@ -697,10 +701,10 @@ export function MiniScoreboard() {
                 }}
                 placeholder="Nombre Visitante"
                 className={cn(
-                  "w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                  state.enableTeamSelectionInMiniScoreboard ? "px-8" : "px-1"
+                  "w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-8"
                 )}
                 aria-label="Nombre del equipo visitante"
+                autoComplete="off"
               />
               {state.enableTeamSelectionInMiniScoreboard && (
                 <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
@@ -709,7 +713,7 @@ export function MiniScoreboard() {
                       onOpenChange={(isOpen) => {
                           setIsAwayPopoverOpen(isOpen);
                           if (isOpen) {
-                              setAwaySearchTerm(""); // Reset search term
+                              setAwaySearchTerm(""); 
                           }
                       }}
                   >
