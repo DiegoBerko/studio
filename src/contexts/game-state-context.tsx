@@ -165,7 +165,7 @@ export type GameAction =
   | { type: 'RESET_CONFIG_TO_DEFAULTS' }
   | { type: 'RESET_GAME_STATE' }
   // Team Actions
-  | { type: 'ADD_TEAM'; payload: Omit<TeamData, 'id' | 'players'> }
+  | { type: 'ADD_TEAM'; payload: Omit<TeamData, 'id'> } // Changed: Now allows players in payload
   | { type: 'UPDATE_TEAM_DETAILS'; payload: { teamId: string; name: string; category: string; logoDataUrl?: string | null } }
   | { type: 'DELETE_TEAM'; payload: { teamId: string } }
   | { type: 'ADD_PLAYER_TO_TEAM'; payload: { teamId: string; player: Omit<PlayerData, 'id'> } }
@@ -1210,10 +1210,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     case 'ADD_TEAM': {
+      // action.payload is Omit<TeamData, 'id'>
+      // This ensures players from payload (e.g., CSV import) are used, or defaults to [] for manual creation.
+      const teamPlayers = Array.isArray(action.payload.players) ? action.payload.players : [];
       const newTeam: TeamData = {
         ...action.payload,
-        id: crypto.randomUUID(),
-        players: [],
+        players: teamPlayers,
+        id: crypto.randomUUID(), // Always generate a new ID
       };
       newStateWithoutMeta = {
         ...state,
@@ -1580,3 +1583,4 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
   const category = availableCategories.find(cat => cat && typeof cat === 'object' && cat.id === categoryId);
   return category ? category.name : undefined;
 };
+
