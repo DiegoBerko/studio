@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes } from '@/contexts/game-state-context';
 import type { Team } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,14 +43,18 @@ export function MiniScoreboard() {
   const [editValue, setEditValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Home Team Name State
   const [localHomeTeamName, setLocalHomeTeamName] = useState(state.homeTeamName);
   const [isHomePopoverOpen, setIsHomePopoverOpen] = useState(false);
   const [homeSearchTerm, setHomeSearchTerm] = useState("");
 
+  // Away Team Name State
   const [localAwayTeamName, setLocalAwayTeamName] = useState(state.awayTeamName);
   const [isAwayPopoverOpen, setIsAwayPopoverOpen] = useState(false);
   const [awaySearchTerm, setAwaySearchTerm] = useState("");
 
+
+  // Sync local input with global state if popover is closed
   useEffect(() => {
     if (!isHomePopoverOpen) {
         setLocalHomeTeamName(state.homeTeamName);
@@ -369,8 +373,18 @@ export function MiniScoreboard() {
   const activeAwayPenaltiesCount = state.awayPenalties.filter(p => p._status === 'running').length;
   const playersOnIceForAway = Math.max(0, state.playersPerTeamOnIce - activeAwayPenaltiesCount);
 
-  const filteredHomeTeams = state.teams.filter(team => team.name.toLowerCase().includes(homeSearchTerm.toLowerCase()));
-  const filteredAwayTeams = state.teams.filter(team => team.name.toLowerCase().includes(awaySearchTerm.toLowerCase()));
+  const filteredHomeTeams = useMemo(() => {
+    return state.teams.filter(team => 
+        team.name.toLowerCase().includes(homeSearchTerm.toLowerCase())
+    );
+  }, [state.teams, homeSearchTerm]);
+
+  const filteredAwayTeams = useMemo(() => {
+    return state.teams.filter(team => 
+        team.name.toLowerCase().includes(awaySearchTerm.toLowerCase())
+    );
+  }, [state.teams, awaySearchTerm]);
+
 
   return (
     <>
@@ -403,17 +417,15 @@ export function MiniScoreboard() {
                 aria-label="Nombre del equipo local"
               />
               <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
-                <Popover open={isHomePopoverOpen} onOpenChange={(isOpen) => {
-                  setIsHomePopoverOpen(isOpen);
-                  if (isOpen) {
-                     setHomeSearchTerm(""); // Clear search term when opening
-                  } else {
-                    // Dispatch only if a selection was made or name changed.
-                    // This check is implicitly handled by localHomeTeamName being the source of truth for the input
-                    // and Popover onOpenChange(false) is the trigger to save.
-                    dispatch({ type: 'SET_HOME_TEAM_NAME', payload: localHomeTeamName.trim() || 'Local' });
-                  }
-                }}>
+                <Popover 
+                    open={isHomePopoverOpen} 
+                    onOpenChange={(isOpen) => {
+                        setIsHomePopoverOpen(isOpen);
+                        if (isOpen) {
+                            setHomeSearchTerm(localHomeTeamName); 
+                        }
+                    }}
+                >
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary-foreground">
                       <Search className="h-4 w-4" />
@@ -437,8 +449,11 @@ export function MiniScoreboard() {
                               key={team.id}
                               value={team.name}
                               onSelect={() => {
-                                setLocalHomeTeamName(team.name); // Update local input state
-                                setIsHomePopoverOpen(false); // Close popover, will trigger dispatch via onOpenChange
+                                const newName = team.name.trim() || 'Local';
+                                setLocalHomeTeamName(newName); 
+                                dispatch({ type: 'SET_HOME_TEAM_NAME', payload: newName }); 
+                                setHomeSearchTerm(newName); 
+                                setIsHomePopoverOpen(false); 
                               }}
                               className="text-sm"
                             >
@@ -672,15 +687,16 @@ export function MiniScoreboard() {
                 className="w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-8"
                 aria-label="Nombre del equipo visitante"
               />
-              <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
-                <Popover open={isAwayPopoverOpen} onOpenChange={(isOpen) => {
-                  setIsAwayPopoverOpen(isOpen);
-                   if (isOpen) {
-                     setAwaySearchTerm(""); // Clear search term when opening
-                  } else {
-                    dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: localAwayTeamName.trim() || 'Visitante' });
-                  }
-                }}>
+               <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
+                <Popover 
+                    open={isAwayPopoverOpen} 
+                    onOpenChange={(isOpen) => {
+                        setIsAwayPopoverOpen(isOpen);
+                        if (isOpen) {
+                            setAwaySearchTerm(localAwayTeamName);
+                        }
+                    }}
+                >
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary-foreground">
                       <Search className="h-4 w-4" />
@@ -704,8 +720,11 @@ export function MiniScoreboard() {
                               key={team.id}
                               value={team.name}
                               onSelect={() => {
-                                setLocalAwayTeamName(team.name);
-                                setIsAwayPopoverOpen(false); 
+                                const newName = team.name.trim() || 'Visitante';
+                                setLocalAwayTeamName(newName);
+                                dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: newName });
+                                setAwaySearchTerm(newName);
+                                setIsAwayPopoverOpen(false);
                               }}
                               className="text-sm"
                             >
