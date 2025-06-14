@@ -200,17 +200,17 @@ export default function TeamsPage() {
         const text = e.target?.result as string;
         const lines = text.split(/\r\n|\n/).map(line => line.trim()).filter(line => line); // Remove empty lines
 
-        if (lines.length < 4) {
-          throw new Error("Archivo CSV demasiado corto o formato incorrecto. Se esperan al menos 4 líneas (2 de encabezado, 1 de datos de equipo, 1+ de jugadores).");
+        if (lines.length < 2) { // At least 1 line for team data, 1 for player data
+          throw new Error("Archivo CSV demasiado corto. Se esperan al menos 2 líneas (1 de datos de equipo, 1+ de jugadores).");
         }
 
-        // Line 1: Team Name, Category Name (from ",Team Name,Category Name")
-        const teamDataParts = lines[1].split(',');
-        if (teamDataParts.length < 3 || !teamDataParts[1]?.trim() || !teamDataParts[2]?.trim()) {
-          throw new Error("Error en la línea 2 del CSV: Formato incorrecto para Nombre de Equipo y Categoría. Esperado ',NombreEquipo,NombreCategoria'.");
+        // Line 1: Team Name,Category Name
+        const teamDataParts = lines[0].split(',');
+        if (teamDataParts.length !== 2 || !teamDataParts[0]?.trim() || !teamDataParts[1]?.trim()) {
+          throw new Error("Error en la línea 1 del CSV: Formato incorrecto. Esperado 'NombreEquipo,NombreCategoria'.");
         }
-        const teamNameCsv = teamDataParts[1].trim();
-        const categoryNameCsv = teamDataParts[2].trim();
+        const teamNameCsv = teamDataParts[0].trim();
+        const categoryNameCsv = teamDataParts[1].trim();
 
         const category = state.availableCategories.find(
           (cat) => cat.name.toLowerCase() === categoryNameCsv.toLowerCase()
@@ -230,8 +230,8 @@ export default function TeamsPage() {
         const players: PlayerData[] = [];
         const playerNumbers = new Set<string>();
 
-        // Lines 3 onwards are player data (after skipping header line 2)
-        for (let i = 3; i < lines.length; i++) {
+        // Player data starts from Line 2 (index 1)
+        for (let i = 1; i < lines.length; i++) {
           const playerDataParts = lines[i].split(',');
           if (playerDataParts.length !== 3) {
             throw new Error(`Error en la línea ${i + 1} del CSV: Se esperan 3 columnas para datos de jugador (Número,Nombre,Rol).`);
