@@ -57,6 +57,23 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
     isWaiting && "opacity-50" // Grisado
   );
 
+  const renderPlayerAlias = () => {
+    if (!matchedPlayer) return null;
+    const name = matchedPlayer.name;
+    const displayName = name.length > 10 ? name.substring(0, 7) + "..." : name;
+    return (
+      <>
+        {'\u00A0\u00A0\u00A0'} {/* Three non-breaking spaces for separation */}
+        <span 
+          className="text-xl md:text-2xl lg:text-3xl xl:text-4xl text-muted-foreground font-normal" 
+          title={name} // Show full name on hover
+        >
+          {displayName}
+        </span>
+      </>
+    );
+  };
+
   return (
     <Card className={cardClasses}>
       <CardContent className="p-3 md:p-4">
@@ -65,14 +82,7 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
             <CagedUserIcon className="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10 text-primary-foreground" />
             <span className="font-semibold text-3xl md:text-4xl lg:text-5xl xl:text-6xl">
               {penalty.playerNumber}
-              {matchedPlayer && (
-                <>
-                  {'\u00A0\u00A0\u00A0'}
-                  <span className="text-xl md:text-2xl lg:text-3xl xl:text-4xl text-muted-foreground font-normal truncate max-w-[100px] sm:max-w-[150px] md:max-w-[200px]" title={matchedPlayer.name}>
-                    {matchedPlayer.name}
-                  </span>
-                </>
-              )}
+              {renderPlayerAlias()}
             </span>
           </div>
           <div className="flex items-center gap-1 md:gap-2 text-accent font-mono text-3xl md:text-4xl lg:text-5xl xl:text-6xl">
