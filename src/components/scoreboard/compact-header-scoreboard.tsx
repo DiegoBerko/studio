@@ -21,7 +21,7 @@ export function CompactHeaderScoreboard() {
   return (
     <Card className="bg-card shadow-xl relative">
        {matchCategoryName && (
-        <div className="absolute top-2 left-2 sm:top-3 sm:left-3 md:top-4 md:left-4 flex items-baseline gap-1 px-2 py-1 bg-primary/20 text-primary-foreground rounded-md backdrop-blur-sm z-10">
+        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 md:bottom-4 md:left-4 flex items-baseline gap-1 px-2 py-1 bg-primary/20 text-primary-foreground rounded-md backdrop-blur-sm z-10">
             <span className="text-xs sm:text-sm md:text-base font-medium">Cat.</span>
             <span className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold">{matchCategoryName}</span>
         </div>

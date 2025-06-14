@@ -405,7 +405,7 @@ export function MiniScoreboard() {
 
   return (
     <>
-      <div className="absolute top-0 left-0 p-2 sm:p-3 md:p-4 z-10">
+      <div className="absolute top-0 left-0 p-2 sm:p-3 md:p-4 z-20">
         {state.availableCategories.length > 0 ? (
             <Select value={state.selectedMatchCategory} onValueChange={handleMatchCategoryChange}>
                 <SelectTrigger className="w-auto min-w-[120px] max-w-[200px] h-8 text-xs bg-card/80 border-border/50 backdrop-blur-sm">
@@ -430,7 +430,7 @@ export function MiniScoreboard() {
         )}
       </div>
 
-      <Card className="mb-8 bg-card shadow-lg pt-8 sm:pt-6"> {/* Added padding-top to avoid overlap with absolute positioned selector */}
+      <Card className="mb-8 bg-card shadow-lg pt-10 sm:pt-8 md:pt-10"> {/* Increased padding-top */}
         <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8 py-6">
           {/* Home Team Section */}
           <div className="flex-1 space-y-1 w-full sm:w-auto">
@@ -843,4 +843,3 @@ export function MiniScoreboard() {
     </>
   );
 }
-
