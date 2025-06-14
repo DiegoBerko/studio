@@ -58,6 +58,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     
     let playersToFilter = [...matchedTeam.players]; 
 
+    // Sort players by number numerically
     playersToFilter.sort((a, b) => {
       const numA = parseInt(a.number, 10);
       const numB = parseInt(b.number, 10);
@@ -176,7 +177,8 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                     justSelectedPlayerRef.current = false; 
                     setPlayerSearchTerm(''); 
                 } else {
-                    // If popover closes without selection, and search term is a valid number, set it
+                    // If popover closes without selection (e.g. click outside), 
+                    // and search term is a valid number, set it as playerNumber
                     if (!justSelectedPlayerRef.current && playerSearchTerm.trim()) {
                         const trimmedSearch = playerSearchTerm.trim().toUpperCase();
                         if (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
@@ -234,8 +236,8 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                         } else {
                              const firstMatch = filteredPlayers[0];
                              if(firstMatch) setPlayerNumber(firstMatch.number);
-                             // else keep playerNumber as is or clear it, depending on desired behavior
                         }
+                        justSelectedPlayerRef.current = true; // Ensure this is set before closing
                         setIsPlayerPopoverOpen(false);
                     }
                 }}
@@ -246,7 +248,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                     ? (
                         <CommandItem
                             key={`typed-${playerSearchTerm.trim()}`}
-                            value={`typed-${playerSearchTerm.trim()}`}
+                            value={`typed-${playerSearchTerm.trim()}`} // Use a prefix to avoid collision if playerSearchTerm is just a number
                             onSelect={() => {
                                 const typedNum = playerSearchTerm.trim().toUpperCase();
                                 setPlayerNumber(typedNum);
