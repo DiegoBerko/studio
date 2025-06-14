@@ -169,6 +169,7 @@ export type GameAction =
   | { type: 'UPDATE_TEAM_DETAILS'; payload: { teamId: string; name: string; category: string; logoDataUrl?: string | null } }
   | { type: 'DELETE_TEAM'; payload: { teamId: string } }
   | { type: 'ADD_PLAYER_TO_TEAM'; payload: { teamId: string; player: Omit<PlayerData, 'id'> } }
+  | { type: 'UPDATE_PLAYER_IN_TEAM'; payload: { teamId: string; playerId: string; updates: Partial<Pick<PlayerData, 'name' | 'number'>> } }
   | { type: 'REMOVE_PLAYER_FROM_TEAM'; payload: { teamId: string; playerId: string } }
   | { type: 'LOAD_TEAMS_FROM_FILE'; payload: TeamData[] };
 
@@ -1253,6 +1254,26 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
       break;
     }
+    case 'UPDATE_PLAYER_IN_TEAM': {
+      const { teamId, playerId, updates } = action.payload;
+      newStateWithoutMeta = {
+        ...state,
+        teams: state.teams.map(team => {
+          if (team.id === teamId) {
+            return {
+              ...team,
+              players: team.players.map(player =>
+                player.id === playerId
+                  ? { ...player, ...updates }
+                  : player
+              ),
+            };
+          }
+          return team;
+        }),
+      };
+      break;
+    }
     case 'REMOVE_PLAYER_FROM_TEAM': {
       newStateWithoutMeta = {
         ...state,
@@ -1496,3 +1517,5 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
   return category ? category.name : undefined;
 };
 
+
+    

@@ -18,7 +18,7 @@ interface AddPlayerFormProps {
 }
 
 export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
-  const { dispatch } = useGameState();
+  const { state, dispatch } = useGameState();
   const { toast } = useToast();
   const [playerNumber, setPlayerNumber] = useState("");
   const [playerName, setPlayerName] = useState("");
@@ -53,6 +53,16 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
             variant: "destructive",
         });
         return;
+    }
+
+    const currentTeam = state.teams.find(t => t.id === teamId);
+    if (currentTeam && currentTeam.players.some(p => p.number === trimmedPlayerNumber)) {
+      toast({
+        title: "Número de Jugador Duplicado",
+        description: `El número #${trimmedPlayerNumber} ya existe en este equipo. Por favor, elige otro.`,
+        variant: "destructive",
+      });
+      return;
     }
 
 
@@ -137,5 +147,7 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
     </Card>
   );
 }
+
+    
 
     

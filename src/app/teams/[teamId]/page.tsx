@@ -149,7 +149,7 @@ export default function ManageTeamPage() {
         {sortedPlayers.length > 0 ? (
           <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
             {sortedPlayers.map(player => (
-              <PlayerListItem key={player.id} player={player} onRemovePlayer={handleRemovePlayer} />
+              <PlayerListItem key={player.id} player={player} teamId={team.id} onRemovePlayer={handleRemovePlayer} />
             ))}
           </div>
         ) : (
@@ -189,3 +189,6 @@ export default function ManageTeamPage() {
     </div>
   );
 }
+
+
+    
