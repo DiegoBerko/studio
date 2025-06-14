@@ -54,15 +54,14 @@ export function MiniScoreboard() {
   const [awaySearchTerm, setAwaySearchTerm] = useState("");
 
 
-  // Sync local input with global state if popover is closed
   useEffect(() => {
-    if (!isHomePopoverOpen) {
+    if (!isHomePopoverOpen) { // Only sync if popover is closed
         setLocalHomeTeamName(state.homeTeamName);
     }
   }, [state.homeTeamName, isHomePopoverOpen]);
 
   useEffect(() => {
-    if (!isAwayPopoverOpen) {
+    if (!isAwayPopoverOpen) { // Only sync if popover is closed
         setLocalAwayTeamName(state.awayTeamName);
     }
   }, [state.awayTeamName, isAwayPopoverOpen]);
@@ -289,9 +288,10 @@ export function MiniScoreboard() {
   let isNextActionDisabled = false;
   if (state.periodDisplayOverride === "Time Out" && state.currentTime > 0) {
       isNextActionDisabled = true;
-  } else if (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS) {
+  } else if (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && state.currentTime <= 0) { // Modified to check currentTime
       isNextActionDisabled = true;
   }
+
 
   const showNextActionButton = state.currentTime <= 0 && !state.isClockRunning;
 
@@ -300,7 +300,13 @@ export function MiniScoreboard() {
     nextActionButtonText = "Finalizar Time Out";
   } else if (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up" && state.currentTime <= 0) {
     nextActionButtonText = "Iniciar 1er Período";
+  } else if (state.periodDisplayOverride === null && state.currentPeriod < MAX_TOTAL_GAME_PERIODS && state.currentTime <= 0) {
+    nextActionButtonText = "Iniciar Descanso";
+  } else if ((state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") && state.currentTime <= 0) {
+    nextActionButtonText = `Iniciar ${getPeriodText(state.currentPeriod + 1, state.numberOfRegularPeriods)}`;
   }
+
+
 
   const isMainClockLastMinute = state.currentTime < 6000 && state.currentTime >= 0 &&
                                (state.periodDisplayOverride !== null || state.currentPeriod >= 0);
@@ -374,12 +380,14 @@ export function MiniScoreboard() {
   const playersOnIceForAway = Math.max(0, state.playersPerTeamOnIce - activeAwayPenaltiesCount);
 
   const filteredHomeTeams = useMemo(() => {
+    if (!homeSearchTerm.trim()) return state.teams;
     return state.teams.filter(team => 
         team.name.toLowerCase().includes(homeSearchTerm.toLowerCase())
     );
   }, [state.teams, homeSearchTerm]);
 
   const filteredAwayTeams = useMemo(() => {
+    if (!awaySearchTerm.trim()) return state.teams;
     return state.teams.filter(team => 
         team.name.toLowerCase().includes(awaySearchTerm.toLowerCase())
     );
@@ -400,7 +408,7 @@ export function MiniScoreboard() {
                 <span className="text-xs text-destructive animate-pulse">0 JUGADORES</span>
               )}
             </div>
-            <div className="relative w-full max-w-xs mx-auto">
+             <div className="relative w-full max-w-xs mx-auto">
               <Input
                 id="homeTeamNameInput"
                 value={localHomeTeamName}
@@ -422,7 +430,11 @@ export function MiniScoreboard() {
                     onOpenChange={(isOpen) => {
                         setIsHomePopoverOpen(isOpen);
                         if (isOpen) {
-                            setHomeSearchTerm(localHomeTeamName); 
+                           setHomeSearchTerm(""); // Reset search term when opening
+                        } else {
+                           // If popover closes without selection, ensure input reflects current localHomeTeamName
+                           // which should have been updated by onBlur or onKeyDown of the Input
+                           // Or if a selection was made, localHomeTeamName is already updated.
                         }
                     }}
                 >
@@ -432,7 +444,7 @@ export function MiniScoreboard() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="p-0 w-[250px]" align="start">
-                    <Command shouldFilter={false}>
+                    <Command shouldFilter={false}> {/* We filter manually with filteredHomeTeams */}
                       <CommandInput
                         placeholder="Buscar equipo..."
                         value={homeSearchTerm}
@@ -441,7 +453,7 @@ export function MiniScoreboard() {
                       />
                       <CommandList>
                         <CommandEmpty>
-                          {homeSearchTerm.trim() === "" && filteredHomeTeams.length === 0 ? "No hay equipos guardados." : "No se encontraron equipos."}
+                          {homeSearchTerm.trim() === "" && state.teams.length === 0 ? "No hay equipos guardados." : "No se encontraron equipos."}
                         </CommandEmpty>
                         <CommandGroup>
                           {filteredHomeTeams.map((team) => (
@@ -452,7 +464,7 @@ export function MiniScoreboard() {
                                 const newName = team.name.trim() || 'Local';
                                 setLocalHomeTeamName(newName); 
                                 dispatch({ type: 'SET_HOME_TEAM_NAME', payload: newName }); 
-                                setHomeSearchTerm(newName); 
+                                setHomeSearchTerm(newName); // Keep search term consistent with selection
                                 setIsHomePopoverOpen(false); 
                               }}
                               className="text-sm"
@@ -546,7 +558,7 @@ export function MiniScoreboard() {
                     if (e.key === 'Enter') handleTimeEditConfirm();
                     if (e.key === 'Escape') setEditingSegment(null);
                   }}
-                  className={cn(commonInputClass, "w-[60px]")}
+                  className={cn(commonInputClass, "w-[60px] px-0")} 
                   maxLength={2}
                 />
               ) : (
@@ -570,7 +582,7 @@ export function MiniScoreboard() {
                     if (e.key === 'Enter') handleTimeEditConfirm();
                     if (e.key === 'Escape') setEditingSegment(null);
                   }}
-                  className={cn(commonInputClass, "w-[60px]")}
+                  className={cn(commonInputClass, "w-[60px] px-0")}
                   maxLength={2}
                 />
               ) : (
@@ -596,7 +608,7 @@ export function MiniScoreboard() {
                         if (e.key === 'Enter') handleTimeEditConfirm();
                         if (e.key === 'Escape') setEditingSegment(null);
                       }}
-                      className={cn(commonInputClass, "w-[30px] text-orange-500")}
+                      className={cn(commonInputClass, "w-[30px] text-orange-500 px-0")}
                       maxLength={1}
                     />
                   ) : (
@@ -693,7 +705,7 @@ export function MiniScoreboard() {
                     onOpenChange={(isOpen) => {
                         setIsAwayPopoverOpen(isOpen);
                         if (isOpen) {
-                            setAwaySearchTerm(localAwayTeamName);
+                            setAwaySearchTerm(""); // Reset search term
                         }
                     }}
                 >
@@ -703,7 +715,7 @@ export function MiniScoreboard() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="p-0 w-[250px]" align="start">
-                    <Command shouldFilter={false}>
+                    <Command shouldFilter={false}> {/* We filter manually with filteredAwayTeams */}
                       <CommandInput
                         placeholder="Buscar equipo..."
                         value={awaySearchTerm}
@@ -712,7 +724,7 @@ export function MiniScoreboard() {
                       />
                       <CommandList>
                         <CommandEmpty>
-                          {awaySearchTerm.trim() === "" && filteredAwayTeams.length === 0 ? "No hay equipos guardados." : "No se encontraron equipos."}
+                           {awaySearchTerm.trim() === "" && state.teams.length === 0 ? "No hay equipos guardados." : "No se encontraron equipos."}
                         </CommandEmpty>
                         <CommandGroup>
                           {filteredAwayTeams.map((team) => (
@@ -723,7 +735,7 @@ export function MiniScoreboard() {
                                 const newName = team.name.trim() || 'Visitante';
                                 setLocalAwayTeamName(newName);
                                 dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: newName });
-                                setAwaySearchTerm(newName);
+                                setAwaySearchTerm(newName); // Keep search term consistent
                                 setIsAwayPopoverOpen(false);
                               }}
                               className="text-sm"

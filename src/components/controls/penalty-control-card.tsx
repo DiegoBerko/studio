@@ -1,22 +1,35 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useGameState, formatTime } from '@/contexts/game-state-context';
-import type { Penalty, Team } from '@/types';
+import type { Penalty, Team, PlayerData } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, UserPlus, Clock, Plus, Minus, Hourglass } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Trash2, UserPlus, Clock, Plus, Minus, Hourglass, ChevronsUpDown, Check } from 'lucide-react';
 import { ControlCardWrapper } from './control-card-wrapper';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface PenaltyControlCardProps {
-  team: Team; // 'home' or 'away' for reducer logic
-  teamName: string; // Actual display name from state
+  team: Team; 
+  teamName: string; 
 }
 
 const ADJUST_TIME_DELTA_SECONDS = 1; 
@@ -24,13 +37,31 @@ const ADJUST_TIME_DELTA_SECONDS = 1;
 export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) {
   const { state, dispatch } = useGameState();
   const [playerNumber, setPlayerNumber] = useState('');
-  const [penaltyDurationSeconds, setPenaltyDurationSeconds] = useState('120'); // Store as seconds string
+  const [penaltyDurationSeconds, setPenaltyDurationSeconds] = useState('120'); 
   const { toast } = useToast();
 
   const [draggedPenaltyId, setDraggedPenaltyId] = useState<string | null>(null);
   const [dragOverPenaltyId, setDragOverPenaltyId] = useState<string | null>(null);
 
+  const [isPlayerPopoverOpen, setIsPlayerPopoverOpen] = useState(false);
+  const [playerSearchTerm, setPlayerSearchTerm] = useState('');
+
   const penalties = team === 'home' ? state.homePenalties : state.awayPenalties;
+
+  const matchedTeam = useMemo(() => state.teams.find(t => t.name === teamName), [state.teams, teamName]);
+  const teamHasPlayers = useMemo(() => matchedTeam && matchedTeam.players.length > 0, [matchedTeam]);
+
+  const filteredPlayers = useMemo(() => {
+    if (!matchedTeam || !teamHasPlayers) return [];
+    const searchTermLower = playerSearchTerm.toLowerCase();
+    if (!searchTermLower.trim()) return matchedTeam.players;
+    return matchedTeam.players.filter(
+      (player: PlayerData) =>
+        player.number.toLowerCase().includes(searchTermLower) ||
+        player.name.toLowerCase().includes(searchTermLower)
+    );
+  }, [matchedTeam, teamHasPlayers, playerSearchTerm]);
+
 
   const handleAddPenalty = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,18 +71,22 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
       toast({ title: "Error", description: "Número de jugador y duración son requeridos.", variant: "destructive" });
       return;
     }
+    if (!/^\d+$/.test(trimmedPlayerNumber) && !/^\d+[A-Za-z]*$/.test(trimmedPlayerNumber)) {
+       toast({ title: "Error", description: "El número de jugador debe ser numérico o un número seguido de letras (ej. 1, 23, 15A).", variant: "destructive" });
+       return;
+    }
+
     const durationSec = parseInt(penaltyDurationSeconds, 10);
     dispatch({
       type: 'ADD_PENALTY',
       payload: {
         team,
-        // Penalty durations (initial and remaining) are stored in seconds in the Penalty type
         penalty: { playerNumber: trimmedPlayerNumber, initialDuration: durationSec, remainingTime: durationSec },
       },
     });
     toast({ title: "Penalidad Agregada", description: `Jugador ${trimmedPlayerNumber} de ${teamName} recibió una penalidad de ${formatTime(durationSec * 100)}.` });
     setPlayerNumber('');
-    // setPenaltyDurationSeconds('120'); // Optionally reset duration
+    setPlayerSearchTerm('');
   };
 
   const handleRemovePenalty = (penaltyId: string) => {
@@ -115,19 +150,86 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     return null;
   };
 
+  const renderPlayerNumberInput = () => {
+    if (teamHasPlayers && matchedTeam) {
+      return (
+        <Popover open={isPlayerPopoverOpen} onOpenChange={(isOpen) => {
+            setIsPlayerPopoverOpen(isOpen);
+            if (isOpen) {
+                setPlayerSearchTerm(''); // Clear search on open
+            }
+        }}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={isPlayerPopoverOpen}
+              className="w-full justify-between"
+            >
+              {playerNumber
+                ? (() => {
+                    const selectedPlayer = matchedTeam.players.find(p => p.number === playerNumber);
+                    return selectedPlayer ? `#${selectedPlayer.number} - ${selectedPlayer.name}` : `#${playerNumber}`;
+                  })()
+                : "Nº Jugador / Seleccionar..."}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+            <Command shouldFilter={false}>
+              <CommandInput 
+                placeholder="Buscar Nº o Nombre..." 
+                value={playerSearchTerm} 
+                onValueChange={setPlayerSearchTerm}
+              />
+              <CommandList>
+                <CommandEmpty>No se encontró jugador.</CommandEmpty>
+                <CommandGroup>
+                  {filteredPlayers.map((player: PlayerData) => (
+                    <CommandItem
+                      key={player.id}
+                      value={`#${player.number} - ${player.name}`}
+                      onSelect={() => {
+                        setPlayerNumber(player.number);
+                        setIsPlayerPopoverOpen(false);
+                        setPlayerSearchTerm('');
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          playerNumber === player.number ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                      #{player.number} - {player.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+      );
+    }
+    return (
+      <Input
+        id={`${team}-playerNumber`}
+        value={playerNumber}
+        onChange={(e) => setPlayerNumber(e.target.value)}
+        placeholder="ej., 99 o 15A"
+        required
+      />
+    );
+  };
+
+
   return (
     <ControlCardWrapper title={`Penalidades ${teamName}`}>
       <form onSubmit={handleAddPenalty} className="space-y-4 mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
           <div>
             <Label htmlFor={`${team}-playerNumber`}>Jugador #</Label>
-            <Input
-              id={`${team}-playerNumber`}
-              value={playerNumber}
-              onChange={(e) => setPlayerNumber(e.target.value)}
-              placeholder="ej., 99"
-              required
-            />
+            {renderPlayerNumberInput()}
           </div>
           <div>
             <Label htmlFor={`${team}-penaltyDuration`}>Duración (segundos)</Label>
@@ -183,7 +285,6 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                       <p className="font-semibold">Jugador {p.playerNumber}</p>
                       <div className="flex items-center text-xs text-muted-foreground">
                         <Clock className="h-3 w-3 mr-1" />
-                        {/* Format penalty time (stored in seconds) to MM:SS using centiseconds for formatTime */}
                         <span>{formatTime(p.remainingTime * 100)} / {formatTime(p.initialDuration * 100)}</span>
                       </div>
                     </div>
@@ -232,3 +333,4 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     </ControlCardWrapper>
   );
 }
+
