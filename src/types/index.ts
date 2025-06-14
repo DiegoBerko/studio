@@ -1,3 +1,4 @@
+
 export interface Penalty {
   id: string;
   playerNumber: string;
@@ -7,3 +8,20 @@ export interface Penalty {
 }
 
 export type Team = 'home' | 'away';
+
+// New types for Team Management
+export type PlayerType = 'player' | 'goalkeeper';
+
+export interface PlayerData {
+  id: string;
+  number: string;
+  type: PlayerType;
+  name: string; // Combined field for Apellido, Nombre o Apodo
+}
+
+export interface TeamData {
+  id: string;
+  name: string;
+  logoDataUrl?: string | null; // Optional: string (Data URL) or null
+  players: PlayerData[];
+}

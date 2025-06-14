@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, Settings, Wrench } from 'lucide-react';
+import { Home, Settings, Wrench, Users } from 'lucide-react'; // Added Users icon
 import { useState, useEffect, useRef } from 'react';
 
 export function Header() {
@@ -126,6 +126,15 @@ export function Header() {
           >
             Configuración
           </Link>
+          <Link
+            href="/teams"
+            className={cn(
+              "transition-colors hover:text-foreground/80",
+              pathname.startsWith("/teams") ? "text-foreground" : "text-foreground/60"
+            )}
+          >
+            Equipos
+          </Link>
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
            <Button variant="ghost" size="icon" asChild className={pathname === "/" ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
@@ -141,6 +150,11 @@ export function Header() {
           <Button variant="ghost" size="icon" asChild className={pathname === "/config" ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
             <Link href="/config" aria-label="Configuración">
               <Wrench className="h-5 w-5" />
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" asChild className={pathname.startsWith("/teams") ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
+            <Link href="/teams" aria-label="Equipos">
+              <Users className="h-5 w-5" />
             </Link>
           </Button>
         </div>

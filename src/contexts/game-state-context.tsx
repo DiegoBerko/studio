@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
-import type { Penalty, Team } from '@/types';
+import type { Penalty, Team, TeamData, PlayerData, PlayerType } from '@/types';
 
 // --- Constantes para la sincronización local ---
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
@@ -87,6 +87,7 @@ interface GameState extends ConfigFields {
   clockStartTimeMs: number | null;
   remainingTimeAtStartCs: number | null; // in centiseconds
   playHornTrigger: number; // Increments to trigger sound effect
+  teams: TeamData[]; // New state for teams
   _lastActionOriginator?: string;
   _lastUpdatedTimestamp?: number;
 }
@@ -132,7 +133,13 @@ export type GameAction =
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
   | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState }
   | { type: 'RESET_CONFIG_TO_DEFAULTS' }
-  | { type: 'RESET_GAME_STATE' };
+  | { type: 'RESET_GAME_STATE' }
+  // Team Actions
+  | { type: 'ADD_TEAM'; payload: Omit<TeamData, 'id' | 'players'> }
+  | { type: 'UPDATE_TEAM_DETAILS'; payload: { teamId: string; name: string; logoDataUrl?: string | null } }
+  | { type: 'DELETE_TEAM'; payload: { teamId: string } }
+  | { type: 'ADD_PLAYER_TO_TEAM'; payload: { teamId: string; player: Omit<PlayerData, 'id'> } }
+  | { type: 'REMOVE_PLAYER_FROM_TEAM'; payload: { teamId: string; playerId: string } };
 
 
 const initialGlobalState: GameState = {
@@ -167,6 +174,7 @@ const initialGlobalState: GameState = {
   clockStartTimeMs: null,
   remainingTimeAtStartCs: null,
   playHornTrigger: 0,
+  teams: [], // Initialize teams as empty array
   _lastActionOriginator: undefined,
   _lastUpdatedTimestamp: undefined,
 };
@@ -195,6 +203,7 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     homePenalties,
     awayPenalties,
     playHornTrigger,
+    teams, // Pass teams through
   } = currentState;
 
   let newPartialState: Partial<GameState> = {};
@@ -287,6 +296,7 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     ...newPartialState,
     homePenalties,
     awayPenalties,
+    teams, // Ensure teams are carried over
     newPlayHornTrigger: shouldTriggerHorn ? playHornTrigger + 1 : playHornTrigger,
   };
 };
@@ -356,6 +366,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...initialGlobalState,
         ...(action.payload ?? {}),
         playHornTrigger: initialGlobalState.playHornTrigger, // Do not hydrate trigger
+        teams: action.payload?.teams || [], // Hydrate teams
       };
 
       hydratedBase.isClockRunning = false;
@@ -868,6 +879,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         newStateWithoutMeta = state;
       }
       break;
+    // Config settings
     case 'SET_CONFIG_NAME':
       newStateWithoutMeta = { ...state, configName: action.payload || initialGlobalState.configName };
       break;
@@ -928,7 +940,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'LOAD_CONFIG_FROM_FILE': {
       const config = action.payload;
       newStateWithoutMeta = {
-        ...state,
+        ...state, // Keep existing teams
         configName: config.configName ?? state.configName,
         defaultWarmUpDuration: config.defaultWarmUpDuration ?? state.defaultWarmUpDuration,
         defaultPeriodDuration: config.defaultPeriodDuration ?? state.defaultPeriodDuration,
@@ -945,7 +957,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         numberOfOvertimePeriods: config.numberOfOvertimePeriods ?? state.numberOfOvertimePeriods,
         playersPerTeamOnIce: config.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
         playSoundAtPeriodEnd: config.playSoundAtPeriodEnd ?? state.playSoundAtPeriodEnd,
-        customHornSoundDataUrl: config.customHornSoundDataUrl === undefined ? state.customHornSoundDataUrl : config.customHornSoundDataUrl, // Allow null to be set
+        customHornSoundDataUrl: config.customHornSoundDataUrl === undefined ? state.customHornSoundDataUrl : config.customHornSoundDataUrl,
       };
       const newMaxPen = newStateWithoutMeta.maxConcurrentPenalties;
       newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, newMaxPen));
@@ -954,7 +966,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
     case 'RESET_CONFIG_TO_DEFAULTS': {
       newStateWithoutMeta = {
-        ...state,
+        ...state, // Keep existing teams
         configName: INITIAL_CONFIG_NAME,
         defaultWarmUpDuration: INITIAL_WARM_UP_DURATION,
         defaultPeriodDuration: INITIAL_PERIOD_DURATION,
@@ -979,28 +991,85 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     case 'RESET_GAME_STATE': {
-      const { _lastActionOriginator, _lastUpdatedTimestamp, playHornTrigger: initialHornTrigger, ...initialsToKeepConfig } = initialGlobalState;
+      const { _lastActionOriginator, _lastUpdatedTimestamp, playHornTrigger: initialHornTrigger, teams: currentTeams, ...initialsToKeepConfigAndTeams } = initialGlobalState;
 
-      const initialWarmUpDurationCs = state.defaultWarmUpDuration ?? initialsToKeepConfig.defaultWarmUpDuration;
-      const autoStartWarmUp = state.autoStartWarmUp ?? initialsToKeepConfig.autoStartWarmUp;
+      const initialWarmUpDurationCs = state.defaultWarmUpDuration ?? initialsToKeepConfigAndTeams.defaultWarmUpDuration;
+      const autoStartWarmUp = state.autoStartWarmUp ?? initialsToKeepConfigAndTeams.autoStartWarmUp;
 
       newStateWithoutMeta = {
-        ...state, // Keeps current config values
-        homeScore: initialsToKeepConfig.homeScore,
-        awayScore: initialsToKeepConfig.awayScore,
+        ...state, // Keeps current config values AND teams
+        homeScore: initialsToKeepConfigAndTeams.homeScore,
+        awayScore: initialsToKeepConfigAndTeams.awayScore,
         currentPeriod: 0,
         currentTime: initialWarmUpDurationCs,
         isClockRunning: autoStartWarmUp && initialWarmUpDurationCs > 0,
         homePenalties: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
         awayPenalties: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
-        homeTeamName: initialsToKeepConfig.homeTeamName,
-        awayTeamName: initialsToKeepConfig.awayTeamName,
+        homeTeamName: initialsToKeepConfigAndTeams.homeTeamName,
+        awayTeamName: initialsToKeepConfigAndTeams.awayTeamName,
         periodDisplayOverride: 'Warm-up',
-        preTimeoutState: initialsToKeepConfig.preTimeoutState,
+        preTimeoutState: initialsToKeepConfigAndTeams.preTimeoutState,
         clockStartTimeMs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? Date.now() : null,
         remainingTimeAtStartCs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? initialWarmUpDurationCs : null,
       };
       newPlayHornTrigger = state.playHornTrigger; // Don't change horn trigger on game reset
+      break;
+    }
+    // Team Management Cases
+    case 'ADD_TEAM': {
+      const newTeam: TeamData = {
+        ...action.payload,
+        id: crypto.randomUUID(),
+        players: [],
+      };
+      newStateWithoutMeta = {
+        ...state,
+        teams: [...state.teams, newTeam],
+      };
+      break;
+    }
+    case 'UPDATE_TEAM_DETAILS': {
+      newStateWithoutMeta = {
+        ...state,
+        teams: state.teams.map(team =>
+          team.id === action.payload.teamId
+            ? { ...team, name: action.payload.name, logoDataUrl: action.payload.logoDataUrl }
+            : team
+        ),
+      };
+      break;
+    }
+    case 'DELETE_TEAM': {
+      newStateWithoutMeta = {
+        ...state,
+        teams: state.teams.filter(team => team.id !== action.payload.teamId),
+      };
+      break;
+    }
+    case 'ADD_PLAYER_TO_TEAM': {
+      const newPlayer: PlayerData = {
+        ...action.payload.player,
+        id: crypto.randomUUID(),
+      };
+      newStateWithoutMeta = {
+        ...state,
+        teams: state.teams.map(team =>
+          team.id === action.payload.teamId
+            ? { ...team, players: [...team.players, newPlayer] }
+            : team
+        ),
+      };
+      break;
+    }
+    case 'REMOVE_PLAYER_FROM_TEAM': {
+      newStateWithoutMeta = {
+        ...state,
+        teams: state.teams.map(team =>
+          team.id === action.payload.teamId
+            ? { ...team, players: team.players.filter(player => player.id !== action.payload.playerId) }
+            : team
+        ),
+      };
       break;
     }
     default:
@@ -1105,6 +1174,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       const stateForStorage: GameState = { ...state };
       stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
       stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
+      // No special cleaning needed for teams as it's already in a good format for JSON.
 
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
 
@@ -1221,3 +1291,4 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 };
 
 export const DEFAULT_SOUND_PATH = DEFAULT_HORN_SOUND_FILE_PATH;
+
