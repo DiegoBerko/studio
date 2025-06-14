@@ -9,15 +9,15 @@ interface TeamScoreDisplayProps {
   teamActualName: string;
   teamDisplayName: "Local" | "Visitante";
   score: number;
-  playersOnIce?: number; // Made optional for cases where it might not be relevant
-  configuredPlayersPerTeam?: number; // Made optional
+  playersOnIce?: number;
+  configuredPlayersPerTeam?: number;
   className?: string;
 }
 
-const TRUNCATE_THRESHOLD = 10;
-const SCROLL_VISIBLE_LENGTH = 8;
-const SCROLL_INTERVAL_START_MS = 5000; // Time to show the start of the name
-const SCROLL_INTERVAL_END_MS = 2000;   // Time to show the end of the name
+const LONG_NAME_THRESHOLD = 10; // Characters after which scrolling might be needed
+const SCROLL_ANIMATION_DURATION_MS = 1000; // Duration of the scroll animation
+const PAUSE_AT_START_DURATION_MS = 5000;   // How long to show the start of the name
+const PAUSE_AT_END_DURATION_MS = 2000;     // How long to show the end of the name
 
 export function TeamScoreDisplay({ 
   teamActualName, 
@@ -29,9 +29,11 @@ export function TeamScoreDisplay({
 }: TeamScoreDisplayProps) {
   const [flash, setFlash] = useState(false);
   const [prevScore, setPrevScore] = useState(score);
-  const [isScrolledToEnd, setIsScrolledToEnd] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [currentScrollX, setCurrentScrollX] = useState(0);
+  const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (score !== prevScore) {
@@ -43,52 +45,64 @@ export function TeamScoreDisplay({
   }, [score, prevScore]);
 
   useEffect(() => {
-    // Clear any existing timers when teamActualName changes or component unmounts
-    const clearTimers = () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
+    const clearCurrentAnimationTimeout = () => {
+      if (animationTimeoutRef.current) {
+        clearTimeout(animationTimeoutRef.current);
+        animationTimeoutRef.current = null;
       }
     };
 
-    if (teamActualName.length > TRUNCATE_THRESHOLD) {
-      setIsScrolledToEnd(false); // Start with the beginning
+    clearCurrentAnimationTimeout();
+    setCurrentScrollX(0); // Reset scroll position when team name changes
 
-      const animateName = () => {
-        // Show start for SCROLL_INTERVAL_START_MS
-        timeoutRef.current = setTimeout(() => {
-          setIsScrolledToEnd(true); // Switch to end
+    if (teamActualName.length > LONG_NAME_THRESHOLD) {
+      const performAnimationCycle = () => {
+        // Ensure refs are available
+        if (!containerRef.current || !textRef.current) {
+          // If refs not ready, try again shortly
+          animationTimeoutRef.current = setTimeout(performAnimationCycle, 100);
+          return;
+        }
+        
+        // Phase 1: Show start, then prepare to scroll to end
+        setCurrentScrollX(0);
+        animationTimeoutRef.current = setTimeout(() => {
+          if (containerRef.current && textRef.current) {
+            const containerWidth = containerRef.current.offsetWidth;
+            const textWidth = textRef.current.scrollWidth; // Use scrollWidth due to nowrap
+            const maxScroll = textWidth - containerWidth;
 
-          // Show end for SCROLL_INTERVAL_END_MS
-          timeoutRef.current = setTimeout(() => {
-            setIsScrolledToEnd(false); // Switch back to start
-          }, SCROLL_INTERVAL_END_MS);
-        }, SCROLL_INTERVAL_START_MS);
+            if (maxScroll > 0) {
+              setCurrentScrollX(-maxScroll); // Trigger scroll to end
+
+              // Phase 2: Paused at end, then prepare to scroll to start
+              animationTimeoutRef.current = setTimeout(() => {
+                setCurrentScrollX(0); // Trigger scroll to start
+
+                // Phase 3: Paused at start, then loop
+                animationTimeoutRef.current = setTimeout(() => {
+                  performAnimationCycle(); // Loop the whole cycle
+                }, PAUSE_AT_START_DURATION_MS + SCROLL_ANIMATION_DURATION_MS);
+              }, PAUSE_AT_END_DURATION_MS + SCROLL_ANIMATION_DURATION_MS);
+            } else {
+              // Text is not actually overflowing, reset and stop animation
+              setCurrentScrollX(0);
+            }
+          }
+        }, PAUSE_AT_START_DURATION_MS);
       };
-
-      animateName(); // Initial call
-      intervalRef.current = setInterval(animateName, SCROLL_INTERVAL_START_MS + SCROLL_INTERVAL_END_MS);
       
+      // Start the first cycle
+      // Delay slightly to ensure initial rendering and measurement can occur
+      animationTimeoutRef.current = setTimeout(performAnimationCycle, 100);
+
     } else {
-      setIsScrolledToEnd(false); // Ensure it's reset if name becomes short
+      setCurrentScrollX(0); // Ensure text is at start if name is short
     }
 
-    return clearTimers;
+    return clearCurrentAnimationTimeout; // Cleanup on unmount or name change
   }, [teamActualName]);
 
-  const nameStart = teamActualName.length > SCROLL_VISIBLE_LENGTH 
-    ? teamActualName.substring(0, SCROLL_VISIBLE_LENGTH) + "..." 
-    : teamActualName;
-  
-  const nameEnd = teamActualName.length > SCROLL_VISIBLE_LENGTH 
-    ? "..." + teamActualName.substring(teamActualName.length - SCROLL_VISIBLE_LENGTH)
-    : teamActualName;
-
-  const shouldAnimate = teamActualName.length > TRUNCATE_THRESHOLD;
 
   return (
     <div className={cn("flex flex-col items-center text-center", className)}>
@@ -100,35 +114,26 @@ export function TeamScoreDisplay({
           <span className="text-sm md:text-base lg:text-lg text-destructive animate-pulse">0 JUGADORES</span>
         )}
       </div>
+      
       <div 
-        className="relative text-xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground uppercase tracking-wide w-full px-1 h-[1.2em] overflow-hidden" // h-[1.2em] for stable height
+        ref={containerRef}
+        className="text-xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground uppercase tracking-wide w-full h-[1.2em] overflow-hidden relative"
         title={teamActualName}
       >
-        {shouldAnimate ? (
-          <>
-            <span
-              className={cn(
-                "absolute inset-0 transition-opacity duration-300 ease-in-out flex items-center justify-center text-center w-full",
-                isScrolledToEnd ? "opacity-0" : "opacity-100"
-              )}
-              aria-hidden={isScrolledToEnd}
-            >
-              {nameStart}
-            </span>
-            <span
-              className={cn(
-                "absolute inset-0 transition-opacity duration-300 ease-in-out flex items-center justify-center text-center w-full",
-                isScrolledToEnd ? "opacity-100" : "opacity-0"
-              )}
-              aria-hidden={!isScrolledToEnd}
-            >
-              {nameEnd}
-            </span>
-          </>
-        ) : (
-          <span className="flex items-center justify-center text-center w-full">{teamActualName}</span>
-        )}
+        <span
+          ref={textRef}
+          className="whitespace-nowrap absolute left-0 top-0"
+          style={{
+            transform: `translateX(${currentScrollX}px)`,
+            transitionProperty: 'transform',
+            transitionDuration: `${SCROLL_ANIMATION_DURATION_MS}ms`,
+            transitionTimingFunction: 'ease-in-out',
+          }}
+        >
+          {teamActualName}
+        </span>
       </div>
+
       <p className="text-sm md:text-base lg:text-lg text-muted-foreground -mt-0.5 md:-mt-1 mb-1 md:mb-1.5">({teamDisplayName})</p>
       <div
         className={cn(
