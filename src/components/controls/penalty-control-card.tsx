@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -58,19 +59,20 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
 
 
   const filteredPlayers = useMemo(() => {
-    if (!matchedTeam || !teamHasPlayers) return []; // Already considers enablePlayerSelectionForPenalties
+    if (!matchedTeam || !teamHasPlayers) return [];
 
     let playersToFilter = [...matchedTeam.players];
 
+    // Sort by player number (numeric sort)
     playersToFilter.sort((a, b) => {
       const numA = parseInt(a.number, 10);
       const numB = parseInt(b.number, 10);
-      if (isNaN(numA) && isNaN(numB)) return a.number.localeCompare(b.number);
-      if (isNaN(numA)) return 1;
-      if (isNaN(numB)) return -1;
+      if (isNaN(numA) && isNaN(numB)) return a.number.localeCompare(b.number); // Both not numbers, sort as string
+      if (isNaN(numA)) return 1; // a is not a number, b is, b comes first
+      if (isNaN(numB)) return -1; // b is not a number, a is, a comes first
       return numA - numB;
     });
-
+    
     const searchTermLower = playerSearchTerm.toLowerCase();
     if (!searchTermLower.trim()) return playersToFilter;
 
@@ -170,7 +172,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   };
 
   const renderPlayerNumberInput = () => {
-    if (teamHasPlayers && matchedTeam) { // teamHasPlayers already considers state.enablePlayerSelectionForPenalties
+    if (teamHasPlayers && matchedTeam) { 
       return (
         <Popover
             open={isPlayerPopoverOpen}
@@ -179,6 +181,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                 if (isOpen) {
                     setPlayerSearchTerm(''); 
                 } else {
+                    // If popover closed without selection, and searchTerm is a valid number, use it.
                     if (!justSelectedPlayerRef.current && playerSearchTerm.trim()) {
                         const trimmedSearch = playerSearchTerm.trim().toUpperCase();
                         if (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
@@ -186,7 +189,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                         }
                     }
                 }
-                justSelectedPlayerRef.current = false; // Reset flag after any open/close action completes
+                justSelectedPlayerRef.current = false; 
             }}
         >
           <PopoverTrigger asChild>
@@ -228,6 +231,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                 placeholder="Buscar Nº o Nombre..."
                 value={playerSearchTerm}
                 onValueChange={setPlayerSearchTerm}
+                autoComplete="off"
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
@@ -308,6 +312,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
         onChange={(e) => setPlayerNumber(e.target.value.toUpperCase())}
         placeholder="ej., 99 o 15A"
         required
+        autoComplete="off"
       />
     );
   };
@@ -433,3 +438,4 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     </ControlCardWrapper>
   );
 }
+
