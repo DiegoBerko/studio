@@ -3,15 +3,15 @@
 
 import React, { useState, useMemo, useRef } from "react";
 import Link from "next/link";
-import { useGameState } from "@/contexts/game-state-context";
+import { useGameState, getCategoryNameById } from "@/contexts/game-state-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search, Users, Info, Upload, Download, ListFilter } from "lucide-react";
+import { PlusCircle, Search, Users, Info, Upload, Download, ListFilter, FileText } from "lucide-react";
 import { TeamListItem } from "@/components/teams/team-list-item";
 import { CreateEditTeamDialog } from "@/components/teams/create-edit-team-dialog";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import type { TeamData } from "@/types";
+import type { TeamData, PlayerData, PlayerType } from "@/types";
 import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
@@ -34,6 +34,7 @@ import {
 const ALL_CATEGORIES_FILTER_KEY = "__ALL_CATEGORIES__";
 const NO_CATEGORIES_PLACEHOLDER_VALUE = "__NO_CATEGORIES_DEFINED__";
 
+
 export default function TeamsPage() {
   const { state, dispatch } = useGameState();
   const router = useRouter();
@@ -41,7 +42,8 @@ export default function TeamsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES_FILTER_KEY);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const jsonFileInputRef = useRef<HTMLInputElement>(null);
+  const csvFileInputRef = useRef<HTMLInputElement>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [currentExportFilename, setCurrentExportFilename] = useState('');
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
@@ -107,11 +109,11 @@ export default function TeamsPage() {
     setIsExportDialogOpen(false);
   };
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
+  const handleImportJsonClick = () => {
+    jsonFileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleJsonFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -122,15 +124,15 @@ export default function TeamsPage() {
         if (typeof text !== 'string') throw new Error("Error al leer el archivo.");
         const importedData = JSON.parse(text);
 
-        if (!Array.isArray(importedData) || !importedData.every(item => 
-            item && typeof item.id === 'string' && 
-            typeof item.name === 'string' && 
-            (typeof item.category === 'string' || item.category === undefined) && 
+        if (!Array.isArray(importedData) || !importedData.every(item =>
+            item && typeof item.id === 'string' &&
+            typeof item.name === 'string' &&
+            (typeof item.category === 'string' || item.category === undefined) &&
             Array.isArray(item.players))
            ) {
           throw new Error("Archivo de equipos no válido o formato incorrecto. Se esperaba un array de equipos.");
         }
-        
+
         const validatedTeams = importedData.map(team => ({
           id: team.id,
           name: team.name,
@@ -157,21 +159,21 @@ export default function TeamsPage() {
         }
 
       } catch (error) {
-        console.error("Error importing teams:", error);
+        console.error("Error importing teams (JSON):", error);
         toast({
-          title: "Error al Importar",
-          description: (error as Error).message || "No se pudo procesar el archivo de equipos.",
+          title: "Error al Importar JSON",
+          description: (error as Error).message || "No se pudo procesar el archivo de equipos JSON.",
           variant: "destructive",
         });
       } finally {
-        if (fileInputRef.current) {
-          fileInputRef.current.value = ""; 
+        if (jsonFileInputRef.current) {
+          jsonFileInputRef.current.value = "";
         }
       }
     };
     reader.readAsText(file);
   };
-  
+
   const confirmImport = () => {
     if (pendingImportData) {
         dispatch({ type: 'LOAD_TEAMS_FROM_FILE', payload: pendingImportData });
@@ -182,6 +184,122 @@ export default function TeamsPage() {
         setPendingImportData(null);
     }
     setIsImportConfirmOpen(false);
+  };
+
+  const handleImportCsvClick = () => {
+    csvFileInputRef.current?.click();
+  };
+
+  const handleCsvFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !csvFileInputRef.current) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split(/\r\n|\n/).map(line => line.trim()).filter(line => line); // Remove empty lines
+
+        if (lines.length < 4) {
+          throw new Error("Archivo CSV demasiado corto o formato incorrecto. Se esperan al menos 4 líneas (2 de encabezado, 1 de datos de equipo, 1+ de jugadores).");
+        }
+
+        // Line 1: Team Name, Category Name (from ",Team Name,Category Name")
+        const teamDataParts = lines[1].split(',');
+        if (teamDataParts.length < 3 || !teamDataParts[1]?.trim() || !teamDataParts[2]?.trim()) {
+          throw new Error("Error en la línea 2 del CSV: Formato incorrecto para Nombre de Equipo y Categoría. Esperado ',NombreEquipo,NombreCategoria'.");
+        }
+        const teamNameCsv = teamDataParts[1].trim();
+        const categoryNameCsv = teamDataParts[2].trim();
+
+        const category = state.availableCategories.find(
+          (cat) => cat.name.toLowerCase() === categoryNameCsv.toLowerCase()
+        );
+        if (!category) {
+          throw new Error(`Categoría "${categoryNameCsv}" no encontrada. Por favor, crea la categoría primero o corrige el CSV.`);
+        }
+        const categoryId = category.id;
+
+        const existingTeam = state.teams.find(
+          (t) => t.name.toLowerCase() === teamNameCsv.toLowerCase() && t.category === categoryId
+        );
+        if (existingTeam) {
+          throw new Error(`El equipo "${teamNameCsv}" en la categoría "${categoryNameCsv}" ya existe.`);
+        }
+
+        const players: PlayerData[] = [];
+        const playerNumbers = new Set<string>();
+
+        // Lines 3 onwards are player data (after skipping header line 2)
+        for (let i = 3; i < lines.length; i++) {
+          const playerDataParts = lines[i].split(',');
+          if (playerDataParts.length !== 3) {
+            throw new Error(`Error en la línea ${i + 1} del CSV: Se esperan 3 columnas para datos de jugador (Número,Nombre,Rol).`);
+          }
+          const playerNumber = playerDataParts[0].trim();
+          const playerName = playerDataParts[1].trim();
+          const playerRoleStr = playerDataParts[2].trim().toLowerCase();
+
+          if (!playerNumber || !playerName || !playerRoleStr) {
+            throw new Error(`Error en la línea ${i + 1} del CSV: Datos faltantes para el jugador.`);
+          }
+          if (!/^\d+$/.test(playerNumber)) {
+            throw new Error(`Error en la línea ${i + 1} del CSV: El número de jugador "${playerNumber}" debe ser numérico.`);
+          }
+          if (playerNumbers.has(playerNumber)) {
+            throw new Error(`Error en la línea ${i + 1} del CSV: Número de jugador "${playerNumber}" duplicado en este archivo.`);
+          }
+          playerNumbers.add(playerNumber);
+
+          let playerType: PlayerType;
+          if (playerRoleStr === 'arquero') {
+            playerType = 'goalkeeper';
+          } else if (playerRoleStr === 'jugador') {
+            playerType = 'player';
+          } else {
+            throw new Error(`Error en la línea ${i + 1} del CSV: Rol de jugador "${playerDataParts[2]}" no válido. Usar "Arquero" o "Jugador".`);
+          }
+
+          players.push({
+            id: crypto.randomUUID(),
+            number: playerNumber,
+            name: playerName,
+            type: playerType,
+          });
+        }
+
+        if (players.length === 0) {
+            throw new Error("No se encontraron jugadores en el archivo CSV.");
+        }
+
+        const newTeam: TeamData = {
+          id: crypto.randomUUID(),
+          name: teamNameCsv,
+          category: categoryId,
+          logoDataUrl: null,
+          players,
+        };
+
+        dispatch({ type: 'ADD_TEAM', payload: newTeam });
+        toast({
+          title: "Equipo Importado desde CSV",
+          description: `Equipo "${teamNameCsv}" con ${players.length} jugadores añadido exitosamente.`,
+        });
+
+      } catch (error) {
+        console.error("Error importing teams (CSV):", error);
+        toast({
+          title: "Error al Importar CSV",
+          description: (error as Error).message || "No se pudo procesar el archivo CSV.",
+          variant: "destructive",
+        });
+      } finally {
+        if (csvFileInputRef.current) {
+          csvFileInputRef.current.value = "";
+        }
+      }
+    };
+    reader.readAsText(file);
   };
 
 
@@ -242,9 +360,9 @@ export default function TeamsPage() {
         <div className="text-center py-12">
           <Info className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold text-card-foreground mb-2">
-            {state.teams.length === 0 
-              ? "No hay equipos creados" 
-              : (searchTerm || (categoryFilter && categoryFilter !== ALL_CATEGORIES_FILTER_KEY)) 
+            {state.teams.length === 0
+              ? "No hay equipos creados"
+              : (searchTerm || (categoryFilter && categoryFilter !== ALL_CATEGORIES_FILTER_KEY))
                 ? "No se encontraron equipos con los filtros aplicados"
                 : "No se encontraron equipos"}
           </h3>
@@ -266,20 +384,30 @@ export default function TeamsPage() {
       <div className="space-y-6 p-6 border rounded-md bg-card">
         <h2 className="text-xl font-semibold text-primary-foreground">Acciones de Datos de Equipos</h2>
         <p className="text-sm text-muted-foreground">
-          Exporta todos tus equipos a un archivo JSON o importa equipos desde un archivo previamente guardado.
+          Exporta todos tus equipos a un archivo JSON, o importa equipos desde un archivo JSON o CSV.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Button onClick={prepareExportTeams} variant="outline" className="flex-1" disabled={state.teams.length === 0}>
-            <Download className="mr-2 h-4 w-4" /> Exportar Todos los Equipos
+            <Download className="mr-2 h-4 w-4" /> Exportar (JSON)
           </Button>
-          <Button onClick={handleImportClick} variant="outline" className="flex-1">
-            <Upload className="mr-2 h-4 w-4" /> Importar Equipos
+          <Button onClick={handleImportJsonClick} variant="outline" className="flex-1">
+            <Upload className="mr-2 h-4 w-4" /> Importar (JSON)
+          </Button>
+           <Button onClick={handleImportCsvClick} variant="outline" className="flex-1">
+            <FileText className="mr-2 h-4 w-4" /> Importar (CSV)
           </Button>
           <input
             type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
+            ref={jsonFileInputRef}
+            onChange={handleJsonFileChange}
             accept=".json"
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={csvFileInputRef}
+            onChange={handleCsvFileChange}
+            accept=".csv"
             className="hidden"
           />
         </div>
@@ -321,9 +449,9 @@ export default function TeamsPage() {
         <AlertDialog open={isImportConfirmOpen} onOpenChange={setIsImportConfirmOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>Confirmar Importación</AlertDialogTitle>
+                    <AlertDialogTitle>Confirmar Importación de JSON</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Ya tienes equipos guardados. Al importar este archivo, se reemplazarán todos los equipos existentes. ¿Deseas continuar?
+                        Ya tienes equipos guardados. Al importar este archivo JSON, se reemplazarán todos los equipos existentes. ¿Deseas continuar?
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -338,3 +466,5 @@ export default function TeamsPage() {
     </div>
   );
 }
+
+    

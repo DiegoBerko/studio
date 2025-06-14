@@ -27,8 +27,8 @@ const NO_CATEGORIES_PLACEHOLDER_VALUE_DIALOG = "__NO_CATEGORIES_DIALOG__";
 interface CreateEditTeamDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  teamToEdit?: TeamData | null; // Pass team data if editing
-  onTeamSaved: (teamId: string) => void; // Callback after saving
+  teamToEdit?: TeamData | null;
+  onTeamSaved: (teamId: string) => void;
 }
 
 export function CreateEditTeamDialog({
@@ -54,9 +54,8 @@ export function CreateEditTeamDialog({
         setTeamName(teamToEdit.name);
         setTeamCategory(teamToEdit.category || (availableCategories.length > 0 ? availableCategories[0].id : ""));
         setLogoPreview(teamToEdit.logoDataUrl || null);
-        setLogoFile(null); 
+        setLogoFile(null);
       } else {
-        // Reset for new team
         setTeamName("");
         setTeamCategory(availableCategories.length > 0 ? availableCategories[0].id : "");
         setLogoPreview(null);
@@ -94,7 +93,7 @@ export function CreateEditTeamDialog({
       setLogoPreview(e.target?.result as string);
     };
     reader.readAsDataURL(file);
-    setLogoFile(file); 
+    setLogoFile(file);
   };
 
   const handleClearLogo = () => {
@@ -104,7 +103,8 @@ export function CreateEditTeamDialog({
   };
 
   const handleSubmit = () => {
-    if (!teamName.trim()) {
+    const trimmedTeamName = teamName.trim();
+    if (!trimmedTeamName) {
       toast({
         title: "Nombre Requerido",
         description: "El nombre del equipo no puede estar vacío.",
@@ -129,9 +129,25 @@ export function CreateEditTeamDialog({
         return;
     }
 
+    const isDuplicate = state.teams.some(
+      (t) =>
+        t.id !== teamToEdit?.id && // Exclude the current team if editing
+        t.name.toLowerCase() === trimmedTeamName.toLowerCase() &&
+        t.category === teamCategory
+    );
+
+    if (isDuplicate) {
+      const categoryName = availableCategories.find(c => c.id === teamCategory)?.name || teamCategory;
+      toast({
+        title: "Equipo Duplicado",
+        description: `Ya existe un equipo con el nombre "${trimmedTeamName}" en la categoría "${categoryName}".`,
+        variant: "destructive",
+      });
+      return;
+    }
 
     const teamPayload = {
-      name: teamName.trim(),
+      name: trimmedTeamName,
       category: teamCategory,
       logoDataUrl: logoPreview,
     };
@@ -147,7 +163,7 @@ export function CreateEditTeamDialog({
       });
       onTeamSaved(teamToEdit.id);
     } else {
-      const newTeamId = crypto.randomUUID(); 
+      const newTeamId = crypto.randomUUID();
       dispatch({
         type: "ADD_TEAM",
         payload: { id: newTeamId, ...teamPayload, players: [] },
@@ -158,7 +174,7 @@ export function CreateEditTeamDialog({
       });
       onTeamSaved(newTeamId);
     }
-    onOpenChange(false); 
+    onOpenChange(false);
   };
 
   return (
@@ -270,3 +286,5 @@ export function CreateEditTeamDialog({
     </Dialog>
   );
 }
+
+    
