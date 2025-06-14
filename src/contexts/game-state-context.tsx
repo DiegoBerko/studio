@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { ReactNode } from 'react';
@@ -40,6 +39,13 @@ const INITIAL_PLAYERS_PER_TEAM_ON_ICE = 5;
 const INITIAL_PLAY_SOUND_AT_PERIOD_END = true;
 const INITIAL_CUSTOM_HORN_SOUND_DATA_URL = null;
 
+// New Team and Alias Config Defaults
+const INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD = true;
+const INITIAL_ENABLE_PLAYER_SELECTION_FOR_PENALTIES = true;
+const INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR = true;
+const INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST = true;
+const INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES = true;
+
 
 type PeriodDisplayOverrideType = "Warm-up" | "Break" | "Pre-OT Break" | "Time Out" | null;
 
@@ -70,6 +76,12 @@ export interface ConfigFields {
   playersPerTeamOnIce: number;
   playSoundAtPeriodEnd: boolean;
   customHornSoundDataUrl: string | null;
+  // New team config fields
+  enableTeamSelectionInMiniScoreboard: boolean;
+  enablePlayerSelectionForPenalties: boolean;
+  showAliasInPenaltyPlayerSelector: boolean;
+  showAliasInControlsPenaltyList: boolean;
+  showAliasInScoreboardPenalties: boolean;
 }
 
 interface GameState extends ConfigFields {
@@ -129,6 +141,12 @@ export type GameAction =
   | { type: 'SET_AUTO_START_TIMEOUTS_VALUE'; payload: boolean }
   | { type: 'SET_PLAY_SOUND_AT_PERIOD_END'; payload: boolean }
   | { type: 'SET_CUSTOM_HORN_SOUND_DATA_URL'; payload: string | null }
+  // New Team Config Actions
+  | { type: 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD'; payload: boolean }
+  | { type: 'SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES'; payload: boolean }
+  | { type: 'SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR'; payload: boolean }
+  | { type: 'SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST'; payload: boolean }
+  | { type: 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES'; payload: boolean }
   | { type: 'LOAD_CONFIG_FROM_FILE'; payload: Partial<ConfigFields> }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
   | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState }
@@ -171,6 +189,12 @@ const initialGlobalState: GameState = {
   playersPerTeamOnIce: INITIAL_PLAYERS_PER_TEAM_ON_ICE,
   playSoundAtPeriodEnd: INITIAL_PLAY_SOUND_AT_PERIOD_END,
   customHornSoundDataUrl: INITIAL_CUSTOM_HORN_SOUND_DATA_URL,
+  // New Team Config Defaults
+  enableTeamSelectionInMiniScoreboard: INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD,
+  enablePlayerSelectionForPenalties: INITIAL_ENABLE_PLAYER_SELECTION_FOR_PENALTIES,
+  showAliasInPenaltyPlayerSelector: INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR,
+  showAliasInControlsPenaltyList: INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
+  showAliasInScoreboardPenalties: INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
   preTimeoutState: null,
   clockStartTimeMs: null,
   remainingTimeAtStartCs: null,
@@ -205,6 +229,14 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     awayPenalties,
     playHornTrigger,
     teams, // Pass teams through
+    // Pass new config fields through
+    configName, defaultWarmUpDuration, autoStartWarmUp, autoStartTimeouts, defaultTimeoutDuration,
+    maxConcurrentPenalties, playersPerTeamOnIce, playSoundAtPeriodEnd, customHornSoundDataUrl,
+    enableTeamSelectionInMiniScoreboard, enablePlayerSelectionForPenalties,
+    showAliasInPenaltyPlayerSelector, showAliasInControlsPenaltyList, showAliasInScoreboardPenalties,
+    // score and team names also
+    homeScore, awayScore, homeTeamName, awayTeamName,
+    isClockRunning, currentTime, clockStartTimeMs, remainingTimeAtStartCs, 
   } = currentState;
 
   let newPartialState: Partial<GameState> = {};
@@ -250,7 +282,7 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
         preTimeoutState: null,
       };
     } else { // Should not happen if timeout ends naturally, but as a fallback
-      newPartialState = { currentTime: 0, isClockRunning: false, periodDisplayOverride: currentState.periodDisplayOverride };
+      newPartialState = { currentTime: currentState.currentTime, isClockRunning: false, periodDisplayOverride: currentState.periodDisplayOverride };
     }
   } else if (periodDisplayOverride === null) { // Game Period Ended
     if (currentPeriod < numRegPeriods) {
@@ -291,16 +323,35 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     newPartialState.clockStartTimeMs = null;
     newPartialState.remainingTimeAtStartCs = null;
   }
+  
+  // Ensure all existing state fields are carried over if not explicitly changed
+  const baseStateForTransition = {
+    homeScore, awayScore, homeTeamName, awayTeamName,
+    isClockRunning: currentState.isClockRunning, // use currentState's isClockRunning before newPartialState applies
+    currentTime: currentState.currentTime,     // use currentState's currentTime before newPartialState applies
+    teams, homePenalties, awayPenalties,
+    configName, defaultWarmUpDuration, defaultPeriodDuration, defaultOTPeriodDuration,
+    defaultBreakDuration, defaultPreOTBreakDuration, defaultTimeoutDuration,
+    maxConcurrentPenalties, autoStartWarmUp, autoStartBreaks, autoStartPreOTBreaks,
+    autoStartTimeouts, numberOfRegularPeriods, numberOfOvertimePeriods, playersPerTeamOnIce,
+    playSoundAtPeriodEnd, customHornSoundDataUrl,
+    enableTeamSelectionInMiniScoreboard, enablePlayerSelectionForPenalties,
+    showAliasInPenaltyPlayerSelector, showAliasInControlsPenaltyList, showAliasInScoreboardPenalties,
+    clockStartTimeMs: currentState.clockStartTimeMs, // Use current ones before newPartialState applies
+    remainingTimeAtStartCs: currentState.remainingTimeAtStartCs,
+    preTimeoutState: currentState.preTimeoutState, // carry over preTimeoutState, newPartialState might nullify it
+    currentPeriod: currentState.currentPeriod, // carry over currentPeriod
+    periodDisplayOverride: currentState.periodDisplayOverride, // carry over periodDisplayOverride
+  };
+
 
   return {
-    ...currentState,
-    ...newPartialState,
-    homePenalties,
-    awayPenalties,
-    teams, // Ensure teams are carried over
+    ...baseStateForTransition, // Spread all fields from currentState
+    ...newPartialState,        // Override with calculated changes
     newPlayHornTrigger: shouldTriggerHorn ? playHornTrigger + 1 : playHornTrigger,
   };
 };
+
 
 const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number): Penalty[] => {
   const newPenalties: Penalty[] = [];
@@ -424,6 +475,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       } else if (hydratedBase.periodDisplayOverride === 'Time Out' && hydratedBase.currentTime <= 0) {
         hydratedBase.isClockRunning = false;
       }
+      
+      // Ensure new config fields are hydrated or defaulted
+      hydratedBase.enableTeamSelectionInMiniScoreboard = action.payload?.enableTeamSelectionInMiniScoreboard ?? initialGlobalState.enableTeamSelectionInMiniScoreboard;
+      hydratedBase.enablePlayerSelectionForPenalties = action.payload?.enablePlayerSelectionForPenalties ?? initialGlobalState.enablePlayerSelectionForPenalties;
+      hydratedBase.showAliasInPenaltyPlayerSelector = action.payload?.showAliasInPenaltyPlayerSelector ?? initialGlobalState.showAliasInPenaltyPlayerSelector;
+      hydratedBase.showAliasInControlsPenaltyList = action.payload?.showAliasInControlsPenaltyList ?? initialGlobalState.showAliasInControlsPenaltyList;
+      hydratedBase.showAliasInScoreboardPenalties = action.payload?.showAliasInScoreboardPenalties ?? initialGlobalState.showAliasInScoreboardPenalties;
+
 
       const { _lastActionOriginator, _lastUpdatedTimestamp, playHornTrigger: hydratedHornTrigger, ...restOfHydrated } = hydratedBase;
       newStateWithoutMeta = restOfHydrated;
@@ -938,6 +997,22 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_CUSTOM_HORN_SOUND_DATA_URL':
       newStateWithoutMeta = { ...state, customHornSoundDataUrl: action.payload };
       break;
+    // New Team Config Reducer Cases
+    case 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD':
+      newStateWithoutMeta = { ...state, enableTeamSelectionInMiniScoreboard: action.payload };
+      break;
+    case 'SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES':
+      newStateWithoutMeta = { ...state, enablePlayerSelectionForPenalties: action.payload };
+      break;
+    case 'SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR':
+      newStateWithoutMeta = { ...state, showAliasInPenaltyPlayerSelector: action.payload };
+      break;
+    case 'SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST':
+      newStateWithoutMeta = { ...state, showAliasInControlsPenaltyList: action.payload };
+      break;
+    case 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES':
+      newStateWithoutMeta = { ...state, showAliasInScoreboardPenalties: action.payload };
+      break;
     case 'LOAD_CONFIG_FROM_FILE': {
       const config = action.payload;
       newStateWithoutMeta = {
@@ -959,6 +1034,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         playersPerTeamOnIce: config.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
         playSoundAtPeriodEnd: config.playSoundAtPeriodEnd ?? state.playSoundAtPeriodEnd,
         customHornSoundDataUrl: config.customHornSoundDataUrl === undefined ? state.customHornSoundDataUrl : config.customHornSoundDataUrl,
+        // Load new team config fields
+        enableTeamSelectionInMiniScoreboard: config.enableTeamSelectionInMiniScoreboard ?? state.enableTeamSelectionInMiniScoreboard,
+        enablePlayerSelectionForPenalties: config.enablePlayerSelectionForPenalties ?? state.enablePlayerSelectionForPenalties,
+        showAliasInPenaltyPlayerSelector: config.showAliasInPenaltyPlayerSelector ?? state.showAliasInPenaltyPlayerSelector,
+        showAliasInControlsPenaltyList: config.showAliasInControlsPenaltyList ?? state.showAliasInControlsPenaltyList,
+        showAliasInScoreboardPenalties: config.showAliasInScoreboardPenalties ?? state.showAliasInScoreboardPenalties,
       };
       const newMaxPen = newStateWithoutMeta.maxConcurrentPenalties;
       newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, newMaxPen));
@@ -985,6 +1066,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         playersPerTeamOnIce: INITIAL_PLAYERS_PER_TEAM_ON_ICE,
         playSoundAtPeriodEnd: INITIAL_PLAY_SOUND_AT_PERIOD_END,
         customHornSoundDataUrl: INITIAL_CUSTOM_HORN_SOUND_DATA_URL,
+        // Reset new team config fields
+        enableTeamSelectionInMiniScoreboard: INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD,
+        enablePlayerSelectionForPenalties: INITIAL_ENABLE_PLAYER_SELECTION_FOR_PENALTIES,
+        showAliasInPenaltyPlayerSelector: INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR,
+        showAliasInControlsPenaltyList: INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
+        showAliasInScoreboardPenalties: INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
       };
       const initialMaxPen = INITIAL_MAX_CONCURRENT_PENALTIES;
       newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, initialMaxPen));
@@ -1295,6 +1382,3 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 };
 
 export const DEFAULT_SOUND_PATH = DEFAULT_HORN_SOUND_FILE_PATH;
-
-
-    

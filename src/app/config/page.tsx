@@ -1,10 +1,10 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
 import { DurationSettingsCard, type DurationSettingsCardRef } from "@/components/config/duration-settings-card";
 import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/config/penalty-settings-card";
-import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card"; // Import new card
+import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card";
+import { TeamSettingsCard, type TeamSettingsCardRef } from "@/components/config/team-settings-card"; // Import new card
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,20 +28,22 @@ export default function ConfigPage() {
   const { toast } = useToast();
   const durationSettingsRef = useRef<DurationSettingsCardRef>(null);
   const penaltySettingsRef = useRef<PenaltySettingsCardRef>(null);
-  const soundSettingsRef = useRef<SoundSettingsCardRef>(null); // Ref for new card
+  const soundSettingsRef = useRef<SoundSettingsCardRef>(null);
+  const teamSettingsRef = useRef<TeamSettingsCardRef>(null); // Ref for new card
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [localConfigName, setLocalConfigName] = useState(state.configName || '');
   const [isConfigNameDirty, setIsConfigNameDirty] = useState(false);
   const [isDurationDirty, setIsDurationDirty] = useState(false);
   const [isPenaltyDirty, setIsPenaltyDirty] = useState(false);
-  const [isSoundDirty, setIsSoundDirty] = useState(false); // Dirty state for new card
+  const [isSoundDirty, setIsSoundDirty] = useState(false);
+  const [isTeamSettingsDirty, setIsTeamSettingsDirty] = useState(false); // Dirty state for new card
 
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [currentExportFilename, setCurrentExportFilename] = useState('');
   const [isResetConfigDialogOpen, setIsResetConfigDialogOpen] = useState(false);
 
-  const pageIsDirty = isConfigNameDirty || isDurationDirty || isPenaltyDirty || isSoundDirty;
+  const pageIsDirty = isConfigNameDirty || isDurationDirty || isPenaltyDirty || isSoundDirty || isTeamSettingsDirty;
 
   useEffect(() => {
     if (!isConfigNameDirty) {
@@ -53,7 +55,8 @@ export default function ConfigPage() {
     let configNameSaveSuccess = true;
     let durationSaveSuccess = true;
     let penaltySaveSuccess = true;
-    let soundSaveSuccess = true; // Save success for new card
+    let soundSaveSuccess = true;
+    let teamSettingsSaveSuccess = true; // Save success for new card
 
     if (isConfigNameDirty) {
       if (localConfigName.trim() === "") {
@@ -75,12 +78,15 @@ export default function ConfigPage() {
     if (penaltySettingsRef.current?.getIsDirty()) {
       penaltySaveSuccess = penaltySettingsRef.current.handleSave();
     }
-    if (soundSettingsRef.current?.getIsDirty()) { // Save sound settings
+    if (soundSettingsRef.current?.getIsDirty()) { 
       soundSaveSuccess = soundSettingsRef.current.handleSave();
+    }
+    if (teamSettingsRef.current?.getIsDirty()) { // Save team settings
+      teamSettingsSaveSuccess = teamSettingsRef.current.handleSave();
     }
 
 
-    if (configNameSaveSuccess && durationSaveSuccess && penaltySaveSuccess && soundSaveSuccess) {
+    if (configNameSaveSuccess && durationSaveSuccess && penaltySaveSuccess && soundSaveSuccess && teamSettingsSaveSuccess) {
       toast({
         title: "Configuración Guardada",
         description: "Todos los cambios han sido guardados exitosamente.",
@@ -108,8 +114,11 @@ export default function ConfigPage() {
     if (penaltySettingsRef.current?.getIsDirty()) {
       penaltySettingsRef.current.handleDiscard();
     }
-    if (soundSettingsRef.current?.getIsDirty()) { // Discard sound settings
+    if (soundSettingsRef.current?.getIsDirty()) { 
       soundSettingsRef.current.handleDiscard();
+    }
+    if (teamSettingsRef.current?.getIsDirty()) { // Discard team settings
+      teamSettingsRef.current.handleDiscard();
     }
     toast({
       title: "Cambios Descartados",
@@ -152,8 +161,14 @@ export default function ConfigPage() {
       numberOfRegularPeriods: state.numberOfRegularPeriods,
       numberOfOvertimePeriods: state.numberOfOvertimePeriods,
       playersPerTeamOnIce: state.playersPerTeamOnIce,
-      playSoundAtPeriodEnd: state.playSoundAtPeriodEnd, // Export sound setting
-      customHornSoundDataUrl: state.customHornSoundDataUrl, // Export sound data URL
+      playSoundAtPeriodEnd: state.playSoundAtPeriodEnd,
+      customHornSoundDataUrl: state.customHornSoundDataUrl,
+      // New team config fields for export
+      enableTeamSelectionInMiniScoreboard: state.enableTeamSelectionInMiniScoreboard,
+      enablePlayerSelectionForPenalties: state.enablePlayerSelectionForPenalties,
+      showAliasInPenaltyPlayerSelector: state.showAliasInPenaltyPlayerSelector,
+      showAliasInControlsPenaltyList: state.showAliasInControlsPenaltyList,
+      showAliasInScoreboardPenalties: state.showAliasInScoreboardPenalties,
     };
     const jsonString = JSON.stringify(configToExport, null, 2);
     const blob = new Blob([jsonString], { type: "application/json" });
@@ -191,7 +206,12 @@ export default function ConfigPage() {
         const importedConfig = JSON.parse(text) as Partial<ConfigFields>;
 
         // Basic validation for a potentially valid config file
-        if (!importedConfig.configName && importedConfig.defaultPeriodDuration === undefined && importedConfig.playersPerTeamOnIce === undefined && importedConfig.playSoundAtPeriodEnd === undefined) {
+        if (!importedConfig.configName && 
+            importedConfig.defaultPeriodDuration === undefined && 
+            importedConfig.playersPerTeamOnIce === undefined && 
+            importedConfig.playSoundAtPeriodEnd === undefined &&
+            importedConfig.enablePlayerSelectionForPenalties === undefined // Check one of the new fields
+           ) {
           throw new Error("Archivo de configuración no válido o formato incorrecto.");
         }
 
@@ -211,15 +231,22 @@ export default function ConfigPage() {
           numberOfRegularPeriods: importedConfig.numberOfRegularPeriods ?? state.numberOfRegularPeriods,
           numberOfOvertimePeriods: importedConfig.numberOfOvertimePeriods ?? state.numberOfOvertimePeriods,
           playersPerTeamOnIce: importedConfig.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
-          playSoundAtPeriodEnd: importedConfig.playSoundAtPeriodEnd ?? state.playSoundAtPeriodEnd, // Import sound setting
-          customHornSoundDataUrl: importedConfig.customHornSoundDataUrl === undefined ? state.customHornSoundDataUrl : importedConfig.customHornSoundDataUrl, // Import sound data URL
+          playSoundAtPeriodEnd: importedConfig.playSoundAtPeriodEnd ?? state.playSoundAtPeriodEnd,
+          customHornSoundDataUrl: importedConfig.customHornSoundDataUrl === undefined ? state.customHornSoundDataUrl : importedConfig.customHornSoundDataUrl,
+          // Import new team config fields
+          enableTeamSelectionInMiniScoreboard: importedConfig.enableTeamSelectionInMiniScoreboard ?? state.enableTeamSelectionInMiniScoreboard,
+          enablePlayerSelectionForPenalties: importedConfig.enablePlayerSelectionForPenalties ?? state.enablePlayerSelectionForPenalties,
+          showAliasInPenaltyPlayerSelector: importedConfig.showAliasInPenaltyPlayerSelector ?? state.showAliasInPenaltyPlayerSelector,
+          showAliasInControlsPenaltyList: importedConfig.showAliasInControlsPenaltyList ?? state.showAliasInControlsPenaltyList,
+          showAliasInScoreboardPenalties: importedConfig.showAliasInScoreboardPenalties ?? state.showAliasInScoreboardPenalties,
         };
 
         dispatch({ type: 'LOAD_CONFIG_FROM_FILE', payload: newConfigFromFile });
 
         durationSettingsRef.current?.handleDiscard();
         penaltySettingsRef.current?.handleDiscard();
-        soundSettingsRef.current?.handleDiscard(); // Discard sound settings card
+        soundSettingsRef.current?.handleDiscard();
+        teamSettingsRef.current?.handleDiscard(); // Discard team settings card
         setIsConfigNameDirty(false); // This will trigger useEffect to update localConfigName
 
         toast({
@@ -251,7 +278,8 @@ export default function ConfigPage() {
     setIsConfigNameDirty(false);
     durationSettingsRef.current?.handleDiscard();
     penaltySettingsRef.current?.handleDiscard();
-    soundSettingsRef.current?.handleDiscard(); // Reset sound settings card
+    soundSettingsRef.current?.handleDiscard();
+    teamSettingsRef.current?.handleDiscard(); // Reset team settings card
 
     toast({
       title: "Configuración Restablecida",
@@ -264,7 +292,16 @@ export default function ConfigPage() {
     if (!isConfigNameDirty) {
         setLocalConfigName(state.configName || '');
     }
-  }, [state.configName, state.defaultWarmUpDuration, state.defaultPeriodDuration, state.defaultOTPeriodDuration, state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration, state.maxConcurrentPenalties, state.autoStartWarmUp, state.autoStartBreaks, state.autoStartPreOTBreaks, state.autoStartTimeouts, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, state.playersPerTeamOnIce, state.playSoundAtPeriodEnd, state.customHornSoundDataUrl, isConfigNameDirty]);
+  }, [
+    state.configName, state.defaultWarmUpDuration, state.defaultPeriodDuration, state.defaultOTPeriodDuration, 
+    state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration, 
+    state.maxConcurrentPenalties, state.autoStartWarmUp, state.autoStartBreaks, state.autoStartPreOTBreaks, 
+    state.autoStartTimeouts, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, state.playersPerTeamOnIce, 
+    state.playSoundAtPeriodEnd, state.customHornSoundDataUrl,
+    state.enableTeamSelectionInMiniScoreboard, state.enablePlayerSelectionForPenalties,
+    state.showAliasInPenaltyPlayerSelector, state.showAliasInControlsPenaltyList, state.showAliasInScoreboardPenalties,
+    isConfigNameDirty
+  ]);
 
 
   return (
@@ -299,7 +336,8 @@ export default function ConfigPage() {
 
       <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
       <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} />
-      <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} /> {/* Add new card */}
+      <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
+      <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty} /> {/* Add new card */}
 
 
       {pageIsDirty && (
@@ -371,7 +409,7 @@ export default function ConfigPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Restablecimiento</AlertDialogTitle>
               <AlertDialogDescription>
-                Esto restablecerá TODAS las configuraciones de esta página (nombre, duraciones, máximos, arranques automáticos, número de períodos, jugadores en cancha, sonido) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer. ¿Estás seguro?
+                Esto restablecerá TODAS las configuraciones de esta página (nombre, duraciones, máximos, arranques automáticos, número de períodos, jugadores en cancha, sonido y configuraciones de equipo/alias) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer. ¿Estás seguro?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

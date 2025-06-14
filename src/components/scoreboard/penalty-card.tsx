@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { Penalty } from '@/types';
@@ -6,14 +5,13 @@ import { useGameState, formatTime } from '@/contexts/game-state-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import React from 'react'; // Import React for useMemo or direct usage
+import React from 'react'; 
 
 interface PenaltyCardProps {
   penalty: Penalty;
   teamName: string; 
 }
 
-// Custom SVG for Caged User Icon
 const CagedUserIcon = ({ className }: { className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -23,18 +21,11 @@ const CagedUserIcon = ({ className }: { className?: string }) => (
     strokeLinejoin="round"
     className={className}
   >
-    {/* User Icon Parts - explicitly set to red (destructive color) */}
     <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" strokeWidth="2" stroke="hsl(var(--destructive))" />
     <circle cx="12" cy="7" r="4" strokeWidth="2" stroke="hsl(var(--destructive))" />
-
-    {/* Cage Bars - drawn AFTER player, with explicit grey stroke */}
-    {/* Bar 1 */}
     <line x1="6" y1="2" x2="6" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
-    {/* Bar 2 */}
     <line x1="10" y1="2" x2="10" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
-    {/* Bar 3 */}
     <line x1="14" y1="2" x2="14" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
-    {/* Bar 4 */}
     <line x1="18" y1="2" x2="18" y2="22" strokeWidth="1" stroke="hsl(var(--muted-foreground))" />
   </svg>
 );
@@ -54,11 +45,12 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
   const isWaiting = penalty._status === 'pending_player' || penalty._status === 'pending_concurrent';
   const cardClasses = cn(
     "bg-muted/50 border-primary/30 transition-opacity",
-    isWaiting && "opacity-50" // Grisado
+    isWaiting && "opacity-50" 
   );
 
   const renderPlayerAlias = () => {
-    if (!matchedPlayer) return null;
+    if (!state.showAliasInScoreboardPenalties || !matchedPlayer || !matchedPlayer.name) return null;
+    
     const name = matchedPlayer.name;
     let displayName = name;
     if (name.length > 10) {
@@ -67,10 +59,10 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
     
     return (
       <>
-        {'\u00A0\u00A0\u00A0'} {/* Three non-breaking spaces for separation */}
+        {'\u00A0\u00A0\u00A0'} 
         <span 
           className="text-xl md:text-2xl lg:text-3xl xl:text-4xl text-muted-foreground font-normal" 
-          title={name} // Show full name on hover
+          title={name} 
         >
           {displayName}
         </span>
@@ -108,4 +100,3 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
     </Card>
   );
 }
-

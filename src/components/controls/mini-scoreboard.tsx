@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -55,13 +54,13 @@ export function MiniScoreboard() {
 
 
   useEffect(() => {
-    if (!isHomePopoverOpen) { // Only sync if popover is closed
+    if (!isHomePopoverOpen) { 
         setLocalHomeTeamName(state.homeTeamName);
     }
   }, [state.homeTeamName, isHomePopoverOpen]);
 
   useEffect(() => {
-    if (!isAwayPopoverOpen) { // Only sync if popover is closed
+    if (!isAwayPopoverOpen) { 
         setLocalAwayTeamName(state.awayTeamName);
     }
   }, [state.awayTeamName, isAwayPopoverOpen]);
@@ -288,7 +287,7 @@ export function MiniScoreboard() {
   let isNextActionDisabled = false;
   if (state.periodDisplayOverride === "Time Out" && state.currentTime > 0) {
       isNextActionDisabled = true;
-  } else if (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && state.currentTime <= 0) { // Modified to check currentTime
+  } else if (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && state.currentTime <= 0) { 
       isNextActionDisabled = true;
   }
 
@@ -421,64 +420,65 @@ export function MiniScoreboard() {
                   }
                 }}
                 placeholder="Nombre Local"
-                className="w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-8"
+                className={cn(
+                    "w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                    state.enableTeamSelectionInMiniScoreboard ? "px-8" : "px-1" 
+                )}
                 aria-label="Nombre del equipo local"
               />
-              <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
-                <Popover 
-                    open={isHomePopoverOpen} 
-                    onOpenChange={(isOpen) => {
-                        setIsHomePopoverOpen(isOpen);
-                        if (isOpen) {
-                           setHomeSearchTerm(""); // Reset search term when opening
-                        } else {
-                           // If popover closes without selection, ensure input reflects current localHomeTeamName
-                           // which should have been updated by onBlur or onKeyDown of the Input
-                           // Or if a selection was made, localHomeTeamName is already updated.
-                        }
-                    }}
-                >
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary-foreground">
-                      <Search className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="p-0 w-[250px]" align="start">
-                    <Command shouldFilter={false}> {/* We filter manually with filteredHomeTeams */}
-                      <CommandInput
-                        placeholder="Buscar equipo..."
-                        value={homeSearchTerm}
-                        onValueChange={setHomeSearchTerm}
-                        className="text-sm h-9"
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                          {homeSearchTerm.trim() === "" && state.teams.length === 0 ? "No hay equipos guardados." : "No se encontraron equipos."}
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {filteredHomeTeams.map((team) => (
-                            <CommandItem
-                              key={team.id}
-                              value={team.name}
-                              onSelect={() => {
-                                const newName = team.name.trim() || 'Local';
-                                setLocalHomeTeamName(newName); 
-                                dispatch({ type: 'SET_HOME_TEAM_NAME', payload: newName }); 
-                                setHomeSearchTerm(newName); // Keep search term consistent with selection
-                                setIsHomePopoverOpen(false); 
-                              }}
-                              className="text-sm"
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", localHomeTeamName === team.name ? "opacity-100" : "opacity-0")} />
-                              {team.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+              {state.enableTeamSelectionInMiniScoreboard && (
+                <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
+                  <Popover 
+                      open={isHomePopoverOpen} 
+                      onOpenChange={(isOpen) => {
+                          setIsHomePopoverOpen(isOpen);
+                          if (isOpen) {
+                            setHomeSearchTerm(""); // Reset search term when opening
+                          }
+                      }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary-foreground">
+                        <Search className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0 w-[250px]" align="start">
+                      <Command shouldFilter={false}> 
+                        <CommandInput
+                          placeholder="Buscar equipo..."
+                          value={homeSearchTerm}
+                          onValueChange={setHomeSearchTerm}
+                          className="text-sm h-9"
+                        />
+                        <CommandList>
+                          <CommandEmpty>
+                            {homeSearchTerm.trim() === "" && state.teams.length === 0 ? "No hay equipos guardados." : "No se encontraron equipos."}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {filteredHomeTeams.map((team) => (
+                              <CommandItem
+                                key={team.id}
+                                value={team.name}
+                                onSelect={() => {
+                                  const newName = team.name.trim() || 'Local';
+                                  setLocalHomeTeamName(newName); 
+                                  dispatch({ type: 'SET_HOME_TEAM_NAME', payload: newName }); 
+                                  setHomeSearchTerm(newName); 
+                                  setIsHomePopoverOpen(false); 
+                                }}
+                                className="text-sm"
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", localHomeTeamName === team.name ? "opacity-100" : "opacity-0")} />
+                                {team.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
             </div>
             <p className="text-sm text-muted-foreground -mt-0.5 text-center">(Local)</p>
             <div className="flex items-center justify-center gap-1 mt-1">
@@ -696,60 +696,65 @@ export function MiniScoreboard() {
                   }
                 }}
                 placeholder="Nombre Visitante"
-                className="w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-8"
+                className={cn(
+                  "w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                  state.enableTeamSelectionInMiniScoreboard ? "px-8" : "px-1"
+                )}
                 aria-label="Nombre del equipo visitante"
               />
-               <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
-                <Popover 
-                    open={isAwayPopoverOpen} 
-                    onOpenChange={(isOpen) => {
-                        setIsAwayPopoverOpen(isOpen);
-                        if (isOpen) {
-                            setAwaySearchTerm(""); // Reset search term
-                        }
-                    }}
-                >
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary-foreground">
-                      <Search className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="p-0 w-[250px]" align="start">
-                    <Command shouldFilter={false}> {/* We filter manually with filteredAwayTeams */}
-                      <CommandInput
-                        placeholder="Buscar equipo..."
-                        value={awaySearchTerm}
-                        onValueChange={setAwaySearchTerm}
-                        className="text-sm h-9"
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                           {awaySearchTerm.trim() === "" && state.teams.length === 0 ? "No hay equipos guardados." : "No se encontraron equipos."}
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {filteredAwayTeams.map((team) => (
-                            <CommandItem
-                              key={team.id}
-                              value={team.name}
-                              onSelect={() => {
-                                const newName = team.name.trim() || 'Visitante';
-                                setLocalAwayTeamName(newName);
-                                dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: newName });
-                                setAwaySearchTerm(newName); // Keep search term consistent
-                                setIsAwayPopoverOpen(false);
-                              }}
-                              className="text-sm"
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", localAwayTeamName === team.name ? "opacity-100" : "opacity-0")} />
-                              {team.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+              {state.enableTeamSelectionInMiniScoreboard && (
+                <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
+                  <Popover 
+                      open={isAwayPopoverOpen} 
+                      onOpenChange={(isOpen) => {
+                          setIsAwayPopoverOpen(isOpen);
+                          if (isOpen) {
+                              setAwaySearchTerm(""); // Reset search term
+                          }
+                      }}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary-foreground">
+                        <Search className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="p-0 w-[250px]" align="start">
+                      <Command shouldFilter={false}> 
+                        <CommandInput
+                          placeholder="Buscar equipo..."
+                          value={awaySearchTerm}
+                          onValueChange={setAwaySearchTerm}
+                          className="text-sm h-9"
+                        />
+                        <CommandList>
+                          <CommandEmpty>
+                            {awaySearchTerm.trim() === "" && state.teams.length === 0 ? "No hay equipos guardados." : "No se encontraron equipos."}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {filteredAwayTeams.map((team) => (
+                              <CommandItem
+                                key={team.id}
+                                value={team.name}
+                                onSelect={() => {
+                                  const newName = team.name.trim() || 'Visitante';
+                                  setLocalAwayTeamName(newName);
+                                  dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: newName });
+                                  setAwaySearchTerm(newName); 
+                                  setIsAwayPopoverOpen(false);
+                                }}
+                                className="text-sm"
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", localAwayTeamName === team.name ? "opacity-100" : "opacity-0")} />
+                                {team.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
             </div>
             <p className="text-sm text-muted-foreground -mt-0.5 text-center">(Visitante)</p>
             <div className="flex items-center justify-center gap-1 mt-1">
@@ -798,4 +803,3 @@ export function MiniScoreboard() {
     </>
   );
 }
-

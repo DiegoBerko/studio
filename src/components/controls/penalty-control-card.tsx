@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -51,14 +50,18 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   const penalties = team === 'home' ? state.homePenalties : state.awayPenalties;
 
   const matchedTeam = useMemo(() => state.teams.find(t => t.name === teamName), [state.teams, teamName]);
-  const teamHasPlayers = useMemo(() => matchedTeam && matchedTeam.players.length > 0, [matchedTeam]);
+  
+  const teamHasPlayers = useMemo(() => {
+      if (!state.enablePlayerSelectionForPenalties) return false; // Global setting check
+      return matchedTeam && matchedTeam.players.length > 0;
+  }, [matchedTeam, state.enablePlayerSelectionForPenalties]);
+
 
   const filteredPlayers = useMemo(() => {
-    if (!matchedTeam || !teamHasPlayers) return [];
+    if (!matchedTeam || !teamHasPlayers) return []; // Already considers enablePlayerSelectionForPenalties
 
     let playersToFilter = [...matchedTeam.players];
 
-    // Sort players by number numerically
     playersToFilter.sort((a, b) => {
       const numA = parseInt(a.number, 10);
       const numB = parseInt(b.number, 10);
@@ -74,9 +77,9 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     return playersToFilter.filter(
       (player: PlayerData) =>
         player.number.toLowerCase().includes(searchTermLower) ||
-        player.name.toLowerCase().includes(searchTermLower)
+        (state.showAliasInPenaltyPlayerSelector && player.name.toLowerCase().includes(searchTermLower))
     );
-  }, [matchedTeam, teamHasPlayers, playerSearchTerm]);
+  }, [matchedTeam, teamHasPlayers, playerSearchTerm, state.showAliasInPenaltyPlayerSelector]);
 
 
   const handleAddPenalty = (e: React.FormEvent) => {
@@ -167,17 +170,15 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   };
 
   const renderPlayerNumberInput = () => {
-    if (teamHasPlayers && matchedTeam) {
+    if (teamHasPlayers && matchedTeam) { // teamHasPlayers already considers state.enablePlayerSelectionForPenalties
       return (
         <Popover
             open={isPlayerPopoverOpen}
             onOpenChange={(isOpen) => {
                 setIsPlayerPopoverOpen(isOpen);
                 if (isOpen) {
-                    justSelectedPlayerRef.current = false;
-                    setPlayerSearchTerm(''); // Reset search term when opening
+                    setPlayerSearchTerm(''); 
                 } else {
-                    // Popover is closing
                     if (!justSelectedPlayerRef.current && playerSearchTerm.trim()) {
                         const trimmedSearch = playerSearchTerm.trim().toUpperCase();
                         if (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
@@ -185,6 +186,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                         }
                     }
                 }
+                justSelectedPlayerRef.current = false; // Reset flag after any open/close action completes
             }}
         >
           <PopoverTrigger asChild>
@@ -197,7 +199,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
               {playerNumber
                 ? (() => {
                     const selectedPlayer = matchedTeam.players.find(p => p.number === playerNumber);
-                    return selectedPlayer ? (
+                    return selectedPlayer && state.showAliasInPenaltyPlayerSelector ? (
                       <span className="truncate flex items-baseline">
                         <span className="text-xs text-muted-foreground mr-0.5">#</span>
                         <span className="font-semibold">{selectedPlayer.number}</span>
@@ -234,16 +236,20 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
 
                         const exactMatchByNumber = filteredPlayers.find(p => p.number.toUpperCase() === trimmedSearch);
                         const startsWithMatch = filteredPlayers.find(p => p.number.toUpperCase().startsWith(trimmedSearch));
-                        const nameMatch = filteredPlayers.find(p => p.name.toUpperCase().includes(trimmedSearch) && p.number.toUpperCase().startsWith(trimmedSearch));
+                        const nameMatch = state.showAliasInPenaltyPlayerSelector ? filteredPlayers.find(p => p.name.toUpperCase().includes(trimmedSearch) && p.number.toUpperCase().startsWith(trimmedSearch)) : null;
 
                         if (exactMatchByNumber) {
                             numToSet = exactMatchByNumber.number;
                         } else if (startsWithMatch) {
                             numToSet = startsWithMatch.number;
-                        } else if (nameMatch) { // if number starts with search and name also contains
+                        } else if (nameMatch) { 
                             numToSet = nameMatch.number;
-                        } else if (filteredPlayers.length > 0 && (trimmedSearch === "" || filteredPlayers[0].number.toUpperCase().startsWith(trimmedSearch) || filteredPlayers[0].name.toUpperCase().includes(trimmedSearch))) {
-                           // Fallback to first item in filtered list if search is ambiguous or empty but list is not
+                        } else if (filteredPlayers.length > 0 && 
+                                   (trimmedSearch === "" || 
+                                    filteredPlayers[0].number.toUpperCase().startsWith(trimmedSearch) || 
+                                    (state.showAliasInPenaltyPlayerSelector && filteredPlayers[0].name.toUpperCase().includes(trimmedSearch))
+                                   )
+                                  ) {
                            numToSet = filteredPlayers[0].number;
                         } else if (trimmedSearch && (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch))) {
                             numToSet = trimmedSearch;
@@ -261,14 +267,14 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                 <CommandEmpty>
                   No se encontró jugador.
                   {playerSearchTerm.trim() && (/^\d+$/.test(playerSearchTerm.trim()) || /^\d+[A-Za-z]*$/.test(playerSearchTerm.trim())) && (
-                     <p className="text-xs text-muted-foreground p-2">Presiona Enter para usar el número tipeado: #{playerSearchTerm.trim().toUpperCase()}</p>
+                     <p className="text-xs text-muted-foreground p-2">Enter para usar: #{playerSearchTerm.trim().toUpperCase()}</p>
                   )}
                 </CommandEmpty>
                 <CommandGroup>
                   {filteredPlayers.map((player: PlayerData) => (
                     <CommandItem
                       key={player.id}
-                      value={`${player.number} - ${player.name}`}
+                      value={`${player.number} - ${state.showAliasInPenaltyPlayerSelector ? player.name : ''}`}
                       onSelect={() => {
                         setPlayerNumber(player.number);
                         justSelectedPlayerRef.current = true;
@@ -283,7 +289,9 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                       />
                       <span className="text-xs text-muted-foreground mr-0.5">#</span>
                       <span className="font-semibold text-sm mr-1">{player.number}</span>
-                      <span className="text-xs text-muted-foreground truncate">{player.name}</span>
+                      {state.showAliasInPenaltyPlayerSelector && player.name && (
+                         <span className="text-xs text-muted-foreground truncate">{player.name}</span>
+                      )}
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -369,7 +377,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                     <div className="flex-1">
                       <p className="font-semibold text-card-foreground">
                         Jugador {p.playerNumber}
-                        {matchedPlayerForPenaltyDisplay && (
+                        {state.enablePlayerSelectionForPenalties && state.showAliasInControlsPenaltyList && matchedPlayerForPenaltyDisplay && matchedPlayerForPenaltyDisplay.name && (
                           <span className="ml-1 text-xs text-muted-foreground font-normal">
                              - {matchedPlayerForPenaltyDisplay.name}
                           </span>
@@ -425,4 +433,3 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     </ControlCardWrapper>
   );
 }
-    
