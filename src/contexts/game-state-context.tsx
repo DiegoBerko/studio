@@ -637,7 +637,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       let newCalculatedTimeCs = state.currentTime;
       let homePenaltiesResult = state.homePenalties;
       let awayPenaltiesResult = state.awayPenalties;
-      let tickShouldTriggerHorn = false;
 
       if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartCs !== null) {
         const elapsedMs = Date.now() - state.clockStartTimeMs;
@@ -662,6 +661,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
               for (const p of penalties) {
                 if (p.remainingTime <= 0) {
+                  // Only add if it was just about to expire and was running, to keep it for one last render if needed.
+                  // Or, if it's a newly expired one due to this tick.
+                   if (p._status === 'running' && p.remainingTime <= 0) {
+                       resultPenalties.push({ ...p, remainingTime: 0, _status: undefined});
+                   } else if (p.remainingTime > 0) { // Keep non-expired penalties for further status update
+                       resultPenalties.push({...p});
+                   }
                   continue;
                 }
                 let status: Penalty['_status'] = undefined;
@@ -679,9 +685,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
                 } else {
                   status = 'pending_concurrent';
                 }
-
-                if (newRemainingTimeForPenaltySec > 0 || (status === 'running' && newRemainingTimeForPenaltySec === 0 && p.remainingTime > 0) ) {
+                // Add to result if it still has time or just expired while running
+                if (newRemainingTimeForPenaltySec > 0 || (status === 'running' && newRemainingTimeForPenaltySec === 0 && p.remainingTime > 0)) {
                    resultPenalties.push({ ...p, remainingTime: newRemainingTimeForPenaltySec, _status: status });
+                } else if (p.remainingTime > 0) { // Keep if it was pending and still has time
+                    resultPenalties.push({ ...p, _status: status});
                 }
               }
               return resultPenalties;
@@ -692,13 +700,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
             awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
           }
-        } else if (state.isClockRunning) {
+        } else if (state.isClockRunning) { // For non-game clock scenarios (warm-up, break, timeout)
             homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
             awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
         }
-      } else if (state.isClockRunning && state.currentTime <= 0) {
+      } else if (state.isClockRunning && state.currentTime <= 0) { // Clock running but time is already zero (should ideally be handled by transition)
          newCalculatedTimeCs = 0;
+         homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
+         awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
       }
+
 
       homePenaltiesResult = sortPenaltiesByStatus(homePenaltiesResult);
       awayPenaltiesResult = sortPenaltiesByStatus(awayPenaltiesResult);
@@ -718,8 +729,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         newStateWithoutMeta = { ...transitionResult };
         if (transitionResult.newPlayHornTrigger && transitionResult.newPlayHornTrigger > state.playHornTrigger) {
             newPlayHornTrigger = transitionResult.newPlayHornTrigger;
-        } else { // If handleAutoTransition decided not to play horn (e.g. end of all periods)
-            newPlayHornTrigger = state.playHornTrigger; // Keep it as is
+        } else {
+            newPlayHornTrigger = state.playHornTrigger;
         }
         delete (newStateWithoutMeta as any).newPlayHornTrigger;
 
@@ -730,11 +741,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           homePenalties: homePenaltiesResult,
           awayPenalties: awayPenaltiesResult,
         };
-        if (state.isClockRunning && newCalculatedTimeCs <= 0) { // Clock was running and just hit zero, but no auto-transition (e.g. game over)
+        if (state.isClockRunning && newCalculatedTimeCs <= 0) {
             newStateWithoutMeta.isClockRunning = false;
             newStateWithoutMeta.clockStartTimeMs = null;
             newStateWithoutMeta.remainingTimeAtStartCs = null;
-            newPlayHornTrigger = state.playHornTrigger + 1; // Sound horn for final period end
+            newPlayHornTrigger = state.playHornTrigger + 1;
         }
       }
       break;
@@ -1184,8 +1195,8 @@ export const getPeriodText = (period: number, numRegPeriods: number): string => 
     const overtimeNumber = period - numRegPeriods;
     if (overtimeNumber === 1 && numRegPeriods > 0) return 'OT';
     if (overtimeNumber > 0 && numRegPeriods > 0) return `OT${overtimeNumber}`;
-    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT';
-    if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`;
+    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT'; // Case for 0 regular periods, first OT is just OT
+    if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`; // Subsequent OTs if 0 regular periods
     return "---";
 };
 
@@ -1210,5 +1221,3 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 };
 
 export const DEFAULT_SOUND_PATH = DEFAULT_HORN_SOUND_FILE_PATH;
-
-    

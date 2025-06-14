@@ -23,7 +23,7 @@ export function SoundPlayer() {
         if (soundSrc) {
           if (audioRef.current && audioRef.current.src !== soundSrc) {
             audioRef.current.pause();
-            audioRef.current = null;
+            audioRef.current = null; // Force re-creation if source changed
           }
 
           if (!audioRef.current) {
@@ -45,11 +45,13 @@ export function SoundPlayer() {
             };
             audioRef.current.oncanplaythrough = () => {
                 audioRef.current?.play().catch(error => {
+                    // Log playback error, browser might prevent autoplay without user interaction
                     console.warn("Playback prevented:", error);
                 });
             };
           } else {
-            audioRef.current.currentTime = 0; 
+            // If audio object exists and source is the same, just play
+            audioRef.current.currentTime = 0; // Rewind to start
             audioRef.current.play().catch(error => {
                 console.warn("Playback prevented:", error);
             });
@@ -58,17 +60,18 @@ export function SoundPlayer() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.playHornTrigger, state.playSoundAtPeriodEnd, state.customHornSoundDataUrl, state.isLoading, toast]);
+  }, [state.playHornTrigger, state.playSoundAtPeriodEnd, state.customHornSoundDataUrl, state.isLoading, toast]); // DEFAULT_SOUND_PATH removed as it's a constant
 
+  // Cleanup effect for when the component unmounts
   useEffect(() => {
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.src = ''; 
+        audioRef.current.src = ''; // Detach the source
         audioRef.current = null;
       }
     };
-  }, []);
+  }, []); // Empty dependency array, runs on unmount
 
-  return null;
+  return null; // This component does not render anything
 }
