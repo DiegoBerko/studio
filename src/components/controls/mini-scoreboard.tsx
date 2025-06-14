@@ -399,14 +399,20 @@ export function MiniScoreboard() {
                   }
                 }}
                 placeholder="Nombre Local"
-                className="w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pr-8"
+                className="w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-8"
                 aria-label="Nombre del equipo local"
               />
-              <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
+              <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
                 <Popover open={isHomePopoverOpen} onOpenChange={(isOpen) => {
                   setIsHomePopoverOpen(isOpen);
-                  if (isOpen) setHomeSearchTerm("");
-                  else dispatch({ type: 'SET_HOME_TEAM_NAME', payload: localHomeTeamName.trim() || 'Local' });
+                  if (isOpen) {
+                     setHomeSearchTerm(""); // Clear search term when opening
+                  } else {
+                    // Dispatch only if a selection was made or name changed.
+                    // This check is implicitly handled by localHomeTeamName being the source of truth for the input
+                    // and Popover onOpenChange(false) is the trigger to save.
+                    dispatch({ type: 'SET_HOME_TEAM_NAME', payload: localHomeTeamName.trim() || 'Local' });
+                  }
                 }}>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary-foreground">
@@ -431,8 +437,8 @@ export function MiniScoreboard() {
                               key={team.id}
                               value={team.name}
                               onSelect={() => {
-                                setLocalHomeTeamName(team.name);
-                                setIsHomePopoverOpen(false); // This will trigger onOpenChange to dispatch
+                                setLocalHomeTeamName(team.name); // Update local input state
+                                setIsHomePopoverOpen(false); // Close popover, will trigger dispatch via onOpenChange
                               }}
                               className="text-sm"
                             >
@@ -663,14 +669,17 @@ export function MiniScoreboard() {
                   }
                 }}
                 placeholder="Nombre Visitante"
-                className="w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 pr-8"
+                className="w-full h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 px-8"
                 aria-label="Nombre del equipo visitante"
               />
-              <div className="absolute right-0 top-1/2 transform -translate-y-1/2">
+              <div className="absolute right-1 top-1/2 transform -translate-y-1/2">
                 <Popover open={isAwayPopoverOpen} onOpenChange={(isOpen) => {
                   setIsAwayPopoverOpen(isOpen);
-                  if (isOpen) setAwaySearchTerm("");
-                  else dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: localAwayTeamName.trim() || 'Visitante' });
+                   if (isOpen) {
+                     setAwaySearchTerm(""); // Clear search term when opening
+                  } else {
+                    dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: localAwayTeamName.trim() || 'Visitante' });
+                  }
                 }}>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary-foreground">
@@ -696,7 +705,7 @@ export function MiniScoreboard() {
                               value={team.name}
                               onSelect={() => {
                                 setLocalAwayTeamName(team.name);
-                                setIsAwayPopoverOpen(false); // This will trigger onOpenChange to dispatch
+                                setIsAwayPopoverOpen(false); 
                               }}
                               className="text-sm"
                             >
