@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Penalty } from '@/types';
@@ -35,12 +36,12 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
   const { state } = useGameState();
 
   const matchedPlayer = React.useMemo(() => {
-    const currentTeam = state.teams.find(t => t.name === teamName);
+    const currentTeam = state.teams.find(t => t.name === teamName && t.category === state.selectedMatchCategory);
     if (currentTeam) {
       return currentTeam.players.find(p => p.number === penalty.playerNumber);
     }
     return null;
-  }, [state.teams, teamName, penalty.playerNumber]);
+  }, [state.teams, teamName, penalty.playerNumber, state.selectedMatchCategory]);
 
   const isWaiting = penalty._status === 'pending_player' || penalty._status === 'pending_concurrent';
   const cardClasses = cn(
@@ -100,3 +101,4 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
     </Card>
   );
 }
+

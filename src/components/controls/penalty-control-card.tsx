@@ -50,7 +50,9 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
 
   const penalties = team === 'home' ? state.homePenalties : state.awayPenalties;
 
-  const matchedTeam = useMemo(() => state.teams.find(t => t.name === teamName), [state.teams, teamName]);
+  const matchedTeam = useMemo(() => {
+    return state.teams.find(t => t.name === teamName && t.category === state.selectedMatchCategory);
+  }, [state.teams, teamName, state.selectedMatchCategory]);
   
   const teamHasPlayers = useMemo(() => {
       if (!state.enablePlayerSelectionForPenalties) return false; // Global setting check
@@ -358,8 +360,8 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
             {penalties.map((p) => {
               const isWaiting = p._status === 'pending_player' || p._status === 'pending_concurrent';
               const statusText = getStatusText(p._status);
-              const matchedTeamForPenaltyDisplay = state.teams.find(t => t.name === teamName);
-              const matchedPlayerForPenaltyDisplay = matchedTeamForPenaltyDisplay?.players.find(pData => pData.number === p.playerNumber);
+              
+              const matchedPlayerForPenaltyDisplay = matchedTeam?.players.find(pData => pData.number === p.playerNumber);
 
               return (
                 <Card
