@@ -31,13 +31,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const ALL_CATEGORIES_FILTER_KEY = "__ALL_CATEGORIES__";
+const NO_CATEGORIES_PLACEHOLDER_VALUE = "__NO_CATEGORIES_DEFINED__";
 
 export default function TeamsPage() {
   const { state, dispatch } = useGameState();
   const router = useRouter();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>(""); // Empty string for "All Categories"
+  const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES_FILTER_KEY);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -49,7 +51,7 @@ export default function TeamsPage() {
   const filteredTeams = useMemo(() => {
     let teamsToFilter = state.teams;
 
-    if (categoryFilter) {
+    if (categoryFilter && categoryFilter !== ALL_CATEGORIES_FILTER_KEY) {
       teamsToFilter = teamsToFilter.filter((team) => team.category === categoryFilter);
     }
 
@@ -213,14 +215,14 @@ export default function TeamsPage() {
                     <SelectValue placeholder="Filtrar por categoría..." />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="">Todas las Categorías</SelectItem>
+                    <SelectItem value={ALL_CATEGORIES_FILTER_KEY}>Todas las Categorías</SelectItem>
                     {state.availableCategories.map((cat) => (
                         <SelectItem key={cat.id} value={cat.id} className="text-sm">
                             {cat.name}
                         </SelectItem>
                     ))}
                      {state.availableCategories.length === 0 && (
-                        <SelectItem value="" disabled>No hay categorías definidas</SelectItem>
+                        <SelectItem value={NO_CATEGORIES_PLACEHOLDER_VALUE} disabled>No hay categorías definidas</SelectItem>
                     )}
                 </SelectContent>
             </Select>
@@ -242,19 +244,19 @@ export default function TeamsPage() {
           <h3 className="text-xl font-semibold text-card-foreground mb-2">
             {state.teams.length === 0 
               ? "No hay equipos creados" 
-              : (searchTerm || categoryFilter) 
+              : (searchTerm || (categoryFilter && categoryFilter !== ALL_CATEGORIES_FILTER_KEY)) 
                 ? "No se encontraron equipos con los filtros aplicados"
                 : "No se encontraron equipos"}
           </h3>
           <p className="text-muted-foreground mb-4">
             {state.teams.length === 0
               ? "Comienza creando tu primer equipo."
-              : (searchTerm || categoryFilter)
+              : (searchTerm || (categoryFilter && categoryFilter !== ALL_CATEGORIES_FILTER_KEY))
                 ? "Intenta con otros filtros o crea un nuevo equipo."
                 : "Crea un nuevo equipo para empezar."}
           </p>
-          {(searchTerm || categoryFilter) && state.teams.length > 0 && (
-             <Button variant="outline" onClick={() => { setSearchTerm(""); setCategoryFilter(""); }}>Limpiar filtros</Button>
+          {(searchTerm || (categoryFilter && categoryFilter !== ALL_CATEGORIES_FILTER_KEY)) && state.teams.length > 0 && (
+             <Button variant="outline" onClick={() => { setSearchTerm(""); setCategoryFilter(ALL_CATEGORIES_FILTER_KEY); }}>Limpiar filtros</Button>
           )}
         </div>
       )}

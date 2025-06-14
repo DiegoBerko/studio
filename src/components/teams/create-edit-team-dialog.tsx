@@ -22,6 +22,8 @@ import type { TeamData } from "@/types";
 import { UploadCloud, XCircle, Image as ImageIcon, ListFilter } from "lucide-react";
 import { DefaultTeamLogo } from "./default-team-logo";
 
+const NO_CATEGORIES_PLACEHOLDER_VALUE_DIALOG = "__NO_CATEGORIES_DIALOG__";
+
 interface CreateEditTeamDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
@@ -202,7 +204,7 @@ export function CreateEditTeamDialog({
                   </SelectItem>
                 ))}
                 {availableCategories.length === 0 && (
-                  <SelectItem value="" disabled>No hay categorías disponibles</SelectItem>
+                  <SelectItem value={NO_CATEGORIES_PLACEHOLDER_VALUE_DIALOG} disabled>No hay categorías disponibles</SelectItem>
                 )}
               </SelectContent>
             </Select>
