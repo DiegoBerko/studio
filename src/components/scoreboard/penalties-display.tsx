@@ -24,7 +24,7 @@ export function PenaltiesDisplay({ teamDisplayType, teamName, penalties }: Penal
           <p className="text-muted-foreground lg:text-lg">Ninguna</p>
         ) : (
           penalties.slice(0, 3).map(penalty => (
-            <PenaltyCard key={penalty.id} penalty={penalty} />
+            <PenaltyCard key={penalty.id} penalty={penalty} teamName={teamName} />
           ))
         )}
         {penalties.length > 3 && (

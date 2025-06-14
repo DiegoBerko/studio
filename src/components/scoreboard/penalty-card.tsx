@@ -2,13 +2,15 @@
 "use client";
 
 import type { Penalty } from '@/types';
-import { formatTime } from '@/contexts/game-state-context';
+import { useGameState, formatTime } from '@/contexts/game-state-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import React from 'react'; // Import React for useMemo or direct usage
 
 interface PenaltyCardProps {
   penalty: Penalty;
+  teamName: string; 
 }
 
 // Custom SVG for Caged User Icon
@@ -38,7 +40,17 @@ const CagedUserIcon = ({ className }: { className?: string }) => (
 );
 
 
-export function PenaltyCard({ penalty }: PenaltyCardProps) {
+export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
+  const { state } = useGameState();
+
+  const matchedPlayer = React.useMemo(() => {
+    const currentTeam = state.teams.find(t => t.name === teamName);
+    if (currentTeam) {
+      return currentTeam.players.find(p => p.number === penalty.playerNumber);
+    }
+    return null;
+  }, [state.teams, teamName, penalty.playerNumber]);
+
   const isWaiting = penalty._status === 'pending_player' || penalty._status === 'pending_concurrent';
   const cardClasses = cn(
     "bg-muted/50 border-primary/30 transition-opacity",
@@ -50,9 +62,18 @@ export function PenaltyCard({ penalty }: PenaltyCardProps) {
       <CardContent className="p-3 md:p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
-            {/* The className prop for CagedUserIcon is still passed but its stroke effect on player parts is overridden */}
             <CagedUserIcon className="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10 text-primary-foreground" />
-            <span className="font-semibold text-3xl md:text-4xl lg:text-5xl xl:text-6xl">{penalty.playerNumber}</span>
+            <span className="font-semibold text-3xl md:text-4xl lg:text-5xl xl:text-6xl">
+              {penalty.playerNumber}
+              {matchedPlayer && (
+                <>
+                  {'\u00A0\u00A0\u00A0'}
+                  <span className="text-xl md:text-2xl lg:text-3xl xl:text-4xl text-muted-foreground font-normal truncate max-w-[100px] sm:max-w-[150px] md:max-w-[200px]" title={matchedPlayer.name}>
+                    {matchedPlayer.name}
+                  </span>
+                </>
+              )}
+            </span>
           </div>
           <div className="flex items-center gap-1 md:gap-2 text-accent font-mono text-3xl md:text-4xl lg:text-5xl xl:text-6xl">
             <Clock className="h-4 w-4 md:h-6 md:w-6 lg:h-7 lg:w-7 text-accent" />
