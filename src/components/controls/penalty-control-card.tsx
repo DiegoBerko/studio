@@ -28,16 +28,16 @@ import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface PenaltyControlCardProps {
-  team: Team; 
-  teamName: string; 
+  team: Team;
+  teamName: string;
 }
 
-const ADJUST_TIME_DELTA_SECONDS = 1; 
+const ADJUST_TIME_DELTA_SECONDS = 1;
 
 export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) {
   const { state, dispatch } = useGameState();
   const [playerNumber, setPlayerNumber] = useState('');
-  const [penaltyDurationSeconds, setPenaltyDurationSeconds] = useState('120'); 
+  const [penaltyDurationSeconds, setPenaltyDurationSeconds] = useState('120');
   const { toast } = useToast();
 
   const [draggedPenaltyId, setDraggedPenaltyId] = useState<string | null>(null);
@@ -55,22 +55,22 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
 
   const filteredPlayers = useMemo(() => {
     if (!matchedTeam || !teamHasPlayers) return [];
-    
-    let playersToFilter = [...matchedTeam.players]; 
+
+    let playersToFilter = [...matchedTeam.players];
 
     // Sort players by number numerically
     playersToFilter.sort((a, b) => {
       const numA = parseInt(a.number, 10);
       const numB = parseInt(b.number, 10);
-      if (isNaN(numA) && isNaN(numB)) return a.number.localeCompare(b.number); // Sort non-numeric as strings
-      if (isNaN(numA)) return 1; 
+      if (isNaN(numA) && isNaN(numB)) return a.number.localeCompare(b.number);
+      if (isNaN(numA)) return 1;
       if (isNaN(numB)) return -1;
       return numA - numB;
     });
-    
+
     const searchTermLower = playerSearchTerm.toLowerCase();
     if (!searchTermLower.trim()) return playersToFilter;
-    
+
     return playersToFilter.filter(
       (player: PlayerData) =>
         player.number.toLowerCase().includes(searchTermLower) ||
@@ -102,7 +102,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     });
     toast({ title: "Penalidad Agregada", description: `Jugador ${trimmedPlayerNumber.toUpperCase()} de ${teamName} recibió una penalidad de ${formatTime(durationSec * 100)}.` });
     setPlayerNumber('');
-    setPlayerSearchTerm(''); 
+    setPlayerSearchTerm('');
   };
 
   const handleRemovePenalty = (penaltyId: string) => {
@@ -155,7 +155,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     setDraggedPenaltyId(null);
     setDragOverPenaltyId(null);
   };
-  
+
   const handleDragEnd = () => {
     setDraggedPenaltyId(null);
     setDragOverPenaltyId(null);
@@ -169,16 +169,15 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   const renderPlayerNumberInput = () => {
     if (teamHasPlayers && matchedTeam) {
       return (
-        <Popover 
-            open={isPlayerPopoverOpen} 
+        <Popover
+            open={isPlayerPopoverOpen}
             onOpenChange={(isOpen) => {
                 setIsPlayerPopoverOpen(isOpen);
                 if (isOpen) {
-                    justSelectedPlayerRef.current = false; 
-                    setPlayerSearchTerm(''); 
+                    justSelectedPlayerRef.current = false;
+                    setPlayerSearchTerm(''); // Reset search term when opening
                 } else {
-                    // If popover closes without selection (e.g. click outside), 
-                    // and search term is a valid number, set it as playerNumber
+                    // Popover is closing
                     if (!justSelectedPlayerRef.current && playerSearchTerm.trim()) {
                         const trimmedSearch = playerSearchTerm.trim().toUpperCase();
                         if (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
@@ -222,58 +221,57 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-            <Command shouldFilter={false}> {/* Manual filtering via filteredPlayers */}
-              <CommandInput 
-                placeholder="Buscar Nº o Nombre..." 
-                value={playerSearchTerm} 
+            <Command shouldFilter={false}>
+              <CommandInput
+                placeholder="Buscar Nº o Nombre..."
+                value={playerSearchTerm}
                 onValueChange={setPlayerSearchTerm}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
                         const trimmedSearch = playerSearchTerm.trim().toUpperCase();
-                        if (trimmedSearch && (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch))) {
-                            setPlayerNumber(trimmedSearch);
-                        } else {
-                             const firstMatch = filteredPlayers[0];
-                             if(firstMatch) setPlayerNumber(firstMatch.number);
+                        let numToSet = "";
+
+                        const exactMatchByNumber = filteredPlayers.find(p => p.number.toUpperCase() === trimmedSearch);
+                        const startsWithMatch = filteredPlayers.find(p => p.number.toUpperCase().startsWith(trimmedSearch));
+                        const nameMatch = filteredPlayers.find(p => p.name.toUpperCase().includes(trimmedSearch) && p.number.toUpperCase().startsWith(trimmedSearch));
+
+                        if (exactMatchByNumber) {
+                            numToSet = exactMatchByNumber.number;
+                        } else if (startsWithMatch) {
+                            numToSet = startsWithMatch.number;
+                        } else if (nameMatch) { // if number starts with search and name also contains
+                            numToSet = nameMatch.number;
+                        } else if (filteredPlayers.length > 0 && (trimmedSearch === "" || filteredPlayers[0].number.toUpperCase().startsWith(trimmedSearch) || filteredPlayers[0].name.toUpperCase().includes(trimmedSearch))) {
+                           // Fallback to first item in filtered list if search is ambiguous or empty but list is not
+                           numToSet = filteredPlayers[0].number;
+                        } else if (trimmedSearch && (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch))) {
+                            numToSet = trimmedSearch;
                         }
-                        justSelectedPlayerRef.current = true; // Ensure this is set before closing
+
+                        if(numToSet){
+                            setPlayerNumber(numToSet);
+                        }
+                        justSelectedPlayerRef.current = true;
                         setIsPlayerPopoverOpen(false);
                     }
                 }}
               />
               <CommandList>
                 <CommandEmpty>
-                  {playerSearchTerm.trim() && (/^\d+$/.test(playerSearchTerm.trim()) || /^\d+[A-Za-z]*$/.test(playerSearchTerm.trim()))
-                    ? (
-                        <CommandItem
-                            key={`typed-${playerSearchTerm.trim()}`}
-                            value={`typed-${playerSearchTerm.trim()}`} // Use a prefix to avoid collision if playerSearchTerm is just a number
-                            onSelect={() => {
-                                const typedNum = playerSearchTerm.trim().toUpperCase();
-                                setPlayerNumber(typedNum);
-                                justSelectedPlayerRef.current = true; 
-                                setIsPlayerPopoverOpen(false);
-                            }}
-                            className="flex items-baseline"
-                        >
-                          <span className="text-muted-foreground text-xs">Usar número tipeado:</span>
-                          <span className="text-xs text-muted-foreground ml-1 mr-0.5">#</span>
-                          <span className="font-semibold text-sm">{playerSearchTerm.trim().toUpperCase()}</span>
-                        </CommandItem>
-                      )
-                    : "No se encontró jugador."
-                  }
+                  No se encontró jugador.
+                  {playerSearchTerm.trim() && (/^\d+$/.test(playerSearchTerm.trim()) || /^\d+[A-Za-z]*$/.test(playerSearchTerm.trim())) && (
+                     <p className="text-xs text-muted-foreground p-2">Presiona Enter para usar el número tipeado: #{playerSearchTerm.trim().toUpperCase()}</p>
+                  )}
                 </CommandEmpty>
                 <CommandGroup>
                   {filteredPlayers.map((player: PlayerData) => (
                     <CommandItem
                       key={player.id}
-                      value={`${player.number} - ${player.name}`} 
+                      value={`${player.number} - ${player.name}`}
                       onSelect={() => {
                         setPlayerNumber(player.number);
-                        setPlayerSearchTerm(''); 
-                        justSelectedPlayerRef.current = true; 
+                        justSelectedPlayerRef.current = true;
                         setIsPlayerPopoverOpen(false);
                       }}
                     >
@@ -341,7 +339,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
         {penalties.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sin penalidades activas.</p>
         ) : (
-          <div 
+          <div
             className="max-h-60 overflow-y-auto space-y-2 pr-2"
           >
             {penalties.map((p) => {
@@ -351,8 +349,8 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
               const matchedPlayerForPenaltyDisplay = matchedTeamForPenaltyDisplay?.players.find(pData => pData.number === p.playerNumber);
 
               return (
-                <Card 
-                  key={p.id} 
+                <Card
+                  key={p.id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, p.id)}
                   onDragEnter={(e) => handleDragEnter(e, p.id)}
@@ -361,10 +359,10 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                   onDrop={(e) => handleDrop(e, p.id)}
                   onDragEnd={handleDragEnd}
                   className={cn(
-                    "p-3 bg-muted/30 flex flex-col cursor-move transition-all", 
+                    "p-3 bg-muted/30 flex flex-col cursor-move transition-all",
                     draggedPenaltyId === p.id && "opacity-50 scale-95 shadow-lg",
                     dragOverPenaltyId === p.id && draggedPenaltyId !== p.id && "border-2 border-primary ring-2 ring-primary",
-                    isWaiting && "opacity-60 bg-muted/10" 
+                    isWaiting && "opacity-60 bg-muted/10"
                   )}
                 >
                   <div className="flex justify-between items-center w-full">
