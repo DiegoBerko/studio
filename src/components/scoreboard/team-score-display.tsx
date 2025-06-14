@@ -14,7 +14,7 @@ interface TeamScoreDisplayProps {
   className?: string;
 }
 
-const LONG_NAME_THRESHOLD = 10; // Reduced from 12
+const LONG_NAME_THRESHOLD = 8; // Changed from 10 to 8
 const SCROLL_ANIMATION_DURATION_MS = 1500; 
 const PAUSE_AT_START_DURATION_MS = 5000;   
 const PAUSE_AT_END_DURATION_MS = 2000;     
@@ -84,6 +84,8 @@ export function TeamScoreDisplay({
             } else {
               // If no scrolling is needed (e.g., window resized wider), stay at start
               setCurrentScrollX(0);
+              // If no scrolling needed, perhaps no need to cycle again for this name length.
+              // Consider clearing or not setting the next cycle if maxScroll <= 0
             }
           }
         }, PAUSE_AT_START_DURATION_MS);
