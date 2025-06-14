@@ -3,12 +3,25 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes } from '@/contexts/game-state-context';
-import type { Team } from '@/types';
+import type { Team, TeamData } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Input } from '@/components/ui/input'; // Still used for time editing
 import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight, User } from 'lucide-react';
+import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight, User, ChevronsUpDown, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -28,7 +41,30 @@ export function MiniScoreboard() {
 
   const [editingSegment, setEditingSegment] = useState<EditingSegment | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null); // For time editing input
+
+  // --- State for Home Team Combobox ---
+  const [currentHomeTeamName, setCurrentHomeTeamName] = useState(state.homeTeamName);
+  const [isHomePopoverOpen, setIsHomePopoverOpen] = useState(false);
+  const homeTriggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isHomePopoverOpen || currentHomeTeamName === state.homeTeamName) {
+      setCurrentHomeTeamName(state.homeTeamName);
+    }
+  }, [state.homeTeamName, isHomePopoverOpen, currentHomeTeamName]);
+
+  // --- State for Away Team Combobox ---
+  const [currentAwayTeamName, setCurrentAwayTeamName] = useState(state.awayTeamName);
+  const [isAwayPopoverOpen, setIsAwayPopoverOpen] = useState(false);
+  const awayTriggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isAwayPopoverOpen || currentAwayTeamName === state.awayTeamName) {
+      setCurrentAwayTeamName(state.awayTeamName);
+    }
+  }, [state.awayTeamName, isAwayPopoverOpen, currentAwayTeamName]);
+
 
   const getTimeParts = useCallback((timeCs: number) => {
     const safeTimeCs = Math.max(0, timeCs);
@@ -48,13 +84,14 @@ export function MiniScoreboard() {
     }
   }, [editingSegment]);
 
-  const handleNameChange = (team: Team, name: string) => {
-    if (team === 'home') {
-      dispatch({ type: 'SET_HOME_TEAM_NAME', payload: name });
-    } else {
-      dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: name });
-    }
-  };
+  // handleNameChange is now handled by Popover's onOpenChange
+  // const handleNameChange = (team: Team, name: string) => {
+  //   if (team === 'home') {
+  //     dispatch({ type: 'SET_HOME_TEAM_NAME', payload: name });
+  //   } else {
+  //     dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: name });
+  //   }
+  // };
 
   const handleScoreAdjust = (team: Team, delta: number) => {
     dispatch({ type: 'ADJUST_SCORE', payload: { team, delta } });
@@ -62,25 +99,25 @@ export function MiniScoreboard() {
     toast({ title: `Puntuación de ${teamName} Actualizada`, description: `Puntuación ${delta > 0 ? 'aumentada' : 'disminuida'} en ${Math.abs(delta)}.` });
   };
 
-  const handleTimeAdjust = (deltaSeconds: number) => { 
-    dispatch({ type: 'ADJUST_TIME', payload: deltaSeconds * 100 }); 
-    toast({ 
-      title: "Reloj Ajustado", 
-      description: `Tiempo ajustado en ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds} segundo${Math.abs(deltaSeconds) === 1 ? '' : 's'}.` 
+  const handleTimeAdjust = (deltaSeconds: number) => {
+    dispatch({ type: 'ADJUST_TIME', payload: deltaSeconds * 100 });
+    toast({
+      title: "Reloj Ajustado",
+      description: `Tiempo ajustado en ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds} segundo${Math.abs(deltaSeconds) === 1 ? '' : 's'}.`
     });
   };
 
   const handleToggleClock = () => {
     setEditingSegment(null); // Cancel any ongoing edit
-    const isFirstGameAction = state.currentPeriod === 0 && 
-                              state.periodDisplayOverride === 'Warm-up' && 
+    const isFirstGameAction = state.currentPeriod === 0 &&
+                              state.periodDisplayOverride === 'Warm-up' &&
                               state.currentTime === state.defaultWarmUpDuration;
-    const hasDefaultTeamNames = state.homeTeamName.trim().toUpperCase() === 'LOCAL' || 
+    const hasDefaultTeamNames = state.homeTeamName.trim().toUpperCase() === 'LOCAL' ||
                                 state.awayTeamName.trim().toUpperCase() === 'VISITANTE';
 
     if (!state.isClockRunning && isFirstGameAction && hasDefaultTeamNames) {
       checkAndConfirm(
-        true, 
+        true,
         "Nombres de Equipo por Defecto",
         "Uno o ambos equipos aún tienen los nombres predeterminados ('Local', 'Visitante'). ¿Deseas iniciar la entrada en calor de todas formas o prefieres actualizar los nombres primero?",
         () => dispatch({ type: 'TOGGLE_CLOCK' })
@@ -100,7 +137,7 @@ export function MiniScoreboard() {
   };
 
   const checkAndConfirm = (
-    condition: boolean, 
+    condition: boolean,
     title: string,
     description: string,
     action: () => void
@@ -108,7 +145,7 @@ export function MiniScoreboard() {
     if (condition) {
       setPendingConfirmation({ title, description, onConfirm: action });
     } else {
-      action(); 
+      action();
     }
   };
 
@@ -126,17 +163,17 @@ export function MiniScoreboard() {
 
       const currentBreakDurationCs = state.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
       const shouldConfirm = state.currentTime > 0 && state.currentTime < currentBreakDurationCs;
-      
+
       checkAndConfirm(
         shouldConfirm,
         "Confirmar Acción",
         `El descanso no ha finalizado. ¿Estás seguro de que quieres retornar a ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}?`,
         actionToConfirm
       );
-    } else { 
-      if (state.currentPeriod === 1) { 
+    } else {
+      if (state.currentPeriod === 1) {
         const actionToConfirm = () => {
-          dispatch({ type: 'SET_PERIOD', payload: 0 }); 
+          dispatch({ type: 'SET_PERIOD', payload: 0 });
           toast({ title: "Entrada en Calor Reiniciada", description: `Reloj de Entrada en Calor (${centisecondsToDisplayMinutes(state.defaultWarmUpDuration)} min) ${state.autoStartWarmUp ? 'corriendo.' : 'pausado.'}` });
         };
         const shouldConfirm = state.currentTime > 0 && state.currentTime < state.defaultPeriodDuration;
@@ -146,20 +183,20 @@ export function MiniScoreboard() {
           "El reloj del 1er período ha corrido. ¿Estás seguro de que quieres volver a la Entrada en Calor (reiniciará su tiempo)?",
           actionToConfirm
         );
-      } else if (state.currentPeriod > 1) { 
+      } else if (state.currentPeriod > 1) {
         const actionToConfirm = () => {
-          dispatch({ type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' }); 
+          dispatch({ type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' });
           const periodBeforeIntendedBreak = state.currentPeriod -1;
           const isPreOT = periodBeforeIntendedBreak >= state.numberOfRegularPeriods;
           const breakType = isPreOT ? "Pre-OT Break" : "Break";
           const durationCs = isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration;
           const autoStart = isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks;
-          toast({ 
-              title: `${breakType} Iniciado`, 
+          toast({
+              title: `${breakType} Iniciado`,
               description: `${breakType} iniciado después de ${getPeriodText(periodBeforeIntendedBreak, state.numberOfRegularPeriods)} (${centisecondsToDisplayMinutes(durationCs)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
           });
         };
-        
+
         const isCurrentPeriodOT = state.currentPeriod > state.numberOfRegularPeriods;
         const currentPeriodExpectedDurationCs = isCurrentPeriodOT ? state.defaultOTPeriodDuration : state.defaultPeriodDuration;
         const shouldConfirm = state.currentTime > 0 && state.currentTime < currentPeriodExpectedDurationCs;
@@ -169,13 +206,13 @@ export function MiniScoreboard() {
           "El reloj del período actual ha corrido. ¿Estás seguro de que quieres iniciar el descanso del período anterior?",
           actionToConfirm
         );
-      } else { 
+      } else {
         toast({ title: "Inicio del Juego", description: "No se puede retroceder más allá de la Entrada en Calor.", variant: "destructive" });
       }
     }
   };
 
-  const handleNextAction = () => { 
+  const handleNextAction = () => {
     setEditingSegment(null);
     if (state.periodDisplayOverride === "Time Out") {
       if (state.currentTime <= 0) {
@@ -187,9 +224,9 @@ export function MiniScoreboard() {
       return;
     }
 
-    if (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up") { 
+    if (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up") {
       const actionToConfirm = () => {
-        dispatch({ type: 'SET_PERIOD', payload: 1 }); 
+        dispatch({ type: 'SET_PERIOD', payload: 1 });
         toast({ title: "1er Período Iniciado", description: `Reloj de 1er Período (${centisecondsToDisplayMinutes(state.defaultPeriodDuration)} min) pausado.` });
       };
       const shouldConfirm = state.currentTime > 0 && state.currentTime < state.defaultWarmUpDuration;
@@ -199,14 +236,14 @@ export function MiniScoreboard() {
           "La Entrada en Calor no ha finalizado. ¿Estás seguro de que quieres iniciar el 1er Período?",
           actionToConfirm
         );
-    } else if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") { 
+    } else if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
       const nextNumericPeriod = state.currentPeriod + 1;
       if (nextNumericPeriod <= MAX_TOTAL_GAME_PERIODS) {
         const actionToConfirm = () => {
             dispatch({ type: 'SET_PERIOD', payload: nextNumericPeriod });
             toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(nextNumericPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
         };
-        
+
         const currentBreakDurationCs = state.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
         const shouldConfirm = state.currentTime > 0 && state.currentTime < currentBreakDurationCs;
 
@@ -219,10 +256,10 @@ export function MiniScoreboard() {
       } else {
         toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}.`, variant: "destructive" });
       }
-    } else { 
+    } else {
       if (state.currentPeriod < MAX_TOTAL_GAME_PERIODS) {
         const actionToConfirm = () => {
-          const isPreOT = state.currentPeriod >= state.numberOfRegularPeriods; 
+          const isPreOT = state.currentPeriod >= state.numberOfRegularPeriods;
           const breakType = isPreOT ? "Pre-OT Break" : "Break";
           const durationCs = isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration;
           const autoStart = isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks;
@@ -232,8 +269,8 @@ export function MiniScoreboard() {
           } else {
               dispatch({ type: 'START_BREAK' });
           }
-          toast({ 
-              title: `${breakType} Iniciado`, 
+          toast({
+              title: `${breakType} Iniciado`,
               description: `${breakType} iniciado después de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)} (${centisecondsToDisplayMinutes(durationCs)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
           });
         };
@@ -241,30 +278,30 @@ export function MiniScoreboard() {
         const isCurrentPeriodOT = state.currentPeriod > state.numberOfRegularPeriods;
         const currentPeriodExpectedDurationCs = isCurrentPeriodOT ? state.defaultOTPeriodDuration : state.defaultPeriodDuration;
         const shouldConfirm = state.currentTime > 0 && state.currentTime < currentPeriodExpectedDurationCs;
-        
+
         checkAndConfirm(
           shouldConfirm,
           "Confirmar Acción",
           "El reloj del período actual ha corrido. ¿Estás seguro de que quieres iniciar el descanso/ir al siguiente período?",
           actionToConfirm
         );
-      } else { 
+      } else {
          toast({ title: "Fin del Juego", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}.`, variant: "destructive" });
       }
     }
   };
-  
+
   const isPreviousPeriodDisabled = (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up") || state.periodDisplayOverride === "Time Out";
-  
+
   let isNextActionDisabled = false;
   if (state.periodDisplayOverride === "Time Out" && state.currentTime > 0) {
       isNextActionDisabled = true;
   } else if (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS) {
-      isNextActionDisabled = true; 
+      isNextActionDisabled = true;
   }
 
   const showNextActionButton = state.currentTime <= 0 && !state.isClockRunning;
-  
+
   let nextActionButtonText = "Siguiente";
   if (state.periodDisplayOverride === "Time Out" && state.currentTime <=0) {
     nextActionButtonText = "Finalizar Time Out";
@@ -272,9 +309,9 @@ export function MiniScoreboard() {
     nextActionButtonText = "Iniciar 1er Período";
   }
 
-  const isMainClockLastMinute = state.currentTime < 6000 && state.currentTime >= 0 && 
+  const isMainClockLastMinute = state.currentTime < 6000 && state.currentTime >= 0 &&
                                (state.periodDisplayOverride !== null || state.currentPeriod >= 0);
-                               
+
   const preTimeoutTimeCs = state.preTimeoutState?.time;
   const isPreTimeoutLastMinute = typeof preTimeoutTimeCs === 'number' && preTimeoutTimeCs < 6000 && preTimeoutTimeCs >= 0;
 
@@ -343,6 +380,9 @@ export function MiniScoreboard() {
   const activeAwayPenaltiesCount = state.awayPenalties.filter(p => p._status === 'running').length;
   const playersOnIceForAway = Math.max(0, state.playersPerTeamOnIce - activeAwayPenaltiesCount);
 
+  const teamNameTriggerClasses = "w-full justify-center font-normal text-sm uppercase text-card-foreground h-auto p-0 text-center hover:bg-transparent focus:ring-0 bg-transparent border-0 leading-tight";
+
+
   return (
     <>
       <Card className="mb-8 bg-card shadow-lg">
@@ -357,30 +397,87 @@ export function MiniScoreboard() {
                 <span className="text-xs text-destructive animate-pulse">0 JUGADORES</span>
               )}
             </div>
-            <Input
-              value={state.homeTeamName}
-              onChange={(e) => handleNameChange('home', e.target.value)}
-              onBlur={(e) => handleNameChange('home', e.target.value.trim() || 'Local')}
-              className="bg-transparent border-0 text-center p-0 text-sm uppercase text-card-foreground placeholder:text-muted-foreground focus:ring-0 focus:border-b focus:border-primary h-auto leading-tight"
-              placeholder="Nombre Local"
-              aria-label="Nombre del equipo local"
-            />
+            <Popover open={isHomePopoverOpen} onOpenChange={(open) => {
+                setIsHomePopoverOpen(open);
+                if (!open) { // When popover closes
+                    dispatch({ type: 'SET_HOME_TEAM_NAME', payload: currentHomeTeamName.trim() || 'Local' });
+                }
+            }}>
+                <PopoverTrigger asChild>
+                    <Button
+                        ref={homeTriggerRef}
+                        variant="ghost" // Use ghost to remove default button styling
+                        role="combobox"
+                        aria-expanded={isHomePopoverOpen}
+                        className={cn(teamNameTriggerClasses, "hover:bg-muted/10")}
+                    >
+                        {currentHomeTeamName || "Nombre Local"}
+                        <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-30" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                    className="p-0"
+                    style={{ width: homeTriggerRef.current?.offsetWidth }}
+                    align="start"
+                >
+                    <Command shouldFilter={true}>
+                        <CommandInput
+                            placeholder="Buscar o escribir..."
+                            value={currentHomeTeamName}
+                            onValueChange={setCurrentHomeTeamName}
+                            className="text-sm"
+                        />
+                        <CommandList>
+                            <CommandEmpty>
+                                {currentHomeTeamName.trim() === "" ? (
+                                    <span className="p-2 text-sm text-muted-foreground">Escribe un nombre.</span>
+                                ) : (
+                                    <span className="p-2 text-sm text-muted-foreground">
+                                        No se encontró. Se usará "{currentHomeTeamName.trim()}".
+                                    </span>
+                                )}
+                            </CommandEmpty>
+                            <CommandGroup>
+                                {state.teams.map((team) => (
+                                    <CommandItem
+                                        key={team.id}
+                                        value={team.name}
+                                        onSelect={() => {
+                                            setCurrentHomeTeamName(team.name);
+                                            // Dispatch happens when popover closes
+                                            setIsHomePopoverOpen(false);
+                                        }}
+                                        className="text-sm"
+                                    >
+                                        <Check
+                                            className={cn("mr-2 h-4 w-4",
+                                                state.homeTeamName === team.name ? "opacity-100" : "opacity-0"
+                                            )}
+                                        />
+                                        {team.name}
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
             <p className="text-sm text-muted-foreground -mt-1">(Local)</p>
             <div className="flex items-center justify-center gap-1 mt-1">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7 text-muted-foreground hover:text-accent" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-accent"
                 onClick={() => handleScoreAdjust('home', -1)}
                 aria-label={`Disminuir Puntuación ${state.homeTeamName}`}
               >
                 <Minus className="h-5 w-5" />
               </Button>
               <p className="text-4xl font-bold text-accent w-12 text-center tabular-nums">{state.homeScore}</p>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7 text-muted-foreground hover:text-accent" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-accent"
                 onClick={() => handleScoreAdjust('home', 1)}
                 aria-label={`Aumentar Puntuación ${state.homeTeamName}`}
               >
@@ -397,7 +494,7 @@ export function MiniScoreboard() {
                 className="w-full max-w-[200px] mx-auto mb-2"
                 variant="default"
                 aria-label={nextActionButtonText}
-                disabled={isNextActionDisabled} 
+                disabled={isNextActionDisabled}
               >
                 <ChevronsRight className="mr-2 h-5 w-5" /> {nextActionButtonText}
               </Button>
@@ -413,14 +510,14 @@ export function MiniScoreboard() {
                 {state.isClockRunning ? 'Pausar' : 'Iniciar'} Reloj
               </Button>
             )}
-            
+
             <div className={cn("text-5xl font-bold tabular-nums flex items-baseline justify-center gap-0.5", isMainClockLastMinute ? "text-orange-500" : "text-accent")}>
               {!state.isClockRunning && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 text-muted-foreground hover:text-accent self-center mr-1"
-                  onClick={() => handleTimeAdjust(-1)} 
+                  onClick={() => handleTimeAdjust(-1)}
                   aria-label="Restar 1 segundo al reloj"
                   disabled={state.currentTime <=0 || editingSegment !== null}
                 >
@@ -443,7 +540,7 @@ export function MiniScoreboard() {
                     if (e.key === 'Enter') handleTimeEditConfirm();
                     if (e.key === 'Escape') setEditingSegment(null);
                   }}
-                  className={cn(commonInputClass, "w-[60px]")} 
+                  className={cn(commonInputClass, "w-[60px]")}
                   maxLength={2}
                 />
               ) : (
@@ -467,7 +564,7 @@ export function MiniScoreboard() {
                     if (e.key === 'Enter') handleTimeEditConfirm();
                     if (e.key === 'Escape') setEditingSegment(null);
                   }}
-                  className={cn(commonInputClass, "w-[60px]")} 
+                  className={cn(commonInputClass, "w-[60px]")}
                   maxLength={2}
                 />
               ) : (
@@ -493,7 +590,7 @@ export function MiniScoreboard() {
                         if (e.key === 'Enter') handleTimeEditConfirm();
                         if (e.key === 'Escape') setEditingSegment(null);
                       }}
-                      className={cn(commonInputClass, "w-[30px] text-orange-500")} 
+                      className={cn(commonInputClass, "w-[30px] text-orange-500")}
                       maxLength={1}
                     />
                   ) : (
@@ -508,7 +605,7 @@ export function MiniScoreboard() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 text-muted-foreground hover:text-accent self-center ml-1"
-                  onClick={() => handleTimeAdjust(1)} 
+                  onClick={() => handleTimeAdjust(1)}
                   aria-label="Sumar 1 segundo al reloj"
                   disabled={editingSegment !== null}
                 >
@@ -518,10 +615,10 @@ export function MiniScoreboard() {
             </div>
 
             <div className="relative mt-1 flex items-center justify-center gap-2">
-               <Button 
-                onClick={handlePreviousPeriod} 
-                variant="ghost" 
-                size="icon" 
+               <Button
+                onClick={handlePreviousPeriod}
+                variant="ghost"
+                size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-primary-foreground"
                 aria-label="Período Anterior o Descanso"
                 disabled={isPreviousPeriodDisabled || editingSegment !== null}
@@ -531,10 +628,10 @@ export function MiniScoreboard() {
               <p className="text-lg text-primary-foreground uppercase w-36 truncate text-center">
                 {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods)}
               </p>
-              <Button 
-                onClick={handleNextAction} 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                onClick={handleNextAction}
+                variant="ghost"
+                size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-primary-foreground"
                 aria-label="Siguiente Período o Descanso"
                 disabled={isNextActionDisabled || editingSegment !== null}
@@ -568,30 +665,86 @@ export function MiniScoreboard() {
                 <span className="text-xs text-destructive animate-pulse">0 JUGADORES</span>
               )}
             </div>
-            <Input
-              value={state.awayTeamName}
-              onChange={(e) => handleNameChange('away', e.target.value)}
-              onBlur={(e) => handleNameChange('away', e.target.value.trim() || 'Visitante')}
-              className="bg-transparent border-0 text-center p-0 text-sm uppercase text-card-foreground placeholder:text-muted-foreground focus:ring-0 focus:border-b focus:border-primary h-auto leading-tight"
-              placeholder="Nombre Visitante"
-              aria-label="Nombre del equipo visitante"
-            />
+             <Popover open={isAwayPopoverOpen} onOpenChange={(open) => {
+                setIsAwayPopoverOpen(open);
+                if (!open) { // When popover closes
+                    dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: currentAwayTeamName.trim() || 'Visitante' });
+                }
+            }}>
+                <PopoverTrigger asChild>
+                    <Button
+                        ref={awayTriggerRef}
+                        variant="ghost"
+                        role="combobox"
+                        aria-expanded={isAwayPopoverOpen}
+                        className={cn(teamNameTriggerClasses, "hover:bg-muted/10")}
+                    >
+                        {currentAwayTeamName || "Nombre Visitante"}
+                        <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-30" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                    className="p-0"
+                    style={{ width: awayTriggerRef.current?.offsetWidth }}
+                    align="start"
+                >
+                    <Command shouldFilter={true}>
+                        <CommandInput
+                            placeholder="Buscar o escribir..."
+                            value={currentAwayTeamName}
+                            onValueChange={setCurrentAwayTeamName}
+                            className="text-sm"
+                        />
+                        <CommandList>
+                           <CommandEmpty>
+                                {currentAwayTeamName.trim() === "" ? (
+                                    <span className="p-2 text-sm text-muted-foreground">Escribe un nombre.</span>
+                                ) : (
+                                    <span className="p-2 text-sm text-muted-foreground">
+                                        No se encontró. Se usará "{currentAwayTeamName.trim()}".
+                                    </span>
+                                )}
+                            </CommandEmpty>
+                            <CommandGroup>
+                                {state.teams.map((team) => (
+                                    <CommandItem
+                                        key={team.id}
+                                        value={team.name}
+                                        onSelect={() => {
+                                            setCurrentAwayTeamName(team.name);
+                                            setIsAwayPopoverOpen(false);
+                                        }}
+                                        className="text-sm"
+                                    >
+                                        <Check
+                                            className={cn("mr-2 h-4 w-4",
+                                                state.awayTeamName === team.name ? "opacity-100" : "opacity-0"
+                                            )}
+                                        />
+                                        {team.name}
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
              <p className="text-sm text-muted-foreground -mt-1">(Visitante)</p>
             <div className="flex items-center justify-center gap-1 mt-1">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7 text-muted-foreground hover:text-accent" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-accent"
                 onClick={() => handleScoreAdjust('away', -1)}
                 aria-label={`Disminuir Puntuación ${state.awayTeamName}`}
               >
                 <Minus className="h-5 w-5" />
               </Button>
               <p className="text-4xl font-bold text-accent w-12 text-center tabular-nums">{state.awayScore}</p>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-7 w-7 text-muted-foreground hover:text-accent" 
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-accent"
                 onClick={() => handleScoreAdjust('away', 1)}
                 aria-label={`Aumentar Puntuación ${state.awayTeamName}`}
               >
@@ -623,4 +776,3 @@ export function MiniScoreboard() {
     </>
   );
 }
-    
