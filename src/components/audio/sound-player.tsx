@@ -18,14 +18,10 @@ export function SoundPlayer() {
       lastPlayedTriggerRef.current = state.playHornTrigger;
 
       if (state.playSoundAtPeriodEnd) {
-        // DEFAULT_SOUND_PATH is a constant. Its potential undefined state during SSR vs
-        // defined state on client might cause hydration diff issues if included in deps.
-        // As a constant, omitting it from deps is safe.
         const soundSrc = state.customHornSoundDataUrl || DEFAULT_SOUND_PATH;
         
         if (soundSrc) {
           if (audioRef.current && audioRef.current.src !== soundSrc) {
-            // Source changed, clean up old audio object if any
             audioRef.current.pause();
             audioRef.current = null;
           }
@@ -36,7 +32,7 @@ export function SoundPlayer() {
               let description = `No se pudo cargar el archivo de sonido. Verifique la configuración.`;
               if (soundSrc === DEFAULT_SOUND_PATH && !state.customHornSoundDataUrl) {
                 description = `No se pudo cargar el sonido predeterminado: ${DEFAULT_SOUND_PATH}. Asegúrate de que el archivo exista en la carpeta 'public/audio'.`;
-              } else if (soundSrc.startsWith('data:')) { // Custom sound was from Data URL
+              } else if (soundSrc.startsWith('data:')) { 
                 description = `No se pudo cargar el sonido personalizado. Verifica el archivo cargado.`;
               }
               toast({
@@ -48,16 +44,12 @@ export function SoundPlayer() {
               if (audioRef.current) audioRef.current = null; // Ensure it's nullified on error
             };
             audioRef.current.oncanplaythrough = () => {
-                 // Attempt to play only once ready
                 audioRef.current?.play().catch(error => {
                     console.warn("Playback prevented:", error);
-                    // This can happen if the user hasn't interacted with the page yet.
-                    // Browsers often block auto-play in such cases.
                 });
             };
           } else {
-             // If audio object exists and source is the same, just play
-            audioRef.current.currentTime = 0; // Rewind to start
+            audioRef.current.currentTime = 0; 
             audioRef.current.play().catch(error => {
                 console.warn("Playback prevented:", error);
             });
@@ -67,18 +59,16 @@ export function SoundPlayer() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.playHornTrigger, state.playSoundAtPeriodEnd, state.customHornSoundDataUrl, state.isLoading, toast]);
-  // Removed DEFAULT_SOUND_PATH from deps as it's a constant and was likely causing hydration issues.
 
-  // Cleanup audio element on component unmount
   useEffect(() => {
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current.src = ''; // Release resources
+        audioRef.current.src = ''; 
         audioRef.current = null;
       }
     };
   }, []);
 
-  return null; // This component does not render anything
+  return null;
 }
