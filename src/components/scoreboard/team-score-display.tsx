@@ -14,7 +14,7 @@ interface TeamScoreDisplayProps {
   className?: string;
 }
 
-const LONG_NAME_THRESHOLD = 8; // Changed from 10 to 8
+const LONG_NAME_THRESHOLD = 8; 
 const SCROLL_ANIMATION_DURATION_MS = 1500; 
 const PAUSE_AT_START_DURATION_MS = 5000;   
 const PAUSE_AT_END_DURATION_MS = 2000;     
@@ -34,6 +34,8 @@ export function TeamScoreDisplay({
   const textRef = useRef<HTMLSpanElement>(null);
   const [currentScrollX, setCurrentScrollX] = useState(0);
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const isLongName = teamActualName.length > LONG_NAME_THRESHOLD;
 
   useEffect(() => {
     if (score !== prevScore) {
@@ -55,15 +57,14 @@ export function TeamScoreDisplay({
     clearCurrentAnimationTimeout();
     setCurrentScrollX(0); 
 
-    if (teamActualName.length > LONG_NAME_THRESHOLD) {
+    if (isLongName) {
       const performAnimationCycle = () => {
-        // Ensure refs are current before proceeding
         if (!containerRef.current || !textRef.current) {
-          animationTimeoutRef.current = setTimeout(performAnimationCycle, 100); // Retry shortly
+          animationTimeoutRef.current = setTimeout(performAnimationCycle, 100);
           return;
         }
         
-        setCurrentScrollX(0); // Start by showing the beginning
+        setCurrentScrollX(0);
 
         animationTimeoutRef.current = setTimeout(() => {
           if (containerRef.current && textRef.current) {
@@ -72,40 +73,37 @@ export function TeamScoreDisplay({
             const maxScroll = textWidth - containerWidth;
 
             if (maxScroll > 0) {
-              setCurrentScrollX(-maxScroll); // Scroll to show the end
+              setCurrentScrollX(-maxScroll);
 
               animationTimeoutRef.current = setTimeout(() => {
-                setCurrentScrollX(0); // Scroll back to the beginning
+                setCurrentScrollX(0); 
 
                 animationTimeoutRef.current = setTimeout(() => {
-                  performAnimationCycle(); // Restart the cycle
+                  performAnimationCycle();
                 }, PAUSE_AT_START_DURATION_MS + SCROLL_ANIMATION_DURATION_MS);
               }, PAUSE_AT_END_DURATION_MS + SCROLL_ANIMATION_DURATION_MS);
             } else {
-              // If no scrolling is needed (e.g., window resized wider), stay at start
               setCurrentScrollX(0);
-              // If no scrolling needed, perhaps no need to cycle again for this name length.
-              // Consider clearing or not setting the next cycle if maxScroll <= 0
             }
           }
         }, PAUSE_AT_START_DURATION_MS);
       };
       
-      // Initial short delay to allow DOM to settle, then start animation
       animationTimeoutRef.current = setTimeout(performAnimationCycle, 100); 
 
     } else {
-      // Name is not long, ensure it's at the start and no animation
       setCurrentScrollX(0);
     }
 
-    return clearCurrentAnimationTimeout; // Cleanup on component unmount or name change
-  }, [teamActualName]);
+    return clearCurrentAnimationTimeout;
+  }, [teamActualName, isLongName]);
 
 
   return (
     <div className={cn(
-        "flex flex-col items-center text-center min-w-[160px] sm:min-w-[180px] md:min-w-[220px] lg:min-w-[260px] xl:min-w-[300px]",
+        "flex flex-col items-center text-center",
+        // Adjusted min-width to constrain visible characters for scrolling
+        "min-w-[120px] sm:min-w-[140px] md:min-w-[160px] lg:min-w-[180px] xl:min-w-[200px]",
         className
       )}>
       <div className="flex justify-center items-center gap-1 mb-1 h-5 md:h-6 lg:h-7">
@@ -118,22 +116,31 @@ export function TeamScoreDisplay({
       </div>
 
       <div
-        ref={containerRef}
-        className="text-xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground uppercase tracking-wide w-full h-[1.2em] overflow-hidden relative"
+        className={cn(
+          "text-xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground uppercase tracking-wide w-full h-[1.2em] relative",
+          isLongName ? "overflow-hidden" : "text-center" // Apply text-center only for short names
+        )}
+        ref={isLongName ? containerRef : null} 
         title={teamActualName}
       >
-        <span
-          ref={textRef}
-          className="whitespace-nowrap absolute left-0 top-0"
-          style={{
-            transform: `translateX(${currentScrollX}px)`,
-            transitionProperty: 'transform',
-            transitionDuration: `${SCROLL_ANIMATION_DURATION_MS}ms`,
-            transitionTimingFunction: 'ease-in-out',
-          }}
-        >
-          {teamActualName}
-        </span>
+        {isLongName ? (
+          <span
+            ref={textRef}
+            className="whitespace-nowrap absolute left-0 top-0"
+            style={{
+              transform: `translateX(${currentScrollX}px)`,
+              transitionProperty: 'transform',
+              transitionDuration: `${SCROLL_ANIMATION_DURATION_MS}ms`,
+              transitionTimingFunction: 'ease-in-out',
+            }}
+          >
+            {teamActualName}
+          </span>
+        ) : (
+          <span className="truncate"> {/* Simple span for short names, truncate as safety */}
+            {teamActualName}
+          </span>
+        )}
       </div>
 
       <p className="text-sm md:text-base lg:text-lg text-muted-foreground -mt-0.5 md:-mt-1 mb-1 md:mb-1.5">({teamDisplayName})</p>
