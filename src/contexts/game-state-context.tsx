@@ -450,7 +450,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...initialGlobalState,
         ...hydratedBasePartial,
         availableCategories: hydratedCategories, // Use robustly hydrated categories
-        teams: action.payload?.teams || [],
+        teams: action.payload?.teams || initialGlobalState.teams, // Ensure teams is always an array
         playHornTrigger: initialGlobalState.playHornTrigger, // Reset playHornTrigger on hydration
       };
       
@@ -1345,35 +1345,89 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       if (!hasHydratedRef.current && typeof window === 'undefined') setIsLoading(false);
       return;
     }
-
     hasHydratedRef.current = true;
-    let payloadForHydration: Partial<GameState> = {};
-
-    try {
-      const rawStoredState = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (rawStoredState) {
-        const parsedState = JSON.parse(rawStoredState) as Partial<GameState>;
-        payloadForHydration = { ...parsedState };
+  
+    const loadInitialState = async () => {
+      let finalPayloadForHydration: Partial<GameState> = {};
+      let loadedFromLocalStorage = false;
+  
+      try {
+        const rawStoredState = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (rawStoredState) {
+          const parsedState = JSON.parse(rawStoredState) as Partial<GameState>;
+          if (parsedState && typeof parsedState.configName === 'string' && parsedState._lastUpdatedTimestamp) { // Check for a meaningful field
+            finalPayloadForHydration = { ...parsedState };
+            loadedFromLocalStorage = true;
+            console.log("Loaded state from localStorage.");
+          } else {
+            console.warn("localStorage state seems incomplete or very old. Will attempt to load from default files.");
+          }
+        }
+      } catch (error) {
+        console.error("Error reading state from localStorage:", error);
       }
-    } catch (error) {
-      console.error("Error reading state from localStorage for hydration:", error);
-    }
-
-    dispatch({ type: 'HYDRATE_FROM_STORAGE', payload: payloadForHydration });
-    setIsLoading(false);
-
+  
+      if (!loadedFromLocalStorage) {
+        console.log("localStorage is empty or invalid. Attempting to load defaults from files...");
+        let configFromFile: Partial<ConfigFields> | null = null;
+        let teamsFromFile: TeamData[] | null = null;
+  
+        try {
+          const configRes = await fetch('/defaults/default-config.json');
+          if (configRes.ok) {
+            configFromFile = await configRes.json();
+            console.log("Loaded default config from file.");
+          } else {
+            console.warn(`Default config file '/defaults/default-config.json' not found (status: ${configRes.status}) or failed to load. Using system defaults for config.`);
+          }
+        } catch (error) {
+          console.error('Error fetching default-config.json:', error);
+        }
+  
+        try {
+          const teamsRes = await fetch('/defaults/default-teams.json');
+          if (teamsRes.ok) {
+            teamsFromFile = await teamsRes.json();
+            console.log("Loaded default teams from file.");
+          } else {
+            console.warn(`Default teams file '/defaults/default-teams.json' not found (status: ${teamsRes.status}) or failed to load. Using system defaults for teams.`);
+          }
+        } catch (error) {
+          console.error('Error fetching default-teams.json:', error);
+        }
+        
+        finalPayloadForHydration = { ...initialGlobalState }; // Start with system defaults
+  
+        if (configFromFile) {
+          finalPayloadForHydration = { ...finalPayloadForHydration, ...configFromFile };
+        }
+        if (teamsFromFile) {
+          finalPayloadForHydration.teams = teamsFromFile;
+        }
+        // Ensure _lastUpdatedTimestamp is not set if loading from files/initial,
+        // so it doesn't overwrite a potentially newer state from another tab after this initial load.
+        // The HYDRATE_FROM_STORAGE reducer will handle this.
+        delete finalPayloadForHydration._lastUpdatedTimestamp;
+      }
+      
+      dispatch({ type: 'HYDRATE_FROM_STORAGE', payload: finalPayloadForHydration });
+      setIsLoading(false);
+    };
+  
+    loadInitialState();
+  
     if ('BroadcastChannel' in window) {
       if (!channelRef.current) {
         channelRef.current = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
       }
       const handleMessage = (event: MessageEvent) => {
-         if (event.data && event.data._lastActionOriginator && event.data._lastActionOriginator !== TAB_ID) {
+          if (event.data && event.data._lastActionOriginator && event.data._lastActionOriginator !== TAB_ID) {
             const receivedState = event.data as GameState;
             dispatch({ type: 'SET_STATE_FROM_LOCAL_BROADCAST', payload: receivedState });
         }
       };
       channelRef.current.addEventListener('message', handleMessage);
-
+  
       return () => {
         if (channelRef.current) {
           channelRef.current.removeEventListener('message', handleMessage);
@@ -1382,6 +1436,16 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
     } else {
       console.warn('BroadcastChannel API not available. Multi-tab sync will not work.');
     }
+  
+  }, []);
+  
+  useEffect(() => { // Separate effect for BroadcastChannel cleanup
+    return () => {
+      if (channelRef.current) {
+        channelRef.current.close();
+        channelRef.current = null;
+      }
+    };
   }, []);
 
 
@@ -1484,8 +1548,8 @@ export const getPeriodText = (period: number, numRegPeriods: number): string => 
     const overtimeNumber = period - numRegPeriods;
     if (overtimeNumber === 1 && numRegPeriods > 0) return 'OT';
     if (overtimeNumber > 0 && numRegPeriods > 0) return `OT${overtimeNumber}`;
-    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT';
-    if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`;
+    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT'; // Case where numRegPeriods is 0
+    if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`; // Case where numRegPeriods is 0
     return "---";
 };
 
@@ -1516,6 +1580,3 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
   const category = availableCategories.find(cat => cat && typeof cat === 'object' && cat.id === categoryId);
   return category ? category.name : undefined;
 };
-
-
-    
