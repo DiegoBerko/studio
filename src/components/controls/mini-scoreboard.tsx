@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes, getCategoryNameById } from '@/contexts/game-state-context';
+import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes, getCategoryNameById, type TeamData } from '@/contexts/game-state-context';
 import type { Team } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -383,19 +383,75 @@ export function MiniScoreboard() {
   const activeAwayPenaltiesCount = state.awayPenalties.filter(p => p._status === 'running').length;
   const playersOnIceForAway = Math.max(0, state.playersPerTeamOnIce - activeAwayPenaltiesCount);
 
-  const filteredHomeTeams = useMemo(() => {
-    if (!homeSearchTerm.trim()) return state.teams;
-    return state.teams.filter(team =>
-        team.name.toLowerCase().includes(homeSearchTerm.toLowerCase())
+
+  const getFilteredTeamsForPopover = (
+      allTeams: TeamData[],
+      searchTerm: string,
+      selectedCategory: string,
+      categoryFilterEnabled: boolean
+    ): TeamData[] => {
+    let teamsToFilter = [...allTeams];
+
+    if (categoryFilterEnabled && selectedCategory) {
+      teamsToFilter = teamsToFilter.filter(team => team.category === selectedCategory);
+    }
+
+    if (!searchTerm.trim()) {
+      return teamsToFilter;
+    }
+    return teamsToFilter.filter(team =>
+      team.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [state.teams, homeSearchTerm]);
+  };
+
+  const filteredHomeTeams = useMemo(() => {
+    return getFilteredTeamsForPopover(
+      state.teams,
+      homeSearchTerm,
+      state.selectedMatchCategory,
+      state.enableTeamSelectionInMiniScoreboard
+    );
+  }, [state.teams, homeSearchTerm, state.selectedMatchCategory, state.enableTeamSelectionInMiniScoreboard]);
 
   const filteredAwayTeams = useMemo(() => {
-    if (!awaySearchTerm.trim()) return state.teams;
-    return state.teams.filter(team =>
-        team.name.toLowerCase().includes(awaySearchTerm.toLowerCase())
+    return getFilteredTeamsForPopover(
+      state.teams,
+      awaySearchTerm,
+      state.selectedMatchCategory,
+      state.enableTeamSelectionInMiniScoreboard
     );
-  }, [state.teams, awaySearchTerm]);
+  }, [state.teams, awaySearchTerm, state.selectedMatchCategory, state.enableTeamSelectionInMiniScoreboard]);
+
+  const getCommandEmptyMessage = (
+      searchTerm: string,
+      categoryFilterEnabled: boolean,
+      selectedCategory: string,
+      allTeamsCount: number,
+      teamsInSelectedCategoryCount: number
+    ): string => {
+    if (searchTerm.trim() !== "") {
+      return "No se encontraron equipos.";
+    }
+    if (categoryFilterEnabled && selectedCategory) {
+      return teamsInSelectedCategoryCount === 0 ? "No hay equipos en la categoría seleccionada." : "No se encontraron equipos.";
+    }
+    return allTeamsCount === 0 ? "No hay equipos guardados." : "No se encontraron equipos.";
+  };
+  
+  const homeTeamsInSelectedCategoryCount = useMemo(() => {
+    if (state.enableTeamSelectionInMiniScoreboard && state.selectedMatchCategory) {
+      return state.teams.filter(team => team.category === state.selectedMatchCategory).length;
+    }
+    return state.teams.length;
+  }, [state.teams, state.selectedMatchCategory, state.enableTeamSelectionInMiniScoreboard]);
+
+  const awayTeamsInSelectedCategoryCount = useMemo(() => {
+    if (state.enableTeamSelectionInMiniScoreboard && state.selectedMatchCategory) {
+      return state.teams.filter(team => team.category === state.selectedMatchCategory).length;
+    }
+    return state.teams.length;
+  }, [state.teams, state.selectedMatchCategory, state.enableTeamSelectionInMiniScoreboard]);
+
 
   const handleMatchCategoryChange = (categoryId: string) => {
     dispatch({ type: 'SET_SELECTED_MATCH_CATEGORY', payload: categoryId });
@@ -404,7 +460,7 @@ export function MiniScoreboard() {
 
 
   return (
-    <div className="relative"> {/* Added relative positioning here */}
+    <div className="relative">
       <div className="absolute top-0 left-0 p-2 sm:p-3 md:p-4 z-20">
         {state.availableCategories.length > 0 ? (
             <Select value={state.selectedMatchCategory} onValueChange={handleMatchCategoryChange}>
@@ -430,7 +486,7 @@ export function MiniScoreboard() {
         )}
       </div>
 
-      <Card className="mb-8 bg-card shadow-lg pt-10 sm:pt-8 md:pt-10">
+      <Card className="mb-8 bg-card shadow-lg pt-12 sm:pt-10 md:pt-12"> {/* Increased pt */}
         <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8 py-6">
           {/* Home Team Section */}
           <div className="flex-1 space-y-1 w-full sm:w-auto">
@@ -488,7 +544,13 @@ export function MiniScoreboard() {
                         />
                         <CommandList>
                           <CommandEmpty>
-                            {homeSearchTerm.trim() === "" && state.teams.length === 0 ? "No hay equipos guardados." : "No se encontraron equipos."}
+                            {getCommandEmptyMessage(
+                              homeSearchTerm,
+                              state.enableTeamSelectionInMiniScoreboard,
+                              state.selectedMatchCategory,
+                              state.teams.length,
+                              homeTeamsInSelectedCategoryCount
+                            )}
                           </CommandEmpty>
                           <CommandGroup>
                             {filteredHomeTeams.map((team) => (
@@ -767,8 +829,14 @@ export function MiniScoreboard() {
                           autoComplete="off"
                         />
                         <CommandList>
-                          <CommandEmpty>
-                            {awaySearchTerm.trim() === "" && state.teams.length === 0 ? "No hay equipos guardados." : "No se encontraron equipos."}
+                           <CommandEmpty>
+                            {getCommandEmptyMessage(
+                              awaySearchTerm,
+                              state.enableTeamSelectionInMiniScoreboard,
+                              state.selectedMatchCategory,
+                              state.teams.length,
+                              awayTeamsInSelectedCategoryCount
+                            )}
                           </CommandEmpty>
                           <CommandGroup>
                             {filteredAwayTeams.map((team) => (
