@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useGameState } from "@/contexts/game-state-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search, Users, Info, Upload, Download } from "lucide-react";
+import { PlusCircle, Search, Users, Info, Upload, Download, ListFilter } from "lucide-react";
 import { TeamListItem } from "@/components/teams/team-list-item";
 import { CreateEditTeamDialog } from "@/components/teams/create-edit-team-dialog";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 
 export default function TeamsPage() {
@@ -30,6 +37,7 @@ export default function TeamsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>(""); // Empty string for "All Categories"
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -39,13 +47,19 @@ export default function TeamsPage() {
 
 
   const filteredTeams = useMemo(() => {
-    if (!searchTerm.trim()) {
-      return state.teams;
+    let teamsToFilter = state.teams;
+
+    if (categoryFilter) {
+      teamsToFilter = teamsToFilter.filter((team) => team.category === categoryFilter);
     }
-    return state.teams.filter((team) =>
+
+    if (!searchTerm.trim()) {
+      return teamsToFilter;
+    }
+    return teamsToFilter.filter((team) =>
       team.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [state.teams, searchTerm]);
+  }, [state.teams, searchTerm, categoryFilter]);
 
   const handleTeamSaved = (teamId: string) => {
     // Potentially navigate to the new/edited team's page, or just close dialog
@@ -109,7 +123,7 @@ export default function TeamsPage() {
         if (!Array.isArray(importedData) || !importedData.every(item => 
             item && typeof item.id === 'string' && 
             typeof item.name === 'string' && 
-            (typeof item.category === 'string' || item.category === undefined) && // Category can be undefined in old files
+            (typeof item.category === 'string' || item.category === undefined) && 
             Array.isArray(item.players))
            ) {
           throw new Error("Archivo de equipos no válido o formato incorrecto. Se esperaba un array de equipos.");
@@ -119,7 +133,7 @@ export default function TeamsPage() {
           id: team.id,
           name: team.name,
           logoDataUrl: team.logoDataUrl || null,
-          category: team.category || (state.availableCategories.length > 0 ? state.availableCategories[0].id : ''), // Default to first available category or empty
+          category: team.category || (state.availableCategories.length > 0 ? state.availableCategories[0].id : ''),
           players: Array.isArray(team.players) ? team.players.map((player: any) => ({
             id: player.id || crypto.randomUUID(),
             number: String(player.number || '0'),
@@ -149,7 +163,7 @@ export default function TeamsPage() {
         });
       } finally {
         if (fileInputRef.current) {
-          fileInputRef.current.value = ""; // Reset file input
+          fileInputRef.current.value = ""; 
         }
       }
     };
@@ -181,16 +195,38 @@ export default function TeamsPage() {
         </Button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-        <Input
-          type="search"
-          placeholder="Buscar equipo por nombre..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 text-base"
-        />
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="relative flex-grow">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+                type="search"
+                placeholder="Buscar equipo por nombre..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 text-base"
+            />
+        </div>
+        <div className="sm:w-auto min-w-[200px]">
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full text-base h-10">
+                    <ListFilter className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <SelectValue placeholder="Filtrar por categoría..." />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="">Todas las Categorías</SelectItem>
+                    {state.availableCategories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id} className="text-sm">
+                            {cat.name}
+                        </SelectItem>
+                    ))}
+                     {state.availableCategories.length === 0 && (
+                        <SelectItem value="" disabled>No hay categorías definidas</SelectItem>
+                    )}
+                </SelectContent>
+            </Select>
+        </div>
       </div>
+
 
       {state.isLoading ? (
         <p className="text-center text-muted-foreground">Cargando equipos...</p>
@@ -204,15 +240,21 @@ export default function TeamsPage() {
         <div className="text-center py-12">
           <Info className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold text-card-foreground mb-2">
-            {state.teams.length === 0 ? "No hay equipos creados" : "No se encontraron equipos"}
+            {state.teams.length === 0 
+              ? "No hay equipos creados" 
+              : (searchTerm || categoryFilter) 
+                ? "No se encontraron equipos con los filtros aplicados"
+                : "No se encontraron equipos"}
           </h3>
           <p className="text-muted-foreground mb-4">
             {state.teams.length === 0
               ? "Comienza creando tu primer equipo."
-              : "Intenta con otro término de búsqueda o crea un nuevo equipo."}
+              : (searchTerm || categoryFilter)
+                ? "Intenta con otros filtros o crea un nuevo equipo."
+                : "Crea un nuevo equipo para empezar."}
           </p>
-          {state.teams.length > 0 && searchTerm && (
-             <Button variant="outline" onClick={() => setSearchTerm("")}>Limpiar búsqueda</Button>
+          {(searchTerm || categoryFilter) && state.teams.length > 0 && (
+             <Button variant="outline" onClick={() => { setSearchTerm(""); setCategoryFilter(""); }}>Limpiar filtros</Button>
           )}
         </div>
       )}
@@ -225,7 +267,7 @@ export default function TeamsPage() {
           Exporta todos tus equipos a un archivo JSON o importa equipos desde un archivo previamente guardado.
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
-          <Button onClick={prepareExportTeams} variant="outline" className="flex-1">
+          <Button onClick={prepareExportTeams} variant="outline" className="flex-1" disabled={state.teams.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Exportar Todos los Equipos
           </Button>
           <Button onClick={handleImportClick} variant="outline" className="flex-1">
