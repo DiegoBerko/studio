@@ -44,8 +44,8 @@ export function SoundPlayer() {
                 description: description,
                 variant: "destructive",
               });
-              console.error("Error loading audio:", soundSrc);
-              audioRef.current = null; // Clear ref on error
+              console.error(`Error loading audio from src: '${soundSrc}'. If this is the default sound ('${DEFAULT_SOUND_PATH}'), ensure the file exists at 'public${DEFAULT_SOUND_PATH}'.`);
+              if (audioRef.current) audioRef.current = null; // Ensure it's nullified on error
             };
             audioRef.current.oncanplaythrough = () => {
                  // Attempt to play only once ready
