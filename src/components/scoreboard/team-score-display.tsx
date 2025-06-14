@@ -14,18 +14,18 @@ interface TeamScoreDisplayProps {
   className?: string;
 }
 
-const LONG_NAME_THRESHOLD = 10; // Characters after which scrolling might be needed
-const SCROLL_ANIMATION_DURATION_MS = 1000; // Duration of the scroll animation
+const LONG_NAME_THRESHOLD = 12; // Characters after which scrolling might be needed
+const SCROLL_ANIMATION_DURATION_MS = 1500; // Duration of the scroll animation (slower)
 const PAUSE_AT_START_DURATION_MS = 5000;   // How long to show the start of the name
 const PAUSE_AT_END_DURATION_MS = 2000;     // How long to show the end of the name
 
-export function TeamScoreDisplay({ 
-  teamActualName, 
-  teamDisplayName, 
-  score, 
-  playersOnIce = 0, 
-  configuredPlayersPerTeam = 0, 
-  className 
+export function TeamScoreDisplay({
+  teamActualName,
+  teamDisplayName,
+  score,
+  playersOnIce = 0,
+  configuredPlayersPerTeam = 0,
+  className
 }: TeamScoreDisplayProps) {
   const [flash, setFlash] = useState(false);
   const [prevScore, setPrevScore] = useState(score);
@@ -57,55 +57,49 @@ export function TeamScoreDisplay({
 
     if (teamActualName.length > LONG_NAME_THRESHOLD) {
       const performAnimationCycle = () => {
-        // Ensure refs are available
         if (!containerRef.current || !textRef.current) {
-          // If refs not ready, try again shortly
           animationTimeoutRef.current = setTimeout(performAnimationCycle, 100);
           return;
         }
-        
-        // Phase 1: Show start, then prepare to scroll to end
+
         setCurrentScrollX(0);
         animationTimeoutRef.current = setTimeout(() => {
           if (containerRef.current && textRef.current) {
             const containerWidth = containerRef.current.offsetWidth;
-            const textWidth = textRef.current.scrollWidth; // Use scrollWidth due to nowrap
+            const textWidth = textRef.current.scrollWidth;
             const maxScroll = textWidth - containerWidth;
 
             if (maxScroll > 0) {
-              setCurrentScrollX(-maxScroll); // Trigger scroll to end
+              setCurrentScrollX(-maxScroll);
 
-              // Phase 2: Paused at end, then prepare to scroll to start
               animationTimeoutRef.current = setTimeout(() => {
-                setCurrentScrollX(0); // Trigger scroll to start
+                setCurrentScrollX(0);
 
-                // Phase 3: Paused at start, then loop
                 animationTimeoutRef.current = setTimeout(() => {
-                  performAnimationCycle(); // Loop the whole cycle
+                  performAnimationCycle();
                 }, PAUSE_AT_START_DURATION_MS + SCROLL_ANIMATION_DURATION_MS);
               }, PAUSE_AT_END_DURATION_MS + SCROLL_ANIMATION_DURATION_MS);
             } else {
-              // Text is not actually overflowing, reset and stop animation
               setCurrentScrollX(0);
             }
           }
         }, PAUSE_AT_START_DURATION_MS);
       };
-      
-      // Start the first cycle
-      // Delay slightly to ensure initial rendering and measurement can occur
-      animationTimeoutRef.current = setTimeout(performAnimationCycle, 100);
 
+      animationTimeoutRef.current = setTimeout(performAnimationCycle, 100);
     } else {
-      setCurrentScrollX(0); // Ensure text is at start if name is short
+      setCurrentScrollX(0);
     }
 
-    return clearCurrentAnimationTimeout; // Cleanup on unmount or name change
+    return clearCurrentAnimationTimeout;
   }, [teamActualName]);
 
 
   return (
-    <div className={cn("flex flex-col items-center text-center", className)}>
+    <div className={cn(
+        "flex flex-col items-center text-center min-w-[160px] sm:min-w-[180px] md:min-w-[220px] lg:min-w-[260px] xl:min-w-[300px]",
+        className
+      )}>
       <div className="flex justify-center items-center gap-1 mb-1 h-5 md:h-6 lg:h-7">
         {playersOnIce > 0 && Array(playersOnIce).fill(null).map((_, index) => (
           <User key={index} className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary-foreground/80" />
@@ -114,8 +108,8 @@ export function TeamScoreDisplay({
           <span className="text-sm md:text-base lg:text-lg text-destructive animate-pulse">0 JUGADORES</span>
         )}
       </div>
-      
-      <div 
+
+      <div
         ref={containerRef}
         className="text-xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground uppercase tracking-wide w-full h-[1.2em] overflow-hidden relative"
         title={teamActualName}
