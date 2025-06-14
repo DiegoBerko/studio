@@ -14,10 +14,10 @@ interface TeamScoreDisplayProps {
   className?: string;
 }
 
-const LONG_NAME_THRESHOLD = 12; // Characters after which scrolling might be needed
-const SCROLL_ANIMATION_DURATION_MS = 1500; // Duration of the scroll animation (slower)
-const PAUSE_AT_START_DURATION_MS = 5000;   // How long to show the start of the name
-const PAUSE_AT_END_DURATION_MS = 2000;     // How long to show the end of the name
+const LONG_NAME_THRESHOLD = 10; // Reduced from 12
+const SCROLL_ANIMATION_DURATION_MS = 1500; 
+const PAUSE_AT_START_DURATION_MS = 5000;   
+const PAUSE_AT_END_DURATION_MS = 2000;     
 
 export function TeamScoreDisplay({
   teamActualName,
@@ -53,16 +53,18 @@ export function TeamScoreDisplay({
     };
 
     clearCurrentAnimationTimeout();
-    setCurrentScrollX(0); // Reset scroll position when team name changes
+    setCurrentScrollX(0); 
 
     if (teamActualName.length > LONG_NAME_THRESHOLD) {
       const performAnimationCycle = () => {
+        // Ensure refs are current before proceeding
         if (!containerRef.current || !textRef.current) {
-          animationTimeoutRef.current = setTimeout(performAnimationCycle, 100);
+          animationTimeoutRef.current = setTimeout(performAnimationCycle, 100); // Retry shortly
           return;
         }
+        
+        setCurrentScrollX(0); // Start by showing the beginning
 
-        setCurrentScrollX(0);
         animationTimeoutRef.current = setTimeout(() => {
           if (containerRef.current && textRef.current) {
             const containerWidth = containerRef.current.offsetWidth;
@@ -70,28 +72,32 @@ export function TeamScoreDisplay({
             const maxScroll = textWidth - containerWidth;
 
             if (maxScroll > 0) {
-              setCurrentScrollX(-maxScroll);
+              setCurrentScrollX(-maxScroll); // Scroll to show the end
 
               animationTimeoutRef.current = setTimeout(() => {
-                setCurrentScrollX(0);
+                setCurrentScrollX(0); // Scroll back to the beginning
 
                 animationTimeoutRef.current = setTimeout(() => {
-                  performAnimationCycle();
+                  performAnimationCycle(); // Restart the cycle
                 }, PAUSE_AT_START_DURATION_MS + SCROLL_ANIMATION_DURATION_MS);
               }, PAUSE_AT_END_DURATION_MS + SCROLL_ANIMATION_DURATION_MS);
             } else {
+              // If no scrolling is needed (e.g., window resized wider), stay at start
               setCurrentScrollX(0);
             }
           }
         }, PAUSE_AT_START_DURATION_MS);
       };
+      
+      // Initial short delay to allow DOM to settle, then start animation
+      animationTimeoutRef.current = setTimeout(performAnimationCycle, 100); 
 
-      animationTimeoutRef.current = setTimeout(performAnimationCycle, 100);
     } else {
+      // Name is not long, ensure it's at the start and no animation
       setCurrentScrollX(0);
     }
 
-    return clearCurrentAnimationTimeout;
+    return clearCurrentAnimationTimeout; // Cleanup on component unmount or name change
   }, [teamActualName]);
 
 
