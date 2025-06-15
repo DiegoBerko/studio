@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
@@ -158,7 +157,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
     <ControlCardWrapper title="Configuración de Tiempos, Períodos y Arranque Automático">
       <div className="space-y-6">
         {/* Regular Periods */}
-        <div className="grid grid-cols-[auto_80px_1fr_80px] items-center gap-x-3 sm:gap-x-4">
+        <div className="grid grid-cols-[auto_theme(spacing.20)_auto_theme(spacing.20)] items-center gap-x-3 sm:gap-x-4">
             <Label htmlFor="numRegularPeriods" className="text-sm whitespace-nowrap justify-self-end">Períodos Regulares (Cant)</Label>
             <Input
             id="numRegularPeriods"
@@ -182,7 +181,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Overtime Periods */}
-        <div className="grid grid-cols-[auto_80px_1fr_80px] items-center gap-x-3 sm:gap-x-4">
+        <div className="grid grid-cols-[auto_theme(spacing.20)_auto_theme(spacing.20)] items-center gap-x-3 sm:gap-x-4">
             <Label htmlFor="numOTPeriods" className="text-sm whitespace-nowrap justify-self-end">Períodos Overtime (Cant)</Label>
             <Input
             id="numOTPeriods"
@@ -206,7 +205,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
         
         {/* Timeouts */}
-        <div className="grid grid-cols-[auto_80px_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+        <div className="grid grid-cols-[auto_theme(spacing.20)_auto_auto] items-center gap-x-3 sm:gap-x-4">
           <Label htmlFor="timeoutDurationConfig" className="text-sm whitespace-nowrap justify-self-end">Timeout (seg)</Label>
           <Input
             id="timeoutDurationConfig"
@@ -226,7 +225,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Regular Breaks */}
-         <div className="grid grid-cols-[auto_80px_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+         <div className="grid grid-cols-[auto_theme(spacing.20)_auto_auto] items-center gap-x-3 sm:gap-x-4">
           <Label htmlFor="breakDurationConfig" className="text-sm whitespace-nowrap justify-self-end">Descanso Reg. (seg)</Label>
           <Input
             id="breakDurationConfig"
@@ -246,7 +245,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Pre-OT Breaks */}
-        <div className="grid grid-cols-[auto_80px_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+        <div className="grid grid-cols-[auto_theme(spacing.20)_auto_auto] items-center gap-x-3 sm:gap-x-4">
           <Label htmlFor="preOTBreakDurationConfig" className="text-sm whitespace-nowrap justify-self-end">Descanso Pre-OT (seg)</Label>
           <Input
             id="preOTBreakDurationConfig"
@@ -266,7 +265,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Warm-up */}
-        <div className="grid grid-cols-[auto_80px_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+        <div className="grid grid-cols-[auto_theme(spacing.20)_auto_auto] items-center gap-x-3 sm:gap-x-4">
             <Label htmlFor="warmUpDurationConfig" className="text-sm whitespace-nowrap justify-self-end">Calentamiento (min)</Label>
             <Input
               id="warmUpDurationConfig"
@@ -290,10 +289,4 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
-    
-
-    
-
-    
-
     
