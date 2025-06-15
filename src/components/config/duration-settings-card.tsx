@@ -151,11 +151,13 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
     getIsDirty: () => isDirty,
   }));
 
+  const inputStyle = "w-20 mt-0"; // Shared style for narrow inputs
+
   return (
     <ControlCardWrapper title="Configuración de Tiempos, Períodos y Arranque Automático">
       <div className="space-y-6">
         {/* Regular Periods */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
             <div>
                 <Label htmlFor="numRegularPeriods">Número de Períodos Regulares</Label>
                 <Input
@@ -169,7 +171,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
                 />
             </div>
             <div>
-              <Label htmlFor="periodDuration">Duración Período Regular (minutos)</Label>
+              <Label htmlFor="periodDuration">Duración Período Regular (min)</Label>
               <Input
                 id="periodDuration"
                 type="number"
@@ -183,7 +185,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Overtime Periods */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
             <div>
                 <Label htmlFor="numOTPeriods">Número de Períodos de Overtime</Label>
                 <Input
@@ -197,7 +199,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
                 />
             </div>
             <div>
-              <Label htmlFor="otPeriodDuration">Duración Overtime (minutos)</Label>
+              <Label htmlFor="otPeriodDuration">Duración Overtime (min)</Label>
               <Input
                 id="otPeriodDuration"
                 type="number"
@@ -211,111 +213,83 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
         
         {/* Timeouts */}
-        <div>
-          <Label htmlFor="timeoutDuration">Duración del Time Out (segundos)</Label>
+        <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+          <Label htmlFor="timeoutDurationConfig" className="whitespace-nowrap">Timeout (seg)</Label>
           <Input
-            id="timeoutDuration"
+            id="timeoutDurationConfig"
             type="number"
             value={localTimeoutDurationInput}
             onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
-            className="mt-1"
+            className={inputStyle}
             placeholder="ej. 30"
             min="1"
           />
-          <div className="flex items-center justify-between mt-3">
-            <Label htmlFor="autoStartTimeouts" className="flex flex-col space-y-1">
-              <span>Iniciar Automáticamente Time Outs</span>
-              <span className="font-normal leading-snug text-muted-foreground text-xs">
-                Si está activo, el reloj comenzará automáticamente al iniciar un Time Out.
-              </span>
-            </Label>
-            <Switch
-              id="autoStartTimeouts"
-              checked={localAutoStartTimeouts}
-              onCheckedChange={(checked) => { setLocalAutoStartTimeouts(checked); markDirty(); }}
-            />
-          </div>
+          <Label htmlFor="autoStartTimeoutsConfig" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
+          <Switch
+            id="autoStartTimeoutsConfig"
+            checked={localAutoStartTimeouts}
+            onCheckedChange={(checked) => { setLocalAutoStartTimeouts(checked); markDirty(); }}
+          />
         </div>
 
         {/* Regular Breaks */}
-        <div>
-          <Label htmlFor="breakDuration">Duración Descanso Regular (segundos)</Label>
+         <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+          <Label htmlFor="breakDurationConfig" className="whitespace-nowrap">Descanso Reg. (seg)</Label>
           <Input
-            id="breakDuration"
+            id="breakDurationConfig"
             type="number"
             value={localBreakDurationInput}
             onChange={(e) => { setLocalBreakDurationInput(e.target.value); markDirty(); }}
-            className="mt-1"
+            className={inputStyle}
             placeholder="ej. 120"
             min="1"
           />
-          <div className="flex items-center justify-between mt-3">
-            <Label htmlFor="autoStartBreaks" className="flex flex-col space-y-1">
-              <span>Iniciar Automáticamente Descansos Regulares</span>
-              <span className="font-normal leading-snug text-muted-foreground text-xs">
-                Si está activo, el reloj comenzará automáticamente al iniciar un descanso regular.
-              </span>
-            </Label>
-            <Switch
-              id="autoStartBreaks"
-              checked={localAutoStartBreaks}
-              onCheckedChange={(checked) => { setLocalAutoStartBreaks(checked); markDirty(); }}
-            />
-          </div>
+          <Label htmlFor="autoStartBreaksConfig" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
+          <Switch
+            id="autoStartBreaksConfig"
+            checked={localAutoStartBreaks}
+            onCheckedChange={(checked) => { setLocalAutoStartBreaks(checked); markDirty(); }}
+          />
         </div>
 
         {/* Pre-OT Breaks */}
-        <div>
-          <Label htmlFor="preOTBreakDuration">Duración Descanso Pre-OT / Entre OTs (segundos)</Label>
+        <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+          <Label htmlFor="preOTBreakDurationConfig" className="whitespace-nowrap">Descanso Pre-OT (seg)</Label>
           <Input
-            id="preOTBreakDuration"
+            id="preOTBreakDurationConfig"
             type="number"
             value={localPreOTBreakDurationInput}
             onChange={(e) => { setLocalPreOTBreakDurationInput(e.target.value); markDirty(); }}
-            className="mt-1"
+            className={inputStyle}
             placeholder="ej. 60"
             min="1"
           />
-          <div className="flex items-center justify-between mt-3">
-            <Label htmlFor="autoStartPreOTBreaks" className="flex flex-col space-y-1">
-              <span>Iniciar Automáticamente Descansos Pre-OT</span>
-              <span className="font-normal leading-snug text-muted-foreground text-xs">
-                Si está activo, el reloj comenzará automáticamente al iniciar un descanso Pre-OT.
-              </span>
-            </Label>
-            <Switch
-              id="autoStartPreOTBreaks"
-              checked={localAutoStartPreOTBreaks}
-              onCheckedChange={(checked) => { setLocalAutoStartPreOTBreaks(checked); markDirty(); }}
-            />
-          </div>
+          <Label htmlFor="autoStartPreOTBreaksConfig" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
+          <Switch
+            id="autoStartPreOTBreaksConfig"
+            checked={localAutoStartPreOTBreaks}
+            onCheckedChange={(checked) => { setLocalAutoStartPreOTBreaks(checked); markDirty(); }}
+          />
         </div>
 
         {/* Warm-up */}
-        <div>
-            <Label htmlFor="warmUpDuration">Duración Entrada en Calor (minutos)</Label>
+        <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+            <Label htmlFor="warmUpDurationConfig" className="whitespace-nowrap">Calentamiento (min)</Label>
             <Input
-              id="warmUpDuration"
+              id="warmUpDurationConfig"
               type="number"
               value={localWarmUpDurationInput}
               onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
-              className="mt-1"
+              className={inputStyle}
               placeholder="ej. 5"
               min="1"
             />
-            <div className="flex items-center justify-between mt-3">
-              <Label htmlFor="autoStartWarmUp" className="flex flex-col space-y-1">
-                <span>Iniciar Automáticamente Entrada en Calor</span>
-                <span className="font-normal leading-snug text-muted-foreground text-xs">
-                  Si está activo, el reloj comenzará automáticamente al iniciar la entrada en calor.
-                </span>
-              </Label>
-              <Switch
-                id="autoStartWarmUp"
-                checked={localAutoStartWarmUp}
-                onCheckedChange={(checked) => { setLocalAutoStartWarmUp(checked); markDirty(); }}
-              />
-            </div>
+            <Label htmlFor="autoStartWarmUpConfig" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
+            <Switch
+              id="autoStartWarmUpConfig"
+              checked={localAutoStartWarmUp}
+              onCheckedChange={(checked) => { setLocalAutoStartWarmUp(checked); markDirty(); }}
+            />
         </div>
       </div>
     </ControlCardWrapper>
@@ -323,3 +297,6 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
+
+
+    
