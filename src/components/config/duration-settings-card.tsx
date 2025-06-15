@@ -6,7 +6,6 @@ import {
   useGameState, 
   centisecondsToDisplayMinutes, 
   centisecondsToDisplaySeconds
-  // CENTISECONDS_PER_SECOND - Removed import
 } from "@/contexts/game-state-context";
 import { ControlCardWrapper } from "@/components/controls/control-card-wrapper";
 import { Label } from "@/components/ui/label";
@@ -26,7 +25,6 @@ interface DurationSettingsCardProps {
 export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, DurationSettingsCardProps>(({ onDirtyChange }, ref) => {
   const { state, dispatch } = useGameState();
 
-  // Local state for inputs (stores minutes or seconds as strings for UI)
   const [localWarmUpDurationInput, setLocalWarmUpDurationInput] = useState(centisecondsToDisplayMinutes(state.defaultWarmUpDuration));
   const [localPeriodDurationInput, setLocalPeriodDurationInput] = useState(centisecondsToDisplayMinutes(state.defaultPeriodDuration));
   const [localOTPeriodDurationInput, setLocalOTPeriodDurationInput] = useState(centisecondsToDisplayMinutes(state.defaultOTPeriodDuration));
@@ -88,27 +86,27 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       if (!isDirty) return true;
 
       const warmUpDurationMin = parseInt(localWarmUpDurationInput, 10);
-      const finalWarmUpDurationCs = (isNaN(warmUpDurationMin) || warmUpDurationMin < 1) ? (60 * 100) : warmUpDurationMin * 60 * 100; // 100 = CENTISECONDS_PER_SECOND
+      const finalWarmUpDurationCs = (isNaN(warmUpDurationMin) || warmUpDurationMin < 1) ? (60 * 100) : warmUpDurationMin * 60 * 100;
       dispatch({ type: "SET_DEFAULT_WARM_UP_DURATION", payload: finalWarmUpDurationCs });
 
       const periodDurationMin = parseInt(localPeriodDurationInput, 10);
-      const finalPeriodDurationCs = (isNaN(periodDurationMin) || periodDurationMin < 1) ? (60 * 100) : periodDurationMin * 60 * 100; // 100 = CENTISECONDS_PER_SECOND
+      const finalPeriodDurationCs = (isNaN(periodDurationMin) || periodDurationMin < 1) ? (60 * 100) : periodDurationMin * 60 * 100;
       dispatch({ type: "SET_DEFAULT_PERIOD_DURATION", payload: finalPeriodDurationCs });
 
       const otPeriodDurationMin = parseInt(localOTPeriodDurationInput, 10);
-      const finalOTPeriodDurationCs = (isNaN(otPeriodDurationMin) || otPeriodDurationMin < 1) ? (60 * 100) : otPeriodDurationMin * 60 * 100; // 100 = CENTISECONDS_PER_SECOND
+      const finalOTPeriodDurationCs = (isNaN(otPeriodDurationMin) || otPeriodDurationMin < 1) ? (60 * 100) : otPeriodDurationMin * 60 * 100;
       dispatch({ type: "SET_DEFAULT_OT_PERIOD_DURATION", payload: finalOTPeriodDurationCs });
 
       const breakDurationSec = parseInt(localBreakDurationInput, 10);
-      const finalBreakDurationCs = (isNaN(breakDurationSec) || breakDurationSec < 1) ? (1 * 100) : breakDurationSec * 100; // 100 = CENTISECONDS_PER_SECOND
+      const finalBreakDurationCs = (isNaN(breakDurationSec) || breakDurationSec < 1) ? (1 * 100) : breakDurationSec * 100;
       dispatch({ type: "SET_DEFAULT_BREAK_DURATION", payload: finalBreakDurationCs });
 
       const preOTBreakDurationSec = parseInt(localPreOTBreakDurationInput, 10);
-      const finalPreOTBreakDurationCs = (isNaN(preOTBreakDurationSec) || preOTBreakDurationSec < 1) ? (1 * 100) : preOTBreakDurationSec * 100; // 100 = CENTISECONDS_PER_SECOND
+      const finalPreOTBreakDurationCs = (isNaN(preOTBreakDurationSec) || preOTBreakDurationSec < 1) ? (1 * 100) : preOTBreakDurationSec * 100;
       dispatch({ type: "SET_DEFAULT_PRE_OT_BREAK_DURATION", payload: finalPreOTBreakDurationCs });
       
       const timeoutDurationSec = parseInt(localTimeoutDurationInput, 10);
-      const finalTimeoutDurationCs = (isNaN(timeoutDurationSec) || timeoutDurationSec < 1) ? (1 * 100) : timeoutDurationSec * 100; // 100 = CENTISECONDS_PER_SECOND
+      const finalTimeoutDurationCs = (isNaN(timeoutDurationSec) || timeoutDurationSec < 1) ? (1 * 100) : timeoutDurationSec * 100;
       dispatch({ type: "SET_DEFAULT_TIMEOUT_DURATION", payload: finalTimeoutDurationCs });
 
       const numRegularPeriods = parseInt(localNumRegularPeriodsInput, 10);
@@ -116,7 +114,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       dispatch({ type: "SET_NUMBER_OF_REGULAR_PERIODS", payload: finalNumRegularPeriods });
 
       const numOTPeriods = parseInt(localNumOTPeriodsInput, 10);
-      const finalNumOTPeriods = (isNaN(numOTPeriods) || numOTPeriods < 0) ? 1 : numOTPeriods; // Allow 0 for no OT
+      const finalNumOTPeriods = (isNaN(numOTPeriods) || numOTPeriods < 0) ? 1 : numOTPeriods;
       dispatch({ type: "SET_NUMBER_OF_OVERTIME_PERIODS", payload: finalNumOTPeriods });
 
       if (localAutoStartWarmUp !== state.autoStartWarmUp) {
@@ -156,6 +154,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
   return (
     <ControlCardWrapper title="Configuración de Tiempos, Períodos y Arranque Automático">
       <div className="space-y-6">
+        {/* Regular Periods */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <Label htmlFor="numRegularPeriods">Número de Períodos Regulares</Label>
@@ -170,49 +169,6 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
                 />
             </div>
             <div>
-                <Label htmlFor="numOTPeriods">Número de Períodos de Overtime</Label>
-                <Input
-                id="numOTPeriods"
-                type="number"
-                value={localNumOTPeriodsInput}
-                onChange={(e) => { setLocalNumOTPeriodsInput(e.target.value); markDirty(); }}
-                className="mt-1"
-                placeholder="ej. 1 (0 para ninguno)"
-                min="0"
-                />
-            </div>
-        </div>
-
-        <div className="space-y-3 p-4 border rounded-md bg-muted/20">
-            <div>
-              <Label htmlFor="warmUpDuration">Duración Entrada en Calor (minutos)</Label>
-              <Input
-                id="warmUpDuration"
-                type="number"
-                value={localWarmUpDurationInput}
-                onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
-                className="mt-1"
-                placeholder="ej. 5"
-                min="1"
-              />
-            </div>
-            <div className="flex items-center justify-between pt-2">
-              <Label htmlFor="autoStartWarmUp" className="flex flex-col space-y-1">
-                <span>Iniciar Automáticamente Entrada en Calor</span>
-                <span className="font-normal leading-snug text-muted-foreground text-xs">
-                  Si está activo, el reloj comenzará automáticamente al iniciar la entrada en calor.
-                </span>
-              </Label>
-              <Switch
-                id="autoStartWarmUp"
-                checked={localAutoStartWarmUp}
-                onCheckedChange={(checked) => { setLocalAutoStartWarmUp(checked); markDirty(); }}
-              />
-            </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
               <Label htmlFor="periodDuration">Duración Período Regular (minutos)</Label>
               <Input
                 id="periodDuration"
@@ -223,6 +179,22 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
                 placeholder="ej. 20"
                 min="1"
               />
+            </div>
+        </div>
+
+        {/* Overtime Periods */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <Label htmlFor="numOTPeriods">Número de Períodos de Overtime</Label>
+                <Input
+                id="numOTPeriods"
+                type="number"
+                value={localNumOTPeriodsInput}
+                onChange={(e) => { setLocalNumOTPeriodsInput(e.target.value); markDirty(); }}
+                className="mt-1"
+                placeholder="ej. 1 (0 para ninguno)"
+                min="0"
+                />
             </div>
             <div>
               <Label htmlFor="otPeriodDuration">Duración Overtime (minutos)</Label>
@@ -237,8 +209,37 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
               />
             </div>
         </div>
+        
+        {/* Timeouts */}
+        <div className="space-y-3 p-4 border rounded-md bg-muted/20">
+          <div>
+            <Label htmlFor="timeoutDuration">Duración del Time Out (segundos)</Label>
+            <Input
+              id="timeoutDuration"
+              type="number"
+              value={localTimeoutDurationInput}
+              onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
+              className="mt-1"
+              placeholder="ej. 30"
+              min="1"
+            />
+          </div>
+          <div className="flex items-center justify-between pt-2">
+            <Label htmlFor="autoStartTimeouts" className="flex flex-col space-y-1">
+              <span>Iniciar Automáticamente Time Outs</span>
+              <span className="font-normal leading-snug text-muted-foreground text-xs">
+                Si está activo, el reloj comenzará automáticamente al iniciar un Time Out.
+              </span>
+            </Label>
+            <Switch
+              id="autoStartTimeouts"
+              checked={localAutoStartTimeouts}
+              onCheckedChange={(checked) => { setLocalAutoStartTimeouts(checked); markDirty(); }}
+            />
+          </div>
+        </div>
 
-
+        {/* Regular Breaks */}
         <div className="space-y-3 p-4 border rounded-md bg-muted/20">
           <div>
             <Label htmlFor="breakDuration">Duración Descanso Regular (segundos)</Label>
@@ -267,6 +268,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
           </div>
         </div>
 
+        {/* Pre-OT Breaks */}
         <div className="space-y-3 p-4 border rounded-md bg-muted/20">
           <div>
             <Label htmlFor="preOTBreakDuration">Duración Descanso Pre-OT / Entre OTs (segundos)</Label>
@@ -294,33 +296,34 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             />
           </div>
         </div>
-        
+
+        {/* Warm-up */}
         <div className="space-y-3 p-4 border rounded-md bg-muted/20">
-          <div>
-            <Label htmlFor="timeoutDuration">Duración del Time Out (segundos)</Label>
-            <Input
-              id="timeoutDuration"
-              type="number"
-              value={localTimeoutDurationInput}
-              onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
-              className="mt-1"
-              placeholder="ej. 30"
-              min="1"
-            />
-          </div>
-          <div className="flex items-center justify-between pt-2">
-            <Label htmlFor="autoStartTimeouts" className="flex flex-col space-y-1">
-              <span>Iniciar Automáticamente Time Outs</span>
-              <span className="font-normal leading-snug text-muted-foreground text-xs">
-                Si está activo, el reloj comenzará automáticamente al iniciar un Time Out.
-              </span>
-            </Label>
-            <Switch
-              id="autoStartTimeouts"
-              checked={localAutoStartTimeouts}
-              onCheckedChange={(checked) => { setLocalAutoStartTimeouts(checked); markDirty(); }}
-            />
-          </div>
+            <div>
+              <Label htmlFor="warmUpDuration">Duración Entrada en Calor (minutos)</Label>
+              <Input
+                id="warmUpDuration"
+                type="number"
+                value={localWarmUpDurationInput}
+                onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
+                className="mt-1"
+                placeholder="ej. 5"
+                min="1"
+              />
+            </div>
+            <div className="flex items-center justify-between pt-2">
+              <Label htmlFor="autoStartWarmUp" className="flex flex-col space-y-1">
+                <span>Iniciar Automáticamente Entrada en Calor</span>
+                <span className="font-normal leading-snug text-muted-foreground text-xs">
+                  Si está activo, el reloj comenzará automáticamente al iniciar la entrada en calor.
+                </span>
+              </Label>
+              <Switch
+                id="autoStartWarmUp"
+                checked={localAutoStartWarmUp}
+                onCheckedChange={(checked) => { setLocalAutoStartWarmUp(checked); markDirty(); }}
+              />
+            </div>
         </div>
       </div>
     </ControlCardWrapper>
@@ -328,5 +331,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
+
+    
 
     
