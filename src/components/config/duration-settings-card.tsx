@@ -211,20 +211,18 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
         
         {/* Timeouts */}
-        <div className="space-y-3 p-4 border rounded-md bg-muted/20">
-          <div>
-            <Label htmlFor="timeoutDuration">Duración del Time Out (segundos)</Label>
-            <Input
-              id="timeoutDuration"
-              type="number"
-              value={localTimeoutDurationInput}
-              onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
-              className="mt-1"
-              placeholder="ej. 30"
-              min="1"
-            />
-          </div>
-          <div className="flex items-center justify-between pt-2">
+        <div>
+          <Label htmlFor="timeoutDuration">Duración del Time Out (segundos)</Label>
+          <Input
+            id="timeoutDuration"
+            type="number"
+            value={localTimeoutDurationInput}
+            onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
+            className="mt-1"
+            placeholder="ej. 30"
+            min="1"
+          />
+          <div className="flex items-center justify-between mt-3">
             <Label htmlFor="autoStartTimeouts" className="flex flex-col space-y-1">
               <span>Iniciar Automáticamente Time Outs</span>
               <span className="font-normal leading-snug text-muted-foreground text-xs">
@@ -240,20 +238,18 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Regular Breaks */}
-        <div className="space-y-3 p-4 border rounded-md bg-muted/20">
-          <div>
-            <Label htmlFor="breakDuration">Duración Descanso Regular (segundos)</Label>
-            <Input
-              id="breakDuration"
-              type="number"
-              value={localBreakDurationInput}
-              onChange={(e) => { setLocalBreakDurationInput(e.target.value); markDirty(); }}
-              className="mt-1"
-              placeholder="ej. 120"
-              min="1"
-            />
-          </div>
-          <div className="flex items-center justify-between pt-2">
+        <div>
+          <Label htmlFor="breakDuration">Duración Descanso Regular (segundos)</Label>
+          <Input
+            id="breakDuration"
+            type="number"
+            value={localBreakDurationInput}
+            onChange={(e) => { setLocalBreakDurationInput(e.target.value); markDirty(); }}
+            className="mt-1"
+            placeholder="ej. 120"
+            min="1"
+          />
+          <div className="flex items-center justify-between mt-3">
             <Label htmlFor="autoStartBreaks" className="flex flex-col space-y-1">
               <span>Iniciar Automáticamente Descansos Regulares</span>
               <span className="font-normal leading-snug text-muted-foreground text-xs">
@@ -269,20 +265,18 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Pre-OT Breaks */}
-        <div className="space-y-3 p-4 border rounded-md bg-muted/20">
-          <div>
-            <Label htmlFor="preOTBreakDuration">Duración Descanso Pre-OT / Entre OTs (segundos)</Label>
-            <Input
-              id="preOTBreakDuration"
-              type="number"
-              value={localPreOTBreakDurationInput}
-              onChange={(e) => { setLocalPreOTBreakDurationInput(e.target.value); markDirty(); }}
-              className="mt-1"
-              placeholder="ej. 60"
-              min="1"
-            />
-          </div>
-          <div className="flex items-center justify-between pt-2">
+        <div>
+          <Label htmlFor="preOTBreakDuration">Duración Descanso Pre-OT / Entre OTs (segundos)</Label>
+          <Input
+            id="preOTBreakDuration"
+            type="number"
+            value={localPreOTBreakDurationInput}
+            onChange={(e) => { setLocalPreOTBreakDurationInput(e.target.value); markDirty(); }}
+            className="mt-1"
+            placeholder="ej. 60"
+            min="1"
+          />
+          <div className="flex items-center justify-between mt-3">
             <Label htmlFor="autoStartPreOTBreaks" className="flex flex-col space-y-1">
               <span>Iniciar Automáticamente Descansos Pre-OT</span>
               <span className="font-normal leading-snug text-muted-foreground text-xs">
@@ -298,20 +292,18 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Warm-up */}
-        <div className="space-y-3 p-4 border rounded-md bg-muted/20">
-            <div>
-              <Label htmlFor="warmUpDuration">Duración Entrada en Calor (minutos)</Label>
-              <Input
-                id="warmUpDuration"
-                type="number"
-                value={localWarmUpDurationInput}
-                onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
-                className="mt-1"
-                placeholder="ej. 5"
-                min="1"
-              />
-            </div>
-            <div className="flex items-center justify-between pt-2">
+        <div>
+            <Label htmlFor="warmUpDuration">Duración Entrada en Calor (minutos)</Label>
+            <Input
+              id="warmUpDuration"
+              type="number"
+              value={localWarmUpDurationInput}
+              onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
+              className="mt-1"
+              placeholder="ej. 5"
+              min="1"
+            />
+            <div className="flex items-center justify-between mt-3">
               <Label htmlFor="autoStartWarmUp" className="flex flex-col space-y-1">
                 <span>Iniciar Automáticamente Entrada en Calor</span>
                 <span className="font-normal leading-snug text-muted-foreground text-xs">
@@ -331,7 +323,3 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
-
-    
-
-    
