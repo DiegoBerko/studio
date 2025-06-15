@@ -159,7 +159,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       <div className="space-y-6">
         {/* Regular Periods */}
         <div className="grid grid-cols-[auto_80px_1fr_80px] items-center gap-x-3 sm:gap-x-4">
-            <Label htmlFor="numRegularPeriods" className="text-sm whitespace-nowrap">Períodos Regulares (Cant)</Label>
+            <Label htmlFor="numRegularPeriods" className="text-sm whitespace-nowrap justify-self-end">Períodos Regulares (Cant)</Label>
             <Input
             id="numRegularPeriods"
             type="number"
@@ -169,7 +169,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             placeholder="ej. 3"
             min="1"
             />
-            <Label htmlFor="periodDuration" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Duración (Min)</Label>
+            <Label htmlFor="periodDuration" className="font-normal text-sm justify-self-end whitespace-nowrap">Duración (Min)</Label>
             <Input
             id="periodDuration"
             type="number"
@@ -183,7 +183,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 
         {/* Overtime Periods */}
         <div className="grid grid-cols-[auto_80px_1fr_80px] items-center gap-x-3 sm:gap-x-4">
-            <Label htmlFor="numOTPeriods" className="text-sm whitespace-nowrap">Períodos Overtime (Cant)</Label>
+            <Label htmlFor="numOTPeriods" className="text-sm whitespace-nowrap justify-self-end">Períodos Overtime (Cant)</Label>
             <Input
             id="numOTPeriods"
             type="number"
@@ -193,7 +193,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             placeholder="ej. 1"
             min="0"
             />
-            <Label htmlFor="otPeriodDuration" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Duración (Min)</Label>
+            <Label htmlFor="otPeriodDuration" className="font-normal text-sm justify-self-end whitespace-nowrap">Duración (Min)</Label>
             <Input
             id="otPeriodDuration"
             type="number"
@@ -206,8 +206,8 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
         
         {/* Timeouts */}
-        <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
-          <Label htmlFor="timeoutDurationConfig" className="text-sm whitespace-nowrap">Timeout (seg)</Label>
+        <div className="grid grid-cols-[auto_80px_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+          <Label htmlFor="timeoutDurationConfig" className="text-sm whitespace-nowrap justify-self-end">Timeout (seg)</Label>
           <Input
             id="timeoutDurationConfig"
             type="number"
@@ -217,7 +217,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             placeholder="ej. 30"
             min="1"
           />
-          <Label htmlFor="autoStartTimeoutsConfig" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
+          <Label htmlFor="autoStartTimeoutsConfig" className="font-normal text-sm justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
           <Switch
             id="autoStartTimeoutsConfig"
             checked={localAutoStartTimeouts}
@@ -226,8 +226,8 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Regular Breaks */}
-         <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
-          <Label htmlFor="breakDurationConfig" className="text-sm whitespace-nowrap">Descanso Reg. (seg)</Label>
+         <div className="grid grid-cols-[auto_80px_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+          <Label htmlFor="breakDurationConfig" className="text-sm whitespace-nowrap justify-self-end">Descanso Reg. (seg)</Label>
           <Input
             id="breakDurationConfig"
             type="number"
@@ -237,7 +237,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             placeholder="ej. 120"
             min="1"
           />
-          <Label htmlFor="autoStartBreaksConfig" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
+          <Label htmlFor="autoStartBreaksConfig" className="font-normal text-sm justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
           <Switch
             id="autoStartBreaksConfig"
             checked={localAutoStartBreaks}
@@ -246,8 +246,8 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Pre-OT Breaks */}
-        <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
-          <Label htmlFor="preOTBreakDurationConfig" className="text-sm whitespace-nowrap">Descanso Pre-OT (seg)</Label>
+        <div className="grid grid-cols-[auto_80px_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+          <Label htmlFor="preOTBreakDurationConfig" className="text-sm whitespace-nowrap justify-self-end">Descanso Pre-OT (seg)</Label>
           <Input
             id="preOTBreakDurationConfig"
             type="number"
@@ -257,7 +257,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             placeholder="ej. 60"
             min="1"
           />
-          <Label htmlFor="autoStartPreOTBreaksConfig" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
+          <Label htmlFor="autoStartPreOTBreaksConfig" className="font-normal text-sm justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
           <Switch
             id="autoStartPreOTBreaksConfig"
             checked={localAutoStartPreOTBreaks}
@@ -266,8 +266,8 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Warm-up */}
-        <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
-            <Label htmlFor="warmUpDurationConfig" className="text-sm whitespace-nowrap">Calentamiento (min)</Label>
+        <div className="grid grid-cols-[auto_80px_1fr_auto] items-center gap-x-3 sm:gap-x-4">
+            <Label htmlFor="warmUpDurationConfig" className="text-sm whitespace-nowrap justify-self-end">Calentamiento (min)</Label>
             <Input
               id="warmUpDurationConfig"
               type="number"
@@ -277,7 +277,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
               placeholder="ej. 5"
               min="1"
             />
-            <Label htmlFor="autoStartWarmUpConfig" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
+            <Label htmlFor="autoStartWarmUpConfig" className="font-normal text-sm justify-self-end whitespace-nowrap">Iniciar Autom.</Label>
             <Switch
               id="autoStartWarmUpConfig"
               checked={localAutoStartWarmUp}
@@ -290,6 +290,8 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
+    
+
     
 
     
