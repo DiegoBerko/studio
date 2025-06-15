@@ -11,6 +11,7 @@ import { ControlCardWrapper } from "@/components/controls/control-card-wrapper";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
 export interface DurationSettingsCardRef {
   handleSave: () => boolean; 
@@ -21,6 +22,8 @@ export interface DurationSettingsCardRef {
 interface DurationSettingsCardProps {
   onDirtyChange: (isDirty: boolean) => void;
 }
+
+const narrowInputStyle = "w-24 mt-1"; // Adjusted for slightly more width for "Cant" and "Min"
 
 export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, DurationSettingsCardProps>(({ onDirtyChange }, ref) => {
   const { state, dispatch } = useGameState();
@@ -151,33 +154,33 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
     getIsDirty: () => isDirty,
   }));
 
-  const inputStyle = "w-20 mt-0"; // Shared style for narrow inputs
+  const commonInputStyle = "w-20 mt-0"; // Shared style for narrow duration inputs
 
   return (
     <ControlCardWrapper title="Configuración de Tiempos, Períodos y Arranque Automático">
       <div className="space-y-6">
         {/* Regular Periods */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 items-end">
             <div>
-                <Label htmlFor="numRegularPeriods">Número de Períodos Regulares</Label>
+                <Label htmlFor="numRegularPeriods" className="text-sm">Períodos Regulares (Cant)</Label>
                 <Input
                 id="numRegularPeriods"
                 type="number"
                 value={localNumRegularPeriodsInput}
                 onChange={(e) => { setLocalNumRegularPeriodsInput(e.target.value); markDirty(); }}
-                className="mt-1"
+                className={narrowInputStyle}
                 placeholder="ej. 3"
                 min="1"
                 />
             </div>
             <div>
-              <Label htmlFor="periodDuration">Duración Período Regular (min)</Label>
+              <Label htmlFor="periodDuration" className="text-sm">Duración (Min)</Label>
               <Input
                 id="periodDuration"
                 type="number"
                 value={localPeriodDurationInput}
                 onChange={(e) => { setLocalPeriodDurationInput(e.target.value); markDirty(); }}
-                className="mt-1"
+                className={narrowInputStyle}
                 placeholder="ej. 20"
                 min="1"
               />
@@ -185,27 +188,27 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Overtime Periods */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 items-end">
             <div>
-                <Label htmlFor="numOTPeriods">Número de Períodos de Overtime</Label>
+                <Label htmlFor="numOTPeriods" className="text-sm">Períodos Overtime (Cant)</Label>
                 <Input
                 id="numOTPeriods"
                 type="number"
                 value={localNumOTPeriodsInput}
                 onChange={(e) => { setLocalNumOTPeriodsInput(e.target.value); markDirty(); }}
-                className="mt-1"
-                placeholder="ej. 1 (0 para ninguno)"
+                className={narrowInputStyle}
+                placeholder="ej. 1"
                 min="0"
                 />
             </div>
             <div>
-              <Label htmlFor="otPeriodDuration">Duración Overtime (min)</Label>
+              <Label htmlFor="otPeriodDuration" className="text-sm">Duración (Min)</Label>
               <Input
                 id="otPeriodDuration"
                 type="number"
                 value={localOTPeriodDurationInput}
                 onChange={(e) => { setLocalOTPeriodDurationInput(e.target.value); markDirty(); }}
-                className="mt-1"
+                className={narrowInputStyle}
                 placeholder="ej. 5"
                 min="1"
               />
@@ -214,13 +217,13 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         
         {/* Timeouts */}
         <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
-          <Label htmlFor="timeoutDurationConfig" className="whitespace-nowrap">Timeout (seg)</Label>
+          <Label htmlFor="timeoutDurationConfig" className="text-sm whitespace-nowrap">Timeout (seg)</Label>
           <Input
             id="timeoutDurationConfig"
             type="number"
             value={localTimeoutDurationInput}
             onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
-            className={inputStyle}
+            className={commonInputStyle}
             placeholder="ej. 30"
             min="1"
           />
@@ -234,13 +237,13 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 
         {/* Regular Breaks */}
          <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
-          <Label htmlFor="breakDurationConfig" className="whitespace-nowrap">Descanso Reg. (seg)</Label>
+          <Label htmlFor="breakDurationConfig" className="text-sm whitespace-nowrap">Descanso Reg. (seg)</Label>
           <Input
             id="breakDurationConfig"
             type="number"
             value={localBreakDurationInput}
             onChange={(e) => { setLocalBreakDurationInput(e.target.value); markDirty(); }}
-            className={inputStyle}
+            className={commonInputStyle}
             placeholder="ej. 120"
             min="1"
           />
@@ -254,13 +257,13 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 
         {/* Pre-OT Breaks */}
         <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
-          <Label htmlFor="preOTBreakDurationConfig" className="whitespace-nowrap">Descanso Pre-OT (seg)</Label>
+          <Label htmlFor="preOTBreakDurationConfig" className="text-sm whitespace-nowrap">Descanso Pre-OT (seg)</Label>
           <Input
             id="preOTBreakDurationConfig"
             type="number"
             value={localPreOTBreakDurationInput}
             onChange={(e) => { setLocalPreOTBreakDurationInput(e.target.value); markDirty(); }}
-            className={inputStyle}
+            className={commonInputStyle}
             placeholder="ej. 60"
             min="1"
           />
@@ -274,13 +277,13 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 
         {/* Warm-up */}
         <div className="grid grid-cols-[auto_minmax(60px,80px)_1fr_auto] items-center gap-x-3 sm:gap-x-4">
-            <Label htmlFor="warmUpDurationConfig" className="whitespace-nowrap">Calentamiento (min)</Label>
+            <Label htmlFor="warmUpDurationConfig" className="text-sm whitespace-nowrap">Calentamiento (min)</Label>
             <Input
               id="warmUpDurationConfig"
               type="number"
               value={localWarmUpDurationInput}
               onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
-              className={inputStyle}
+              className={commonInputStyle}
               placeholder="ej. 5"
               min="1"
             />
@@ -297,6 +300,6 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
-
+    
 
     
