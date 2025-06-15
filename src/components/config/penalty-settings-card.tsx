@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
@@ -13,40 +12,34 @@ export interface PenaltySettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef>((props, ref) => {
+interface PenaltySettingsCardProps {
+  onDirtyChange: (isDirty: boolean) => void;
+}
+
+export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySettingsCardProps>((props, ref) => {
   const { state, dispatch } = useGameState();
+  const { onDirtyChange } = props;
   
   const [localMaxPenaltiesInput, setLocalMaxPenaltiesInput] = useState(String(state.maxConcurrentPenalties));
   const [localPlayersPerTeamInput, setLocalPlayersPerTeamInput] = useState(String(state.playersPerTeamOnIce));
-  // No isDirty local state needed here, getIsDirty will compare directly
+  const [isDirtyLocal, setIsDirtyLocal] = useState(false);
 
   useEffect(() => {
-    // This effect only runs if the card itself isn't considered "dirty" by the parent page's logic,
-    // or if the direct comparison in getIsDirty returns false.
-    // It ensures that if global state changes (e.g., from file import or reset),
-    // the local inputs reflect that, UNLESS the user has uncommitted changes.
-    if (!getIsDirtyInternal()) {
+    onDirtyChange(isDirtyLocal);
+  }, [isDirtyLocal, onDirtyChange]);
+
+  useEffect(() => {
+    if (!isDirtyLocal) {
         setLocalMaxPenaltiesInput(String(state.maxConcurrentPenalties));
         setLocalPlayersPerTeamInput(String(state.playersPerTeamOnIce));
     }
-  }, [state.maxConcurrentPenalties, state.playersPerTeamOnIce]);
+  }, [state.maxConcurrentPenalties, state.playersPerTeamOnIce, isDirtyLocal]);
 
-
-  const markDirty = () => {
-    // This function is essentially a no-op now as dirtiness is determined by direct comparison.
-    // Kept for potential future use or if a child component needed to signal dirtiness.
-  };
-
-  const getIsDirtyInternal = () => {
-    return (
-      localMaxPenaltiesInput !== String(state.maxConcurrentPenalties) ||
-      localPlayersPerTeamInput !== String(state.playersPerTeamOnIce)
-    );
-  };
+  const markDirty = () => setIsDirtyLocal(true);
 
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      if (!getIsDirtyInternal()) return true;
+      if (!isDirtyLocal) return true;
 
       const maxPenNum = parseInt(localMaxPenaltiesInput, 10);
       const finalMaxPenalties = (isNaN(maxPenNum) || maxPenNum < 1) ? 1 : maxPenNum;
@@ -56,28 +49,29 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef>((props, re
       const finalPlayersPerTeam = (isNaN(playersNum) || playersNum < 1) ? 1 : playersNum;
       dispatch({ type: "SET_PLAYERS_PER_TEAM_ON_ICE", payload: finalPlayersPerTeam });
       
-      // After saving, local inputs should match global state, so getIsDirty will return false
+      setIsDirtyLocal(false);
       return true;
     },
     handleDiscard: () => {
       setLocalMaxPenaltiesInput(String(state.maxConcurrentPenalties));
       setLocalPlayersPerTeamInput(String(state.playersPerTeamOnIce));
+      setIsDirtyLocal(false);
     },
-    getIsDirty: getIsDirtyInternal,
+    getIsDirty: () => isDirtyLocal,
   }));
 
   return (
     <ControlCardWrapper title="Formato de Juego y Penalidades">
       <div className="space-y-6">
         <div>
-          <div className="grid grid-cols-[auto_minmax(0,theme(spacing.24))] items-center gap-x-3 sm:gap-x-4">
+          <div className="grid grid-cols-[auto_theme(spacing.24)] items-center gap-x-3 sm:gap-x-4">
             <Label htmlFor="playersPerTeam">Jugadores en Cancha</Label>
             <Input
               id="playersPerTeam"
               type="number"
               value={localPlayersPerTeamInput}
               onChange={(e) => { setLocalPlayersPerTeamInput(e.target.value); markDirty(); }}
-              className="text-sm" // Width controlled by grid
+              className="text-sm"
               placeholder="ej. 5"
               min="1"
             />
@@ -88,14 +82,14 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef>((props, re
         </div>
         
         <div>
-          <div className="grid grid-cols-[auto_minmax(0,theme(spacing.24))] items-center gap-x-3 sm:gap-x-4">
+          <div className="grid grid-cols-[auto_theme(spacing.24)] items-center gap-x-3 sm:gap-x-4">
             <Label htmlFor="maxConcurrentPenalties">Máximo Penalidades Concurrentes</Label>
             <Input
               id="maxConcurrentPenalties"
               type="number"
               value={localMaxPenaltiesInput}
               onChange={(e) => { setLocalMaxPenaltiesInput(e.target.value); markDirty(); }}
-              className="text-sm" // Width controlled by grid
+              className="text-sm"
               placeholder="ej. 2"
               min="1"
             />

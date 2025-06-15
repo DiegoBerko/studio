@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -39,32 +38,28 @@ export default function ConfigPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [localConfigName, setLocalConfigName] = useState(state.configName || '');
+  const [isConfigNameDirty, setIsConfigNameDirty] = useState(false);
+  const [isDurationDirty, setIsDurationDirty] = useState(false);
+  const [isPenaltyDirty, setIsPenaltyDirty] = useState(false);
+  const [isSoundDirty, setIsSoundDirty] = useState(false);
+  const [isTeamSettingsDirty, setIsTeamSettingsDirty] = useState(false);
+  const [isCategorySettingsDirty, setIsCategorySettingsDirty] = useState(false);
   
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [currentExportFilename, setCurrentExportFilename] = useState('');
   const [isResetConfigDialogOpen, setIsResetConfigDialogOpen] = useState(false);
 
-  // Calculate pageIsDirty dynamically
-  const getPageIsDirty = () => {
-    const isConfigNameLocalDirty = localConfigName !== (state.configName || '');
-    const isDurationCardDirty = durationSettingsRef.current?.getIsDirty() || false;
-    const isPenaltyCardDirty = penaltySettingsRef.current?.getIsDirty() || false;
-    const isSoundCardDirty = soundSettingsRef.current?.getIsDirty() || false;
-    const isTeamSettingsCardDirty = teamSettingsRef.current?.getIsDirty() || false;
-    const isCategorySettingsCardDirty = categorySettingsRef.current?.getIsDirty() || false;
-
-    return isConfigNameLocalDirty || isDurationCardDirty || isPenaltyCardDirty || isSoundCardDirty || isTeamSettingsCardDirty || isCategorySettingsCardDirty;
-  };
-  
-  const pageIsDirty = getPageIsDirty();
-
   useEffect(() => {
-    // Only update localConfigName from state if it's not currently dirty
-    if (localConfigName === (state.configName || '')) {
-      setLocalConfigName(state.configName || '');
-    }
+    setLocalConfigName(state.configName || '');
+    setIsConfigNameDirty(false);
   }, [state.configName]);
 
+  const handleLocalConfigNameChange = (newName: string) => {
+    setLocalConfigName(newName);
+    setIsConfigNameDirty(newName !== (state.configName || ''));
+  };
+
+  const pageIsDirty = isConfigNameDirty || isDurationDirty || isPenaltyDirty || isSoundDirty || isTeamSettingsDirty || isCategorySettingsDirty;
 
   const handleSaveAllConfig = () => {
     let configNameSaveSuccess = true;
@@ -74,7 +69,7 @@ export default function ConfigPage() {
     let teamSettingsSaveSuccess = true;
     let categorySettingsSaveSuccess = true;
 
-    if (localConfigName !== (state.configName || '')) {
+    if (isConfigNameDirty) {
       if (localConfigName.trim() === "") {
         toast({
           title: "Nombre de Configuración Requerido",
@@ -84,25 +79,30 @@ export default function ConfigPage() {
         configNameSaveSuccess = false;
       } else {
         dispatch({ type: 'SET_CONFIG_NAME', payload: localConfigName.trim() });
+        setIsConfigNameDirty(false); 
       }
     }
 
-    if (durationSettingsRef.current?.getIsDirty()) {
+    if (durationSettingsRef.current && isDurationDirty) {
       durationSaveSuccess = durationSettingsRef.current.handleSave();
+      if (durationSaveSuccess) setIsDurationDirty(false);
     }
-    if (penaltySettingsRef.current?.getIsDirty()) {
+    if (penaltySettingsRef.current && isPenaltyDirty) {
       penaltySaveSuccess = penaltySettingsRef.current.handleSave();
+      if (penaltySaveSuccess) setIsPenaltyDirty(false);
     }
-    if (soundSettingsRef.current?.getIsDirty()) {
+    if (soundSettingsRef.current && isSoundDirty) {
       soundSaveSuccess = soundSettingsRef.current.handleSave();
+      if (soundSaveSuccess) setIsSoundDirty(false);
     }
-    if (teamSettingsRef.current?.getIsDirty()) {
+    if (teamSettingsRef.current && isTeamSettingsDirty) {
       teamSettingsSaveSuccess = teamSettingsRef.current.handleSave();
+      if (teamSettingsSaveSuccess) setIsTeamSettingsDirty(false);
     }
-    if (categorySettingsRef.current?.getIsDirty()) {
+    if (categorySettingsRef.current && isCategorySettingsDirty) {
       categorySettingsSaveSuccess = categorySettingsRef.current.handleSave();
+      if (categorySettingsSaveSuccess) setIsCategorySettingsDirty(false);
     }
-
 
     if (configNameSaveSuccess && durationSaveSuccess && penaltySaveSuccess && soundSaveSuccess && teamSettingsSaveSuccess && categorySettingsSaveSuccess) {
       toast({
@@ -110,9 +110,8 @@ export default function ConfigPage() {
         description: "Todos los cambios de configuración han sido guardados exitosamente.",
       });
     } else if (!configNameSaveSuccess) {
-      // Toast already shown for config name error
-    }
-     else {
+      // Toast already shown
+    } else {
       toast({
         title: "Error al Guardar Configuración",
         description: "Algunas configuraciones no pudieron ser guardadas. Revisa los campos.",
@@ -122,23 +121,29 @@ export default function ConfigPage() {
   };
 
   const handleDiscardAllConfig = () => {
-    if (localConfigName !== (state.configName || '')) {
+    if (isConfigNameDirty) {
       setLocalConfigName(state.configName || '');
+      setIsConfigNameDirty(false);
     }
-    if (durationSettingsRef.current?.getIsDirty()) {
+    if (durationSettingsRef.current && isDurationDirty) {
       durationSettingsRef.current.handleDiscard();
+      setIsDurationDirty(false);
     }
-    if (penaltySettingsRef.current?.getIsDirty()) {
+    if (penaltySettingsRef.current && isPenaltyDirty) {
       penaltySettingsRef.current.handleDiscard();
+      setIsPenaltyDirty(false);
     }
-    if (soundSettingsRef.current?.getIsDirty()) {
+    if (soundSettingsRef.current && isSoundDirty) {
       soundSettingsRef.current.handleDiscard();
+      setIsSoundDirty(false);
     }
-    if (teamSettingsRef.current?.getIsDirty()) {
+    if (teamSettingsRef.current && isTeamSettingsDirty) {
       teamSettingsRef.current.handleDiscard();
+      setIsTeamSettingsDirty(false);
     }
-    if (categorySettingsRef.current?.getIsDirty()) {
+    if (categorySettingsRef.current && isCategorySettingsDirty) {
       categorySettingsRef.current.handleDiscard();
+      setIsCategorySettingsDirty(false);
     }
     toast({
       title: "Cambios de Configuración Descartados",
@@ -264,18 +269,14 @@ export default function ConfigPage() {
         };
 
         dispatch({ type: 'LOAD_CONFIG_FROM_FILE', payload: newConfigFromFile });
-
-        // After dispatching, the state will update, and useEffects in child cards
-        // (which depend on global state values) will run.
-        // Their `handleDiscard` might not be strictly necessary here if their `useEffect`s correctly
-        // update local inputs based on the new global state, especially since forceMount keeps them alive.
-        // However, calling discard ensures they reset to the new global state explicitly.
-        durationSettingsRef.current?.handleDiscard();
-        penaltySettingsRef.current?.handleDiscard();
-        soundSettingsRef.current?.handleDiscard();
-        teamSettingsRef.current?.handleDiscard();
-        categorySettingsRef.current?.handleDiscard();
-        setLocalConfigName(newConfigFromFile.configName || ''); // Ensure local config name also updates
+        setLocalConfigName(newConfigFromFile.configName || '');
+        setIsConfigNameDirty(false);
+        setIsDurationDirty(false);
+        setIsPenaltyDirty(false);
+        setIsSoundDirty(false);
+        setIsTeamSettingsDirty(false);
+        setIsCategorySettingsDirty(false);
+        // Card specific discards will be handled by their useEffects reacting to global state change
 
         toast({
           title: "Configuración Importada",
@@ -303,13 +304,14 @@ export default function ConfigPage() {
 
   const performConfigReset = () => {
     dispatch({ type: 'RESET_CONFIG_TO_DEFAULTS' });
-    // Similar to import, child cards will update via their useEffects or handleDiscard will reset them.
-    setLocalConfigName(state.configName || ''); // Reset local config name after dispatch
-    durationSettingsRef.current?.handleDiscard();
-    penaltySettingsRef.current?.handleDiscard();
-    soundSettingsRef.current?.handleDiscard();
-    teamSettingsRef.current?.handleDiscard();
-    categorySettingsRef.current?.handleDiscard();
+    setLocalConfigName(initialGlobalState.configName); // initialGlobalState or derived default name
+    setIsConfigNameDirty(false);
+    setIsDurationDirty(false);
+    setIsPenaltyDirty(false);
+    setIsSoundDirty(false);
+    setIsTeamSettingsDirty(false);
+    setIsCategorySettingsDirty(false);
+    // Card specific discards will be handled by their useEffects reacting to global state change
 
     toast({
       title: "Configuración Restablecida",
@@ -317,7 +319,6 @@ export default function ConfigPage() {
     });
     setIsResetConfigDialogOpen(false);
   };
-
 
   const tabContentClassName = "mt-6 p-6 border rounded-md bg-card/30 shadow-sm";
 
@@ -342,7 +343,7 @@ export default function ConfigPage() {
         <Input
           id="configName"
           value={localConfigName}
-          onChange={(e) => { setLocalConfigName(e.target.value);}}
+          onChange={(e) => handleLocalConfigNameChange(e.target.value)}
           placeholder="ej. Formato 4vs4 Juvenil"
           className="text-base"
         />
@@ -360,22 +361,22 @@ export default function ConfigPage() {
         </TabsList>
         <TabsContent value="gameFormat" className={tabContentClassName} forceMount>
           <div className="space-y-6">
-            <PenaltySettingsCard ref={penaltySettingsRef} />
+            <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} />
           </div>
         </TabsContent>
         <TabsContent value="timings" className={tabContentClassName} forceMount>
-           <DurationSettingsCard ref={durationSettingsRef} />
+           <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
         </TabsContent>
         <TabsContent value="sound" className={tabContentClassName} forceMount>
-           <SoundSettingsCard ref={soundSettingsRef} />
+           <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
         </TabsContent>
         <TabsContent value="teamsAndDisplay" className={tabContentClassName} forceMount>
           <div className="space-y-8">
-            <CategorySettingsCard ref={categorySettingsRef} />
+            <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
             <Separator />
             <TeamsManagementTab />
             <Separator />
-            <TeamSettingsCard ref={teamSettingsRef} />
+            <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty}/>
           </div>
         </TabsContent>
       </Tabs>
@@ -464,3 +465,10 @@ export default function ConfigPage() {
     </div>
   );
 }
+
+// Helper to get initial state for ConfigPage (if needed)
+// This can be expanded or used if more complex default logic is required outside of GameStateContext
+const initialGlobalState = {
+  configName: "Configuración Predeterminada",
+  // Add other default values if needed for comparison or reset independent of GameStateContext
+};

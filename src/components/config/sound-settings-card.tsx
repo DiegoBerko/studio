@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef } from "react";
@@ -23,52 +22,52 @@ export interface SoundSettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-export const SoundSettingsCard = forwardRef<SoundSettingsCardRef>((props, ref) => {
+interface SoundSettingsCardProps {
+  onDirtyChange: (isDirty: boolean) => void;
+}
+
+export const SoundSettingsCard = forwardRef<SoundSettingsCardRef, SoundSettingsCardProps>((props, ref) => {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
+  const { onDirtyChange } = props;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [localPlaySound, setLocalPlaySound] = useState(state.playSoundAtPeriodEnd);
   const [localCustomSoundDataUrl, setLocalCustomSoundDataUrl] = useState(state.customHornSoundDataUrl);
   const [customSoundFileName, setCustomSoundFileName] = useState<string | null>(null);
-
-  // No local isDirty state, dirtiness is determined by direct comparison in getIsDirty
+  const [isDirtyLocal, setIsDirtyLocal] = useState(false);
 
   useEffect(() => {
-     if (!getIsDirtyInternal()) {
+    onDirtyChange(isDirtyLocal);
+  }, [isDirtyLocal, onDirtyChange]);
+
+  useEffect(() => {
+     if (!isDirtyLocal) {
       setLocalPlaySound(state.playSoundAtPeriodEnd);
       setLocalCustomSoundDataUrl(state.customHornSoundDataUrl);
       setCustomSoundFileName(null); 
     }
-  }, [state.playSoundAtPeriodEnd, state.customHornSoundDataUrl]);
+  }, [state.playSoundAtPeriodEnd, state.customHornSoundDataUrl, isDirtyLocal]);
 
-
-  const markDirty = () => {
-    // No-op, dirtiness from direct comparison
-  };
-
-  const getIsDirtyInternal = () => {
-    return (
-      localPlaySound !== state.playSoundAtPeriodEnd ||
-      localCustomSoundDataUrl !== state.customHornSoundDataUrl
-    );
-  };
+  const markDirty = () => setIsDirtyLocal(true);
 
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      if (!getIsDirtyInternal()) return true;
+      if (!isDirtyLocal) return true;
 
       dispatch({ type: "SET_PLAY_SOUND_AT_PERIOD_END", payload: localPlaySound });
       dispatch({ type: "SET_CUSTOM_HORN_SOUND_DATA_URL", payload: localCustomSoundDataUrl });
       
+      setIsDirtyLocal(false);
       return true; 
     },
     handleDiscard: () => {
       setLocalPlaySound(state.playSoundAtPeriodEnd);
       setLocalCustomSoundDataUrl(state.customHornSoundDataUrl);
       setCustomSoundFileName(null);
+      setIsDirtyLocal(false);
     },
-    getIsDirty: getIsDirtyInternal,
+    getIsDirty: () => isDirtyLocal,
   }));
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -84,7 +83,7 @@ export const SoundSettingsCard = forwardRef<SoundSettingsCardRef>((props, ref) =
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
+    if (file.size > 2 * 1024 * 1024) { // 2MB limit
          toast({
             title: "Archivo Demasiado Grande",
             description: "El tamaño máximo del archivo de sonido es 2MB.",
@@ -94,13 +93,12 @@ export const SoundSettingsCard = forwardRef<SoundSettingsCardRef>((props, ref) =
         return;
     }
 
-
     const reader = new FileReader();
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
       setLocalCustomSoundDataUrl(dataUrl);
       setCustomSoundFileName(file.name);
-      markDirty(); // Though not strictly needed due to getIsDirtyInternal, good for consistency
+      markDirty();
       toast({
         title: "Sonido Personalizado Cargado",
         description: `"${file.name}" listo para usar. Guarda los cambios.`,
@@ -113,7 +111,7 @@ export const SoundSettingsCard = forwardRef<SoundSettingsCardRef>((props, ref) =
     setLocalCustomSoundDataUrl(null);
     setCustomSoundFileName(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    markDirty(); // Same as above
+    markDirty();
     toast({
       title: "Sonido Personalizado Eliminado",
       description: "Se usará el sonido predeterminado. Guarda los cambios.",
@@ -124,7 +122,6 @@ export const SoundSettingsCard = forwardRef<SoundSettingsCardRef>((props, ref) =
     localCustomSoundDataUrl 
       ? (customSoundFileName || "Sonido Personalizado Cargado")
       : `Predeterminado (${DEFAULT_SOUND_PATH.split('/').pop() || 'default-horn.wav'})`;
-
 
   return (
     <ControlCardWrapper title="Configuración de Sonido de Bocina">

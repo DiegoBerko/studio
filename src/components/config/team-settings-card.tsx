@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
@@ -15,20 +14,28 @@ export interface TeamSettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-export const TeamSettingsCard = forwardRef<TeamSettingsCardRef>((props, ref) => {
+interface TeamSettingsCardProps {
+  onDirtyChange: (isDirty: boolean) => void;
+}
+
+export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCardProps>((props, ref) => {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
+  const { onDirtyChange } = props;
 
   const [localEnableTeamUsage, setLocalEnableTeamUsage] = useState(state.enableTeamSelectionInMiniScoreboard);
   const [localEnablePlayerSelection, setLocalEnablePlayerSelection] = useState(state.enablePlayerSelectionForPenalties);
   const [localShowAliasInSelector, setLocalShowAliasInSelector] = useState(state.showAliasInPenaltyPlayerSelector);
   const [localShowAliasInControlsList, setLocalShowAliasInControlsList] = useState(state.showAliasInControlsPenaltyList);
   const [localShowAliasInScoreboard, setLocalShowAliasInScoreboard] = useState(state.showAliasInScoreboardPenalties);
-  
-  // No local isDirty state, dirtiness is determined by direct comparison in getIsDirty
+  const [isDirtyLocal, setIsDirtyLocal] = useState(false);
 
   useEffect(() => {
-    if (!getIsDirtyInternal()) {
+    onDirtyChange(isDirtyLocal);
+  }, [isDirtyLocal, onDirtyChange]);
+  
+  useEffect(() => {
+    if (!isDirtyLocal) {
       setLocalEnableTeamUsage(state.enableTeamSelectionInMiniScoreboard);
       setLocalEnablePlayerSelection(state.enablePlayerSelectionForPenalties);
       setLocalShowAliasInSelector(state.showAliasInPenaltyPlayerSelector);
@@ -41,39 +48,26 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef>((props, ref) => 
     state.showAliasInPenaltyPlayerSelector,
     state.showAliasInControlsPenaltyList,
     state.showAliasInScoreboardPenalties,
+    isDirtyLocal,
   ]);
 
-  const markDirty = () => {
-    // No-op
-  };
-
-  const getIsDirtyInternal = () => {
-    return (
-      localEnableTeamUsage !== state.enableTeamSelectionInMiniScoreboard ||
-      localEnablePlayerSelection !== state.enablePlayerSelectionForPenalties ||
-      localShowAliasInSelector !== state.showAliasInPenaltyPlayerSelector ||
-      localShowAliasInControlsList !== state.showAliasInControlsPenaltyList ||
-      localShowAliasInScoreboard !== state.showAliasInScoreboardPenalties
-    );
-  };
+  const markDirty = () => setIsDirtyLocal(true);
 
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      if (!getIsDirtyInternal()) return true;
+      if (!isDirtyLocal) return true;
 
       dispatch({ type: "SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD", payload: localEnableTeamUsage });
-      // Dispatching the master toggle will cause the reducer to handle dependent toggles.
-      // If localEnableTeamUsage is true, we then dispatch the current local states for sub-toggles.
       if (localEnableTeamUsage) {
         dispatch({ type: "SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES", payload: localEnablePlayerSelection });
         if (localEnablePlayerSelection) {
             dispatch({ type: "SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR", payload: localShowAliasInSelector });
             dispatch({ type: "SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST", payload: localShowAliasInControlsList });
         }
-         // showAliasInScoreboardPenalties is independent of enablePlayerSelection
         dispatch({ type: "SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES", payload: localShowAliasInScoreboard });
       }
       
+      setIsDirtyLocal(false);
       return true; 
     },
     handleDiscard: () => {
@@ -82,8 +76,9 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef>((props, ref) => 
       setLocalShowAliasInSelector(state.showAliasInPenaltyPlayerSelector);
       setLocalShowAliasInControlsList(state.showAliasInControlsPenaltyList);
       setLocalShowAliasInScoreboard(state.showAliasInScoreboardPenalties);
+      setIsDirtyLocal(false);
     },
-    getIsDirty: getIsDirtyInternal,
+    getIsDirty: () => isDirtyLocal,
   }));
   
   const handleMasterToggleChange = (checked: boolean) => {
@@ -105,7 +100,6 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef>((props, ref) => 
         setLocalShowAliasInControlsList(false);
     }
   };
-
 
   return (
     <ControlCardWrapper title="Configuración de Display (Alias y Selección)">

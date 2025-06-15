@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
@@ -14,37 +13,35 @@ export interface CategorySettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-export const CategorySettingsCard = forwardRef<CategorySettingsCardRef>((props, ref) => {
+interface CategorySettingsCardProps {
+  onDirtyChange: (isDirty: boolean) => void;
+}
+
+export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, CategorySettingsCardProps>((props, ref) => {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
+  const { onDirtyChange } = props;
 
   const [localCategoriesString, setLocalCategoriesString] = useState(
     state.availableCategories.map(c => c.name).join(", ")
   );
-  
-  // No local isDirty state, dirtiness is determined by direct comparison in getIsDirty
+  const [isDirtyLocal, setIsDirtyLocal] = useState(false);
 
   useEffect(() => {
-    // This effect only runs if the card itself isn't considered "dirty" by the parent page's logic
-    // or if the direct comparison in getIsDirty returns false.
-     if (!getIsDirtyInternal()) {
+    onDirtyChange(isDirtyLocal);
+  }, [isDirtyLocal, onDirtyChange]);
+
+  useEffect(() => {
+     if (!isDirtyLocal) {
       setLocalCategoriesString(state.availableCategories.map(c => c.name).join(", "));
     }
-  }, [state.availableCategories]);
+  }, [state.availableCategories, isDirtyLocal]);
 
-
-  const markDirty = () => {
-    // This function is essentially a no-op now as dirtiness is determined by direct comparison.
-  };
-
-  const getIsDirtyInternal = () => {
-    const globalCategoriesString = state.availableCategories.map(c => c.name).join(", ");
-    return localCategoriesString !== globalCategoriesString;
-  };
+  const markDirty = () => setIsDirtyLocal(true);
 
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      if (!getIsDirtyInternal()) return true;
+      if (!isDirtyLocal) return true;
 
       const categoryNames = localCategoriesString
         .split(',')
@@ -59,19 +56,22 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef>((props, 
             description: "Los nombres de las categorías deben ser únicos (ignorando mayúsculas/minúsculas y después de eliminar duplicados exactos).",
             variant: "destructive",
         });
+        // Do not set isDirtyLocal to false here, let user correct or discard
+        return false; 
       }
       
       const finalCategories: CategoryData[] = Array.from(new Set(categoryNames)) 
           .map(name => ({ id: name, name })); 
 
       dispatch({ type: "SET_AVAILABLE_CATEGORIES", payload: finalCategories });
-      
+      setIsDirtyLocal(false);
       return true; 
     },
     handleDiscard: () => {
       setLocalCategoriesString(state.availableCategories.map(c => c.name).join(", "));
+      setIsDirtyLocal(false);
     },
-    getIsDirty: getIsDirtyInternal,
+    getIsDirty: () => isDirtyLocal,
   }));
 
   return (
