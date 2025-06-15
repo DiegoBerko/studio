@@ -23,7 +23,7 @@ interface DurationSettingsCardProps {
   onDirtyChange: (isDirty: boolean) => void;
 }
 
-const narrowInputStyle = "w-20 mt-0 text-sm"; 
+const inputColumnStyle = "w-24 text-sm"; 
 
 export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, DurationSettingsCardProps>(({ onDirtyChange }, ref) => {
   const { state, dispatch } = useGameState();
@@ -156,140 +156,126 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 
   return (
     <ControlCardWrapper title="Configuración de Tiempos, Períodos y Arranque Automático">
-      <div className="space-y-6">
+      <div className="grid grid-cols-[auto_minmax(0,theme(spacing.24))_auto_auto] items-center gap-x-3 sm:gap-x-4 gap-y-5">
         {/* Regular Periods */}
-        <div className="grid grid-cols-[auto_theme(spacing.20)_auto_theme(spacing.20)] items-center gap-x-3 sm:gap-x-4">
-            <Label htmlFor="numRegularPeriods" className="text-sm whitespace-nowrap">Períodos Regulares (Cant)</Label>
-            <Input
-              id="numRegularPeriods"
-              type="number"
-              value={localNumRegularPeriodsInput}
-              onChange={(e) => { setLocalNumRegularPeriodsInput(e.target.value); markDirty(); }}
-              className={narrowInputStyle}
-              placeholder="ej. 3"
-              min="1"
-            />
-            <Label htmlFor="periodDuration" className="text-sm whitespace-nowrap">Duración (Min)</Label>
-            <Input
-              id="periodDuration"
-              type="number"
-              value={localPeriodDurationInput}
-              onChange={(e) => { setLocalPeriodDurationInput(e.target.value); markDirty(); }}
-              className={narrowInputStyle}
-              placeholder="ej. 20"
-              min="1"
-            />
-        </div>
+        <Label htmlFor="numRegularPeriods" className="text-sm whitespace-nowrap">Períodos Regulares (Cant)</Label>
+        <Input
+          id="numRegularPeriods"
+          type="number"
+          value={localNumRegularPeriodsInput}
+          onChange={(e) => { setLocalNumRegularPeriodsInput(e.target.value); markDirty(); }}
+          className={inputColumnStyle}
+          placeholder="ej. 3"
+          min="1"
+        />
+        <Label htmlFor="periodDuration" className="text-sm whitespace-nowrap">Duración (Min)</Label>
+        <Input
+          id="periodDuration"
+          type="number"
+          value={localPeriodDurationInput}
+          onChange={(e) => { setLocalPeriodDurationInput(e.target.value); markDirty(); }}
+          className={inputColumnStyle}
+          placeholder="ej. 20"
+          min="1"
+        />
 
         {/* Overtime Periods */}
-        <div className="grid grid-cols-[auto_theme(spacing.20)_auto_theme(spacing.20)] items-center gap-x-3 sm:gap-x-4">
-            <Label htmlFor="numOTPeriods" className="text-sm whitespace-nowrap">Períodos Overtime (Cant)</Label>
-            <Input
-              id="numOTPeriods"
-              type="number"
-              value={localNumOTPeriodsInput}
-              onChange={(e) => { setLocalNumOTPeriodsInput(e.target.value); markDirty(); }}
-              className={narrowInputStyle}
-              placeholder="ej. 1"
-              min="0"
-            />
-            <Label htmlFor="otPeriodDuration" className="text-sm whitespace-nowrap">Duración (Min)</Label>
-            <Input
-              id="otPeriodDuration"
-              type="number"
-              value={localOTPeriodDurationInput}
-              onChange={(e) => { setLocalOTPeriodDurationInput(e.target.value); markDirty(); }}
-              className={narrowInputStyle}
-              placeholder="ej. 5"
-              min="1"
-            />
-        </div>
+        <Label htmlFor="numOTPeriods" className="text-sm whitespace-nowrap">Períodos Overtime (Cant)</Label>
+        <Input
+          id="numOTPeriods"
+          type="number"
+          value={localNumOTPeriodsInput}
+          onChange={(e) => { setLocalNumOTPeriodsInput(e.target.value); markDirty(); }}
+          className={inputColumnStyle}
+          placeholder="ej. 1"
+          min="0"
+        />
+        <Label htmlFor="otPeriodDuration" className="text-sm whitespace-nowrap">Duración (Min)</Label>
+        <Input
+          id="otPeriodDuration"
+          type="number"
+          value={localOTPeriodDurationInput}
+          onChange={(e) => { setLocalOTPeriodDurationInput(e.target.value); markDirty(); }}
+          className={inputColumnStyle}
+          placeholder="ej. 5"
+          min="1"
+        />
         
         {/* Timeouts */}
-        <div className="grid grid-cols-[auto_theme(spacing.20)_auto_auto] items-center gap-x-3 sm:gap-x-4">
-          <Label htmlFor="timeoutDurationConfig" className="text-sm whitespace-nowrap">Timeout (seg)</Label>
-          <Input
-            id="timeoutDurationConfig"
-            type="number"
-            value={localTimeoutDurationInput}
-            onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
-            className={narrowInputStyle}
-            placeholder="ej. 30"
-            min="1"
-          />
-          <Label htmlFor="autoStartTimeoutsConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
-          <Switch
-            id="autoStartTimeoutsConfig"
-            checked={localAutoStartTimeouts}
-            onCheckedChange={(checked) => { setLocalAutoStartTimeouts(checked); markDirty(); }}
-          />
-        </div>
+        <Label htmlFor="timeoutDurationConfig" className="text-sm whitespace-nowrap">Timeout (seg)</Label>
+        <Input
+          id="timeoutDurationConfig"
+          type="number"
+          value={localTimeoutDurationInput}
+          onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
+          className={inputColumnStyle}
+          placeholder="ej. 30"
+          min="1"
+        />
+        <Label htmlFor="autoStartTimeoutsConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
+        <Switch
+          id="autoStartTimeoutsConfig"
+          checked={localAutoStartTimeouts}
+          onCheckedChange={(checked) => { setLocalAutoStartTimeouts(checked); markDirty(); }}
+        />
 
         {/* Regular Breaks */}
-         <div className="grid grid-cols-[auto_theme(spacing.20)_auto_auto] items-center gap-x-3 sm:gap-x-4">
-          <Label htmlFor="breakDurationConfig" className="text-sm whitespace-nowrap">Descanso Reg. (seg)</Label>
-          <Input
-            id="breakDurationConfig"
-            type="number"
-            value={localBreakDurationInput}
-            onChange={(e) => { setLocalBreakDurationInput(e.target.value); markDirty(); }}
-            className={narrowInputStyle}
-            placeholder="ej. 120"
-            min="1"
-          />
-          <Label htmlFor="autoStartBreaksConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
-          <Switch
-            id="autoStartBreaksConfig"
-            checked={localAutoStartBreaks}
-            onCheckedChange={(checked) => { setLocalAutoStartBreaks(checked); markDirty(); }}
-          />
-        </div>
+        <Label htmlFor="breakDurationConfig" className="text-sm whitespace-nowrap">Descanso Reg. (seg)</Label>
+        <Input
+          id="breakDurationConfig"
+          type="number"
+          value={localBreakDurationInput}
+          onChange={(e) => { setLocalBreakDurationInput(e.target.value); markDirty(); }}
+          className={inputColumnStyle}
+          placeholder="ej. 120"
+          min="1"
+        />
+        <Label htmlFor="autoStartBreaksConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
+        <Switch
+          id="autoStartBreaksConfig"
+          checked={localAutoStartBreaks}
+          onCheckedChange={(checked) => { setLocalAutoStartBreaks(checked); markDirty(); }}
+        />
 
         {/* Pre-OT Breaks */}
-        <div className="grid grid-cols-[auto_theme(spacing.20)_auto_auto] items-center gap-x-3 sm:gap-x-4">
-          <Label htmlFor="preOTBreakDurationConfig" className="text-sm whitespace-nowrap">Descanso Pre-OT (seg)</Label>
-          <Input
-            id="preOTBreakDurationConfig"
-            type="number"
-            value={localPreOTBreakDurationInput}
-            onChange={(e) => { setLocalPreOTBreakDurationInput(e.target.value); markDirty(); }}
-            className={narrowInputStyle}
-            placeholder="ej. 60"
-            min="1"
-          />
-          <Label htmlFor="autoStartPreOTBreaksConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
-          <Switch
-            id="autoStartPreOTBreaksConfig"
-            checked={localAutoStartPreOTBreaks}
-            onCheckedChange={(checked) => { setLocalAutoStartPreOTBreaks(checked); markDirty(); }}
-          />
-        </div>
+        <Label htmlFor="preOTBreakDurationConfig" className="text-sm whitespace-nowrap">Descanso Pre-OT (seg)</Label>
+        <Input
+          id="preOTBreakDurationConfig"
+          type="number"
+          value={localPreOTBreakDurationInput}
+          onChange={(e) => { setLocalPreOTBreakDurationInput(e.target.value); markDirty(); }}
+          className={inputColumnStyle}
+          placeholder="ej. 60"
+          min="1"
+        />
+        <Label htmlFor="autoStartPreOTBreaksConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
+        <Switch
+          id="autoStartPreOTBreaksConfig"
+          checked={localAutoStartPreOTBreaks}
+          onCheckedChange={(checked) => { setLocalAutoStartPreOTBreaks(checked); markDirty(); }}
+        />
 
         {/* Warm-up */}
-        <div className="grid grid-cols-[auto_theme(spacing.20)_auto_auto] items-center gap-x-3 sm:gap-x-4">
-            <Label htmlFor="warmUpDurationConfig" className="text-sm whitespace-nowrap">Calentamiento (min)</Label>
-            <Input
-              id="warmUpDurationConfig"
-              type="number"
-              value={localWarmUpDurationInput}
-              onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
-              className={narrowInputStyle}
-              placeholder="ej. 5"
-              min="1"
-            />
-            <Label htmlFor="autoStartWarmUpConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
-            <Switch
-              id="autoStartWarmUpConfig"
-              checked={localAutoStartWarmUp}
-              onCheckedChange={(checked) => { setLocalAutoStartWarmUp(checked); markDirty(); }}
-            />
-        </div>
+        <Label htmlFor="warmUpDurationConfig" className="text-sm whitespace-nowrap">Calentamiento (min)</Label>
+        <Input
+          id="warmUpDurationConfig"
+          type="number"
+          value={localWarmUpDurationInput}
+          onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
+          className={inputColumnStyle}
+          placeholder="ej. 5"
+          min="1"
+        />
+        <Label htmlFor="autoStartWarmUpConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
+        <Switch
+          id="autoStartWarmUpConfig"
+          checked={localAutoStartWarmUp}
+          onCheckedChange={(checked) => { setLocalAutoStartWarmUp(checked); markDirty(); }}
+        />
       </div>
     </ControlCardWrapper>
   );
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
-    
-
     
