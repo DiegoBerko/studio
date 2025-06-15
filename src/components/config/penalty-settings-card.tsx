@@ -64,35 +64,40 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySet
 
   return (
     <ControlCardWrapper title="Formato de Juego y Penalidades">
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div>
-          <Label htmlFor="playersPerTeam">Jugadores en Cancha (sin arquero)</Label>
-          <Input
-            id="playersPerTeam"
-            type="number"
-            value={localPlayersPerTeamInput}
-            onChange={(e) => { setLocalPlayersPerTeamInput(e.target.value); markDirty(); }}
-            className="mt-1"
-            placeholder="ej. 5"
-            min="1"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
+          <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 sm:gap-x-4">
+            <Label htmlFor="playersPerTeam">Jugadores en Cancha</Label>
+            <Input
+              id="playersPerTeam"
+              type="number"
+              value={localPlayersPerTeamInput}
+              onChange={(e) => { setLocalPlayersPerTeamInput(e.target.value); markDirty(); }}
+              className="w-24 text-sm"
+              placeholder="ej. 5"
+              min="1"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-1.5">
             Número de jugadores de campo por equipo (excluyendo al arquero).
           </p>
         </div>
-        <div className="pt-2">
-          <Label htmlFor="maxConcurrentPenalties">Máximo Penalidades Concurrentes por Equipo</Label>
-          <Input
-            id="maxConcurrentPenalties"
-            type="number"
-            value={localMaxPenaltiesInput}
-            onChange={(e) => { setLocalMaxPenaltiesInput(e.target.value); markDirty(); }}
-            className="mt-1"
-            placeholder="ej. 2"
-            min="1"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            Define cuántas penalidades pueden correr su tiempo simultáneamente para un mismo equipo.
+        
+        <div>
+          <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 sm:gap-x-4">
+            <Label htmlFor="maxConcurrentPenalties">Máximo Penalidades Concurrentes por Equipo</Label>
+            <Input
+              id="maxConcurrentPenalties"
+              type="number"
+              value={localMaxPenaltiesInput}
+              onChange={(e) => { setLocalMaxPenaltiesInput(e.target.value); markDirty(); }}
+              className="w-24 text-sm"
+              placeholder="ej. 2"
+              min="1"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Define cuántas penalidades pueden correr su tiempo simultáneamente para un mismo equipo. (Ligado a cuántos jugadores menos en cancha puede tener un equipo)
           </p>
         </div>
       </div>
@@ -101,5 +106,4 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySet
 });
 
 PenaltySettingsCard.displayName = "PenaltySettingsCard";
-
     
