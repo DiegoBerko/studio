@@ -14,8 +14,6 @@ export interface CategorySettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-// Interface CategorySettingsCardProps removida ya que onDirtyChange no se usa más
-
 export const CategorySettingsCard = forwardRef<CategorySettingsCardRef>((props, ref) => {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
@@ -24,28 +22,29 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef>((props, 
     state.availableCategories.map(c => c.name).join(", ")
   );
   
-  const [isDirty, setIsDirty] = useState(false); // Flag local de "dirty"
+  // No local isDirty state, dirtiness is determined by direct comparison in getIsDirty
 
   useEffect(() => {
-    // Este efecto se ejecuta cuando state.availableCategories cambia o cuando isDirty cambia.
-    // Si la tarjeta no está marcada como "dirty" por una edición del usuario,
-    // actualiza el string local para reflejar el estado global.
-    if (!isDirty) {
+    // This effect only runs if the card itself isn't considered "dirty" by the parent page's logic
+    // or if the direct comparison in getIsDirty returns false.
+     if (!getIsDirtyInternal()) {
       setLocalCategoriesString(state.availableCategories.map(c => c.name).join(", "));
     }
-  }, [state.availableCategories, isDirty]);
+  }, [state.availableCategories]);
 
 
   const markDirty = () => {
-    if (!isDirty) setIsDirty(true);
+    // This function is essentially a no-op now as dirtiness is determined by direct comparison.
+  };
+
+  const getIsDirtyInternal = () => {
+    const globalCategoriesString = state.availableCategories.map(c => c.name).join(", ");
+    return localCategoriesString !== globalCategoriesString;
   };
 
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      if (!isDirty) { // Si el flag local indica que no hay cambios, no hagas nada
-        const globalCategoriesString = state.availableCategories.map(c => c.name).join(", ");
-        if (localCategoriesString === globalCategoriesString) return true; // Verifica por si acaso
-      }
+      if (!getIsDirtyInternal()) return true;
 
       const categoryNames = localCategoriesString
         .split(',')
@@ -60,38 +59,24 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef>((props, 
             description: "Los nombres de las categorías deben ser únicos (ignorando mayúsculas/minúsculas y después de eliminar duplicados exactos).",
             variant: "destructive",
         });
-        // No retornamos false aquí, permitimos guardar lo que es válido si el usuario insiste,
-        // o podría implementarse una validación más estricta para retornar false.
-        // Por ahora, se guardarán los nombres únicos.
       }
       
       const finalCategories: CategoryData[] = Array.from(new Set(categoryNames)) 
           .map(name => ({ id: name, name })); 
 
-      // Permitir string vacío para eliminar todas las categorías.
-      // La validación de "no puede estar vacío si no se quiere tener ninguna" es un poco confusa.
-      // Si el usuario quiere 0 categorías, el string local será "" y finalCategories.length será 0.
-      // Esto es válido.
-
       dispatch({ type: "SET_AVAILABLE_CATEGORIES", payload: finalCategories });
       
-      setIsDirty(false); // Resetea el flag "dirty" después de guardar
       return true; 
     },
     handleDiscard: () => {
       setLocalCategoriesString(state.availableCategories.map(c => c.name).join(", "));
-      setIsDirty(false); // Resetea el flag "dirty"
     },
-    getIsDirty: () => {
-      // Compara activamente el valor local con el valor del estado global
-      const globalCategoriesString = state.availableCategories.map(c => c.name).join(", ");
-      return localCategoriesString !== globalCategoriesString;
-    },
+    getIsDirty: getIsDirtyInternal,
   }));
 
   return (
     <ControlCardWrapper title="Configuración de Categorías Disponibles">
-      <div className="space-y-2 p-4 border rounded-md bg-muted/20">
+      <div className="space-y-2">
         <div className="grid grid-cols-[auto_1fr] items-center gap-x-4">
           <Label htmlFor="categoriesInput" className="text-base font-medium whitespace-nowrap">
             Nombres de Categorías
@@ -103,7 +88,7 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef>((props, 
             value={localCategoriesString}
             onChange={(e) => {
               setLocalCategoriesString(e.target.value);
-              markDirty(); // Marca como "dirty" al editar
+              markDirty();
             }}
           />
         </div>
@@ -117,5 +102,3 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef>((props, 
 });
 
 CategorySettingsCard.displayName = "CategorySettingsCard";
-
-    

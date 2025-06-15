@@ -15,8 +15,6 @@ export interface TeamSettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-// Interface TeamSettingsCardProps removida
-
 export const TeamSettingsCard = forwardRef<TeamSettingsCardRef>((props, ref) => {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
@@ -27,11 +25,10 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef>((props, ref) => 
   const [localShowAliasInControlsList, setLocalShowAliasInControlsList] = useState(state.showAliasInControlsPenaltyList);
   const [localShowAliasInScoreboard, setLocalShowAliasInScoreboard] = useState(state.showAliasInScoreboardPenalties);
   
-  const [isDirty, setIsDirty] = useState(false); // Flag local de "dirty"
+  // No local isDirty state, dirtiness is determined by direct comparison in getIsDirty
 
   useEffect(() => {
-    // Si la tarjeta no está marcada como "dirty", actualiza los valores locales para reflejar el estado global.
-    if (!isDirty) {
+    if (!getIsDirtyInternal()) {
       setLocalEnableTeamUsage(state.enableTeamSelectionInMiniScoreboard);
       setLocalEnablePlayerSelection(state.enablePlayerSelectionForPenalties);
       setLocalShowAliasInSelector(state.showAliasInPenaltyPlayerSelector);
@@ -44,15 +41,13 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef>((props, ref) => 
     state.showAliasInPenaltyPlayerSelector,
     state.showAliasInControlsPenaltyList,
     state.showAliasInScoreboardPenalties,
-    isDirty // Dependencia importante para la condición
   ]);
 
   const markDirty = () => {
-    if (!isDirty) setIsDirty(true);
+    // No-op
   };
 
   const getIsDirtyInternal = () => {
-    // Compara activamente los valores locales con los valores del estado global
     return (
       localEnableTeamUsage !== state.enableTeamSelectionInMiniScoreboard ||
       localEnablePlayerSelection !== state.enablePlayerSelectionForPenalties ||
@@ -64,22 +59,21 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef>((props, ref) => 
 
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      if (!isDirty && !getIsDirtyInternal()) return true;
+      if (!getIsDirtyInternal()) return true;
 
       dispatch({ type: "SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD", payload: localEnableTeamUsage });
+      // Dispatching the master toggle will cause the reducer to handle dependent toggles.
+      // If localEnableTeamUsage is true, we then dispatch the current local states for sub-toggles.
       if (localEnableTeamUsage) {
         dispatch({ type: "SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES", payload: localEnablePlayerSelection });
         if (localEnablePlayerSelection) {
             dispatch({ type: "SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR", payload: localShowAliasInSelector });
             dispatch({ type: "SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST", payload: localShowAliasInControlsList });
-        } else {
-            // El reducer se encargará de forzar estos a false si enablePlayerSelection es false
         }
+         // showAliasInScoreboardPenalties is independent of enablePlayerSelection
         dispatch({ type: "SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES", payload: localShowAliasInScoreboard });
       }
-      // El reducer se encargará de forzar los switches dependientes a false si localEnableTeamUsage es false.
       
-      setIsDirty(false); // Resetea el flag "dirty"
       return true; 
     },
     handleDiscard: () => {
@@ -88,9 +82,8 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef>((props, ref) => 
       setLocalShowAliasInSelector(state.showAliasInPenaltyPlayerSelector);
       setLocalShowAliasInControlsList(state.showAliasInControlsPenaltyList);
       setLocalShowAliasInScoreboard(state.showAliasInScoreboardPenalties);
-      setIsDirty(false); // Resetea el flag "dirty"
     },
-    getIsDirty: getIsDirtyInternal, // Usa la función de comparación activa
+    getIsDirty: getIsDirtyInternal,
   }));
   
   const handleMasterToggleChange = (checked: boolean) => {
@@ -206,5 +199,3 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef>((props, ref) => 
 });
 
 TeamSettingsCard.displayName = "TeamSettingsCard";
-
-    

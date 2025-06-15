@@ -23,8 +23,6 @@ export interface SoundSettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-// Interface SoundSettingsCardProps removida
-
 export const SoundSettingsCard = forwardRef<SoundSettingsCardRef>((props, ref) => {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
@@ -34,20 +32,19 @@ export const SoundSettingsCard = forwardRef<SoundSettingsCardRef>((props, ref) =
   const [localCustomSoundDataUrl, setLocalCustomSoundDataUrl] = useState(state.customHornSoundDataUrl);
   const [customSoundFileName, setCustomSoundFileName] = useState<string | null>(null);
 
-  const [isDirty, setIsDirty] = useState(false); // Flag local de "dirty"
+  // No local isDirty state, dirtiness is determined by direct comparison in getIsDirty
 
   useEffect(() => {
-    // Si la tarjeta no está marcada como "dirty", actualiza los valores locales para reflejar el estado global.
-    if (!isDirty) {
+     if (!getIsDirtyInternal()) {
       setLocalPlaySound(state.playSoundAtPeriodEnd);
       setLocalCustomSoundDataUrl(state.customHornSoundDataUrl);
-      setCustomSoundFileName(null); // Reset filename as we're loading from state if not dirty
+      setCustomSoundFileName(null); 
     }
-  }, [state.playSoundAtPeriodEnd, state.customHornSoundDataUrl, isDirty]);
+  }, [state.playSoundAtPeriodEnd, state.customHornSoundDataUrl]);
 
 
   const markDirty = () => {
-    if (!isDirty) setIsDirty(true);
+    // No-op, dirtiness from direct comparison
   };
 
   const getIsDirtyInternal = () => {
@@ -59,21 +56,19 @@ export const SoundSettingsCard = forwardRef<SoundSettingsCardRef>((props, ref) =
 
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      if (!isDirty && !getIsDirtyInternal()) return true;
+      if (!getIsDirtyInternal()) return true;
 
       dispatch({ type: "SET_PLAY_SOUND_AT_PERIOD_END", payload: localPlaySound });
       dispatch({ type: "SET_CUSTOM_HORN_SOUND_DATA_URL", payload: localCustomSoundDataUrl });
       
-      setIsDirty(false); // Resetea el flag "dirty"
       return true; 
     },
     handleDiscard: () => {
       setLocalPlaySound(state.playSoundAtPeriodEnd);
       setLocalCustomSoundDataUrl(state.customHornSoundDataUrl);
       setCustomSoundFileName(null);
-      setIsDirty(false); // Resetea el flag "dirty"
     },
-    getIsDirty: getIsDirtyInternal, // Usa la función de comparación activa
+    getIsDirty: getIsDirtyInternal,
   }));
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,7 +100,7 @@ export const SoundSettingsCard = forwardRef<SoundSettingsCardRef>((props, ref) =
       const dataUrl = e.target?.result as string;
       setLocalCustomSoundDataUrl(dataUrl);
       setCustomSoundFileName(file.name);
-      markDirty();
+      markDirty(); // Though not strictly needed due to getIsDirtyInternal, good for consistency
       toast({
         title: "Sonido Personalizado Cargado",
         description: `"${file.name}" listo para usar. Guarda los cambios.`,
@@ -118,7 +113,7 @@ export const SoundSettingsCard = forwardRef<SoundSettingsCardRef>((props, ref) =
     setLocalCustomSoundDataUrl(null);
     setCustomSoundFileName(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    markDirty();
+    markDirty(); // Same as above
     toast({
       title: "Sonido Personalizado Eliminado",
       description: "Se usará el sonido predeterminado. Guarda los cambios.",
@@ -202,5 +197,3 @@ export const SoundSettingsCard = forwardRef<SoundSettingsCardRef>((props, ref) =
 });
 
 SoundSettingsCard.displayName = "SoundSettingsCard";
-
-    

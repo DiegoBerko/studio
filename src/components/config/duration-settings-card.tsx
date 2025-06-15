@@ -19,9 +19,7 @@ export interface DurationSettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-// Interface DurationSettingsCardProps removida
-
-const narrowInputStyle = "w-24 text-sm";
+const narrowInputStyle = "w-24 text-sm"; // Reverted to w-24 for consistency if needed by grid
 
 export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, ref) => {
   const { state, dispatch } = useGameState();
@@ -41,11 +39,14 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
   const [localNumRegularPeriodsInput, setLocalNumRegularPeriodsInput] = useState(String(state.numberOfRegularPeriods));
   const [localNumOTPeriodsInput, setLocalNumOTPeriodsInput] = useState(String(state.numberOfOvertimePeriods));
 
-  const [isDirty, setIsDirty] = useState(false); // Flag local de "dirty"
+  // No local isDirty state, dirtiness is determined by direct comparison in getIsDirty
 
   useEffect(() => {
-    // Si la tarjeta no está marcada como "dirty", actualiza los valores locales para reflejar el estado global.
-    if (!isDirty) {
+    // This effect only runs if the card itself isn't considered "dirty" by the parent page's logic
+    // or if the direct comparison in getIsDirty returns false.
+    // It ensures that if global state changes (e.g., from file import or reset),
+    // the local inputs reflect that, UNLESS the user has uncommitted changes.
+     if (!getIsDirtyInternal()) {
       setLocalWarmUpDurationInput(centisecondsToDisplayMinutes(state.defaultWarmUpDuration));
       setLocalPeriodDurationInput(centisecondsToDisplayMinutes(state.defaultPeriodDuration));
       setLocalOTPeriodDurationInput(centisecondsToDisplayMinutes(state.defaultOTPeriodDuration));
@@ -64,18 +65,32 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
     state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration,
     state.autoStartWarmUp, state.autoStartBreaks, state.autoStartPreOTBreaks, state.autoStartTimeouts,
     state.numberOfRegularPeriods, state.numberOfOvertimePeriods,
-    isDirty // Dependencia importante para la condición
   ]);
   
   const markDirty = () => {
-    if (!isDirty) setIsDirty(true);
+    // This function is essentially a no-op now as dirtiness is determined by direct comparison.
+  };
+
+  const getIsDirtyInternal = () => {
+    return (
+      localWarmUpDurationInput !== centisecondsToDisplayMinutes(state.defaultWarmUpDuration) ||
+      localPeriodDurationInput !== centisecondsToDisplayMinutes(state.defaultPeriodDuration) ||
+      localOTPeriodDurationInput !== centisecondsToDisplayMinutes(state.defaultOTPeriodDuration) ||
+      localBreakDurationInput !== centisecondsToDisplaySeconds(state.defaultBreakDuration) ||
+      localPreOTBreakDurationInput !== centisecondsToDisplaySeconds(state.defaultPreOTBreakDuration) ||
+      localTimeoutDurationInput !== centisecondsToDisplaySeconds(state.defaultTimeoutDuration) ||
+      localAutoStartWarmUp !== state.autoStartWarmUp ||
+      localAutoStartBreaks !== state.autoStartBreaks ||
+      localAutoStartPreOTBreaks !== state.autoStartPreOTBreaks ||
+      localAutoStartTimeouts !== state.autoStartTimeouts ||
+      localNumRegularPeriodsInput !== String(state.numberOfRegularPeriods) ||
+      localNumOTPeriodsInput !== String(state.numberOfOvertimePeriods)
+    );
   };
 
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      // Solo guarda si hay cambios locales "dirty" o si los valores locales difieren del estado global
-      if (!isDirty && !getIsDirtyInternal()) return true;
-
+      if (!getIsDirtyInternal()) return true;
 
       const warmUpDurationMin = parseInt(localWarmUpDurationInput, 10);
       const finalWarmUpDurationCs = (isNaN(warmUpDurationMin) || warmUpDurationMin < 1) ? (60 * 100) : warmUpDurationMin * 60 * 100;
@@ -122,7 +137,6 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
         dispatch({ type: "SET_AUTO_START_TIMEOUTS_VALUE", payload: localAutoStartTimeouts });
       }
       
-      setIsDirty(false); // Resetea el flag "dirty"
       return true;
     },
     handleDiscard: () => {
@@ -138,32 +152,14 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
       setLocalAutoStartTimeouts(state.autoStartTimeouts);
       setLocalNumRegularPeriodsInput(String(state.numberOfRegularPeriods));
       setLocalNumOTPeriodsInput(String(state.numberOfOvertimePeriods));
-      setIsDirty(false); // Resetea el flag "dirty"
     },
-    getIsDirty: getIsDirtyInternal, // Usa la función de comparación activa
+    getIsDirty: getIsDirtyInternal,
   }));
-
-  const getIsDirtyInternal = () => {
-    return (
-      localWarmUpDurationInput !== centisecondsToDisplayMinutes(state.defaultWarmUpDuration) ||
-      localPeriodDurationInput !== centisecondsToDisplayMinutes(state.defaultPeriodDuration) ||
-      localOTPeriodDurationInput !== centisecondsToDisplayMinutes(state.defaultOTPeriodDuration) ||
-      localBreakDurationInput !== centisecondsToDisplaySeconds(state.defaultBreakDuration) ||
-      localPreOTBreakDurationInput !== centisecondsToDisplaySeconds(state.defaultPreOTBreakDuration) ||
-      localTimeoutDurationInput !== centisecondsToDisplaySeconds(state.defaultTimeoutDuration) ||
-      localAutoStartWarmUp !== state.autoStartWarmUp ||
-      localAutoStartBreaks !== state.autoStartBreaks ||
-      localAutoStartPreOTBreaks !== state.autoStartPreOTBreaks ||
-      localAutoStartTimeouts !== state.autoStartTimeouts ||
-      localNumRegularPeriodsInput !== String(state.numberOfRegularPeriods) ||
-      localNumOTPeriodsInput !== String(state.numberOfOvertimePeriods)
-    );
-  };
 
 
   return (
     <ControlCardWrapper title="Configuración de Tiempos, Períodos y Arranque Automático">
-      <div className="grid grid-cols-[auto_minmax(0,theme(spacing.24))_auto_auto] items-center gap-x-3 sm:gap-x-4 gap-y-6">
+      <div className="grid grid-cols-[auto_theme(spacing.24)_auto_auto] items-center gap-x-3 sm:gap-x-4 gap-y-6">
         
         {/* Períodos Regulares */}
         <Label htmlFor="numRegularPeriods" className="text-sm whitespace-nowrap">Períodos Regulares (Cant)</Label>
@@ -172,7 +168,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
           type="number"
           value={localNumRegularPeriodsInput}
           onChange={(e) => { setLocalNumRegularPeriodsInput(e.target.value); markDirty(); }}
-          className={narrowInputStyle}
+          className="text-sm" // Width from grid column
           placeholder="ej. 3"
           min="1"
         />
@@ -182,7 +178,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
           type="number"
           value={localPeriodDurationInput}
           onChange={(e) => { setLocalPeriodDurationInput(e.target.value); markDirty(); }}
-          className={narrowInputStyle}
+          className="text-sm" // Width from grid column
           placeholder="ej. 20"
           min="1"
         />
@@ -194,7 +190,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
           type="number"
           value={localNumOTPeriodsInput}
           onChange={(e) => { setLocalNumOTPeriodsInput(e.target.value); markDirty(); }}
-          className={narrowInputStyle}
+          className="text-sm" // Width from grid column
           placeholder="ej. 1"
           min="0"
         />
@@ -204,7 +200,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
           type="number"
           value={localOTPeriodDurationInput}
           onChange={(e) => { setLocalOTPeriodDurationInput(e.target.value); markDirty(); }}
-          className={narrowInputStyle}
+          className="text-sm" // Width from grid column
           placeholder="ej. 5"
           min="1"
         />
@@ -216,7 +212,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
           type="number"
           value={localTimeoutDurationInput}
           onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
-          className={narrowInputStyle}
+          className="text-sm" // Width from grid column
           placeholder="ej. 30"
           min="1"
         />
@@ -234,7 +230,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
           type="number"
           value={localBreakDurationInput}
           onChange={(e) => { setLocalBreakDurationInput(e.target.value); markDirty(); }}
-          className={narrowInputStyle}
+          className="text-sm" // Width from grid column
           placeholder="ej. 120"
           min="1"
         />
@@ -252,7 +248,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
           type="number"
           value={localPreOTBreakDurationInput}
           onChange={(e) => { setLocalPreOTBreakDurationInput(e.target.value); markDirty(); }}
-          className={narrowInputStyle}
+          className="text-sm" // Width from grid column
           placeholder="ej. 60"
           min="1"
         />
@@ -270,7 +266,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
           type="number"
           value={localWarmUpDurationInput}
           onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
-          className={narrowInputStyle}
+          className="text-sm" // Width from grid column
           placeholder="ej. 5"
           min="1"
         />
@@ -286,5 +282,3 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, 
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
-
-    
