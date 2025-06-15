@@ -5,8 +5,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { DurationSettingsCard, type DurationSettingsCardRef } from "@/components/config/duration-settings-card";
 import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/config/penalty-settings-card";
 import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card";
-import { TeamSettingsCard, type TeamSettingsCardRef } from "@/components/config/team-settings-card";
+import { TeamSettingsCard, type TeamSettingsCardRef } from "@/components/config/team-settings-card"; // Will be part of a tab or needs re-evaluation
 import { CategorySettingsCard, type CategorySettingsCardRef } from "@/components/config/category-settings-card";
+import { TeamsManagementTab } from '@/components/config/teams-management-tab'; // New component for teams
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function ConfigPage() {
   const { state, dispatch } = useGameState();
@@ -31,7 +33,7 @@ export default function ConfigPage() {
   const durationSettingsRef = useRef<DurationSettingsCardRef>(null);
   const penaltySettingsRef = useRef<PenaltySettingsCardRef>(null);
   const soundSettingsRef = useRef<SoundSettingsCardRef>(null);
-  const teamSettingsRef = useRef<TeamSettingsCardRef>(null);
+  const teamSettingsRef = useRef<TeamSettingsCardRef>(null); // For "Configuración de Equipos y Alias"
   const categorySettingsRef = useRef<CategorySettingsCardRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -40,7 +42,7 @@ export default function ConfigPage() {
   const [isDurationDirty, setIsDurationDirty] = useState(false);
   const [isPenaltyDirty, setIsPenaltyDirty] = useState(false);
   const [isSoundDirty, setIsSoundDirty] = useState(false);
-  const [isTeamSettingsDirty, setIsTeamSettingsDirty] = useState(false);
+  const [isTeamSettingsDirty, setIsTeamSettingsDirty] = useState(false); // For "Configuración de Equipos y Alias" card
   const [isCategorySettingsDirty, setIsCategorySettingsDirty] = useState(false);
 
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -55,7 +57,7 @@ export default function ConfigPage() {
     }
   }, [state.configName, isConfigNameDirty]);
 
-  const handleSaveAll = () => {
+  const handleSaveAllConfig = () => {
     let configNameSaveSuccess = true;
     let durationSaveSuccess = true;
     let penaltySaveSuccess = true;
@@ -97,21 +99,21 @@ export default function ConfigPage() {
     if (configNameSaveSuccess && durationSaveSuccess && penaltySaveSuccess && soundSaveSuccess && teamSettingsSaveSuccess && categorySettingsSaveSuccess) {
       toast({
         title: "Configuración Guardada",
-        description: "Todos los cambios han sido guardados exitosamente.",
+        description: "Todos los cambios de configuración han sido guardados exitosamente.",
       });
     } else if (!configNameSaveSuccess) {
       // Toast already shown for config name error
     }
      else {
       toast({
-        title: "Error al Guardar",
+        title: "Error al Guardar Configuración",
         description: "Algunas configuraciones no pudieron ser guardadas. Revisa los campos.",
         variant: "destructive",
       });
     }
   };
 
-  const handleDiscardAll = () => {
+  const handleDiscardAllConfig = () => {
     if (isConfigNameDirty) {
       setLocalConfigName(state.configName || '');
       setIsConfigNameDirty(false);
@@ -132,8 +134,8 @@ export default function ConfigPage() {
       categorySettingsRef.current.handleDiscard();
     }
     toast({
-      title: "Cambios Descartados",
-      description: "Los cambios no guardados han sido revertidos.",
+      title: "Cambios de Configuración Descartados",
+      description: "Los cambios no guardados en la configuración han sido revertidos.",
     });
   };
 
@@ -321,16 +323,16 @@ export default function ConfigPage() {
 
 
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-8">
+    <div className="w-full max-w-4xl mx-auto space-y-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-primary-foreground">Configuración General</h1>
         {pageIsDirty && (
           <div className="flex gap-2">
-            <Button onClick={handleSaveAll} size="sm">
-              <Save className="mr-2 h-4 w-4" /> Guardar Cambios
+            <Button onClick={handleSaveAllConfig} size="sm">
+              <Save className="mr-2 h-4 w-4" /> Guardar Config.
             </Button>
-            <Button onClick={handleDiscardAll} variant="outline" size="sm">
-              <Undo2 className="mr-2 h-4 w-4" /> Descartar
+            <Button onClick={handleDiscardAllConfig} variant="outline" size="sm">
+              <Undo2 className="mr-2 h-4 w-4" /> Descartar Config.
             </Button>
           </div>
         )}
@@ -349,21 +351,42 @@ export default function ConfigPage() {
           Este nombre se usará para identificar la configuración al exportarla.
         </p>
       </div>
-
-      <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
-      <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} />
-      <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
-      <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty} />
-      <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
-
+      
+      <Tabs defaultValue="gameFormat" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+          <TabsTrigger value="gameFormat">Formato Juego</TabsTrigger>
+          <TabsTrigger value="timings">Tiempos</TabsTrigger>
+          <TabsTrigger value="sound">Sonido</TabsTrigger>
+          <TabsTrigger value="categoriesAndTeams">Categorías y Equipos</TabsTrigger>
+        </TabsList>
+        <TabsContent value="gameFormat" className="mt-6">
+          <div className="space-y-6">
+            <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} />
+            <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty} /> 
+          </div>
+        </TabsContent>
+        <TabsContent value="timings" className="mt-6">
+           <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
+        </TabsContent>
+        <TabsContent value="sound" className="mt-6">
+           <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
+        </TabsContent>
+        <TabsContent value="categoriesAndTeams" className="mt-6">
+          <div className="space-y-8">
+            <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
+            <Separator />
+            <TeamsManagementTab />
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {pageIsDirty && (
         <div className="mt-8 flex justify-end gap-2">
-          <Button onClick={handleSaveAll}>
-            <Save className="mr-2 h-4 w-4" /> Guardar Cambios
+          <Button onClick={handleSaveAllConfig}>
+            <Save className="mr-2 h-4 w-4" /> Guardar Configuración
           </Button>
-          <Button onClick={handleDiscardAll} variant="outline">
-            <Undo2 className="mr-2 h-4 w-4" /> Descartar Cambios
+          <Button onClick={handleDiscardAllConfig} variant="outline">
+            <Undo2 className="mr-2 h-4 w-4" /> Descartar Configuración
           </Button>
         </div>
       )}
@@ -371,9 +394,9 @@ export default function ConfigPage() {
       <Separator className="my-10" />
 
       <div className="space-y-6 p-6 border rounded-md bg-card">
-        <h2 className="text-xl font-semibold text-primary-foreground">Acciones</h2>
+        <h2 className="text-xl font-semibold text-primary-foreground">Acciones de Configuración</h2>
         <p className="text-sm text-muted-foreground">
-          Guarda tu configuración actual en un archivo, carga una configuración previamente guardada, o restablece todas las configuraciones a sus valores predeterminados de fábrica.
+          Guarda tu configuración general actual en un archivo, carga una configuración previamente guardada, o restablece todas las configuraciones a sus valores predeterminados de fábrica.
         </p>
         <div className="flex flex-col sm:flex-row gap-4">
           <Button onClick={prepareExportConfig} variant="outline" className="flex-1">
@@ -441,5 +464,3 @@ export default function ConfigPage() {
     </div>
   );
 }
-
-    

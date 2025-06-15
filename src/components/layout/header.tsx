@@ -5,49 +5,41 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, Settings, Wrench, Users } from 'lucide-react'; // Added Users icon
+import { Home, Settings, Wrench, Users } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 export function Header() {
   const pathname = usePathname();
   const isScoreboardPage = pathname === '/';
 
-  // Si no es la scoreboard page, el header es visible por defecto.
-  // Si es la scoreboard page, empieza oculto y se maneja con hover/mouse position.
   const [isVisible, setIsVisible] = useState(!isScoreboardPage);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Efecto para manejar la visibilidad inicial basada en la ruta y al cambiar de ruta
   useEffect(() => {
     if (isScoreboardPage) {
-      setIsVisible(false); // En scoreboard, asegurar que empiece oculto
+      setIsVisible(false); 
     } else {
-      setIsVisible(true);  // En otras páginas, asegurar que empiece visible
+      setIsVisible(true);  
     }
-  }, [isScoreboardPage]); // Solo se ejecuta cuando isScoreboardPage cambia
+  }, [isScoreboardPage]); 
 
-  // Efecto para añadir/quitar listeners de mousemove, solo en la scoreboard page
   useEffect(() => {
     if (!isScoreboardPage) {
-      // Limpiar listeners si existían y salimos de la scoreboard page
       if (hideTimeoutRef.current) {
         clearTimeout(hideTimeoutRef.current);
         hideTimeoutRef.current = null;
       }
-      // No se necesitan listeners de mousemove si no es la scoreboard page
       return;
     }
 
-    // Si estamos en la scoreboard page
     const handleMouseMove = (event: MouseEvent) => {
-      if (event.clientY < 80) { // Si el mouse está cerca del top (ej: 80px)
+      if (event.clientY < 80) { 
         setIsVisible(true);
         if (hideTimeoutRef.current) {
           clearTimeout(hideTimeoutRef.current);
           hideTimeoutRef.current = null;
         }
       }
-      // No se oculta aquí; onMouseLeave del header se encarga de eso.
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -58,7 +50,7 @@ export function Header() {
         clearTimeout(hideTimeoutRef.current);
       }
     };
-  }, [isScoreboardPage]); // Solo se activa/desactiva con el cambio de isScoreboardPage
+  }, [isScoreboardPage]);
 
   const handleHeaderMouseEnter = () => {
     if (isScoreboardPage) {
@@ -72,13 +64,12 @@ export function Header() {
 
   const handleHeaderMouseLeave = () => {
     if (isScoreboardPage) {
-      // Si ya hay un timeout, no crear otro
       if (hideTimeoutRef.current) {
         clearTimeout(hideTimeoutRef.current);
       }
       hideTimeoutRef.current = setTimeout(() => {
         setIsVisible(false);
-      }, 300); // Ocultar después de 300ms
+      }, 300); 
     }
   };
 
@@ -88,10 +79,10 @@ export function Header() {
       onMouseLeave={handleHeaderMouseLeave}
       className={cn(
         "sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
-        "transition-all duration-300 ease-in-out", // Para opacity y transform
+        "transition-all duration-300 ease-in-out",
         isScoreboardPage
           ? (isVisible ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-full pointer-events-none")
-          : "opacity-100 translate-y-0 pointer-events-auto" // Siempre visible y interactuable si no es scoreboard
+          : "opacity-100 translate-y-0 pointer-events-auto"
       )}
     >
       <div className="container flex h-14 max-w-screen-2xl items-center">
@@ -118,7 +109,7 @@ export function Header() {
             Controles
           </Link>
           <Link
-            href="/config"
+            href="/config" // Link "Configuración"
             className={cn(
               "transition-colors hover:text-foreground/80",
               pathname === "/config" ? "text-foreground" : "text-foreground/60"
@@ -127,10 +118,10 @@ export function Header() {
             Configuración
           </Link>
           <Link
-            href="/teams"
+            href="/config" // Link "Equipos" ahora apunta a /config
             className={cn(
               "transition-colors hover:text-foreground/80",
-              pathname.startsWith("/teams") ? "text-foreground" : "text-foreground/60"
+              pathname === "/config" ? "text-foreground" : "text-foreground/60" // Active state similar to Configuración
             )}
           >
             Equipos
@@ -148,12 +139,14 @@ export function Header() {
             </Link>
           </Button>
           <Button variant="ghost" size="icon" asChild className={pathname === "/config" ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
-            <Link href="/config" aria-label="Configuración">
+            <Link href="/config" aria-label="Configuración & Equipos">
               <Wrench className="h-5 w-5" />
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" asChild className={pathname.startsWith("/teams") ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
-            <Link href="/teams" aria-label="Equipos">
+           {/* The Users icon button might be redundant if Wrench leads to the combined page,
+               or it can also point to /config. For consistency, let's have it point to /config as well. */}
+          <Button variant="ghost" size="icon" asChild className={pathname === "/config" ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
+            <Link href="/config" aria-label="Equipos (en Config)">
               <Users className="h-5 w-5" />
             </Link>
           </Button>
