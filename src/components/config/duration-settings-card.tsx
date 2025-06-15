@@ -23,7 +23,7 @@ interface DurationSettingsCardProps {
   onDirtyChange: (isDirty: boolean) => void;
 }
 
-const narrowInputStyle = "w-24 mt-1"; // Adjusted for slightly more width for "Cant" and "Min"
+const narrowInputStyle = "w-20 mt-0"; 
 
 export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, DurationSettingsCardProps>(({ onDirtyChange }, ref) => {
   const { state, dispatch } = useGameState();
@@ -154,65 +154,57 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
     getIsDirty: () => isDirty,
   }));
 
-  const commonInputStyle = "w-20 mt-0"; // Shared style for narrow duration inputs
+  const commonInputStyle = "w-20 mt-0";
 
   return (
     <ControlCardWrapper title="Configuración de Tiempos, Períodos y Arranque Automático">
       <div className="space-y-6">
         {/* Regular Periods */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 items-end">
-            <div>
-                <Label htmlFor="numRegularPeriods" className="text-sm">Períodos Regulares (Cant)</Label>
-                <Input
-                id="numRegularPeriods"
-                type="number"
-                value={localNumRegularPeriodsInput}
-                onChange={(e) => { setLocalNumRegularPeriodsInput(e.target.value); markDirty(); }}
-                className={narrowInputStyle}
-                placeholder="ej. 3"
-                min="1"
-                />
-            </div>
-            <div>
-              <Label htmlFor="periodDuration" className="text-sm">Duración (Min)</Label>
-              <Input
-                id="periodDuration"
-                type="number"
-                value={localPeriodDurationInput}
-                onChange={(e) => { setLocalPeriodDurationInput(e.target.value); markDirty(); }}
-                className={narrowInputStyle}
-                placeholder="ej. 20"
-                min="1"
-              />
-            </div>
+        <div className="grid grid-cols-[auto_80px_auto_80px] items-end gap-x-3 sm:gap-x-4 gap-y-1">
+            <Label htmlFor="numRegularPeriods" className="text-sm whitespace-nowrap">Períodos Regulares (Cant)</Label>
+            <Input
+            id="numRegularPeriods"
+            type="number"
+            value={localNumRegularPeriodsInput}
+            onChange={(e) => { setLocalNumRegularPeriodsInput(e.target.value); markDirty(); }}
+            className={narrowInputStyle}
+            placeholder="ej. 3"
+            min="1"
+            />
+            <Label htmlFor="periodDuration" className="text-sm whitespace-nowrap">Duración (Min)</Label>
+            <Input
+            id="periodDuration"
+            type="number"
+            value={localPeriodDurationInput}
+            onChange={(e) => { setLocalPeriodDurationInput(e.target.value); markDirty(); }}
+            className={narrowInputStyle}
+            placeholder="ej. 20"
+            min="1"
+            />
         </div>
 
         {/* Overtime Periods */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 items-end">
-            <div>
-                <Label htmlFor="numOTPeriods" className="text-sm">Períodos Overtime (Cant)</Label>
-                <Input
-                id="numOTPeriods"
-                type="number"
-                value={localNumOTPeriodsInput}
-                onChange={(e) => { setLocalNumOTPeriodsInput(e.target.value); markDirty(); }}
-                className={narrowInputStyle}
-                placeholder="ej. 1"
-                min="0"
-                />
-            </div>
-            <div>
-              <Label htmlFor="otPeriodDuration" className="text-sm">Duración (Min)</Label>
-              <Input
-                id="otPeriodDuration"
-                type="number"
-                value={localOTPeriodDurationInput}
-                onChange={(e) => { setLocalOTPeriodDurationInput(e.target.value); markDirty(); }}
-                className={narrowInputStyle}
-                placeholder="ej. 5"
-                min="1"
-              />
-            </div>
+        <div className="grid grid-cols-[auto_80px_auto_80px] items-end gap-x-3 sm:gap-x-4 gap-y-1">
+            <Label htmlFor="numOTPeriods" className="text-sm whitespace-nowrap">Períodos Overtime (Cant)</Label>
+            <Input
+            id="numOTPeriods"
+            type="number"
+            value={localNumOTPeriodsInput}
+            onChange={(e) => { setLocalNumOTPeriodsInput(e.target.value); markDirty(); }}
+            className={narrowInputStyle}
+            placeholder="ej. 1"
+            min="0"
+            />
+            <Label htmlFor="otPeriodDuration" className="text-sm whitespace-nowrap">Duración (Min)</Label>
+            <Input
+            id="otPeriodDuration"
+            type="number"
+            value={localOTPeriodDurationInput}
+            onChange={(e) => { setLocalOTPeriodDurationInput(e.target.value); markDirty(); }}
+            className={narrowInputStyle}
+            placeholder="ej. 5"
+            min="1"
+            />
         </div>
         
         {/* Timeouts */}
