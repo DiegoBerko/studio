@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, Settings, Wrench, Users } from 'lucide-react';
+import { Home, Settings, Wrench } from 'lucide-react'; // Users icon removed
 import { useState, useEffect, useRef } from 'react';
 
 export function Header() {
@@ -109,7 +109,7 @@ export function Header() {
             Controles
           </Link>
           <Link
-            href="/config" // Link "Configuración"
+            href="/config"
             className={cn(
               "transition-colors hover:text-foreground/80",
               pathname === "/config" ? "text-foreground" : "text-foreground/60"
@@ -117,15 +117,7 @@ export function Header() {
           >
             Configuración
           </Link>
-          <Link
-            href="/config" // Link "Equipos" ahora apunta a /config
-            className={cn(
-              "transition-colors hover:text-foreground/80",
-              pathname === "/config" ? "text-foreground" : "text-foreground/60" // Active state similar to Configuración
-            )}
-          >
-            Equipos
-          </Link>
+          {/* Equipos link removed */}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
            <Button variant="ghost" size="icon" asChild className={pathname === "/" ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
@@ -143,13 +135,7 @@ export function Header() {
               <Wrench className="h-5 w-5" />
             </Link>
           </Button>
-           {/* The Users icon button might be redundant if Wrench leads to the combined page,
-               or it can also point to /config. For consistency, let's have it point to /config as well. */}
-          <Button variant="ghost" size="icon" asChild className={pathname === "/config" ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
-            <Link href="/config" aria-label="Equipos (en Config)">
-              <Users className="h-5 w-5" />
-            </Link>
-          </Button>
+           {/* Users icon button removed */}
         </div>
       </div>
     </header>

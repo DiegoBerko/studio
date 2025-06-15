@@ -5,9 +5,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { DurationSettingsCard, type DurationSettingsCardRef } from "@/components/config/duration-settings-card";
 import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/config/penalty-settings-card";
 import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card";
-import { TeamSettingsCard, type TeamSettingsCardRef } from "@/components/config/team-settings-card"; // Will be part of a tab or needs re-evaluation
+import { TeamSettingsCard, type TeamSettingsCardRef } from "@/components/config/team-settings-card";
 import { CategorySettingsCard, type CategorySettingsCardRef } from "@/components/config/category-settings-card";
-import { TeamsManagementTab } from '@/components/config/teams-management-tab'; // New component for teams
+import { TeamsManagementTab } from '@/components/config/teams-management-tab';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from '@/lib/utils';
 
 export default function ConfigPage() {
   const { state, dispatch } = useGameState();
@@ -33,7 +34,7 @@ export default function ConfigPage() {
   const durationSettingsRef = useRef<DurationSettingsCardRef>(null);
   const penaltySettingsRef = useRef<PenaltySettingsCardRef>(null);
   const soundSettingsRef = useRef<SoundSettingsCardRef>(null);
-  const teamSettingsRef = useRef<TeamSettingsCardRef>(null); // For "Configuración de Equipos y Alias"
+  const teamSettingsRef = useRef<TeamSettingsCardRef>(null);
   const categorySettingsRef = useRef<CategorySettingsCardRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,7 +43,7 @@ export default function ConfigPage() {
   const [isDurationDirty, setIsDurationDirty] = useState(false);
   const [isPenaltyDirty, setIsPenaltyDirty] = useState(false);
   const [isSoundDirty, setIsSoundDirty] = useState(false);
-  const [isTeamSettingsDirty, setIsTeamSettingsDirty] = useState(false); // For "Configuración de Equipos y Alias" card
+  const [isTeamSettingsDirty, setIsTeamSettingsDirty] = useState(false);
   const [isCategorySettingsDirty, setIsCategorySettingsDirty] = useState(false);
 
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -321,6 +322,7 @@ export default function ConfigPage() {
     isConfigNameDirty
   ]);
 
+  const tabContentClassName = "mt-6 p-6 border rounded-md bg-card/30 shadow-sm";
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-8">
@@ -357,25 +359,26 @@ export default function ConfigPage() {
           <TabsTrigger value="gameFormat">Formato Juego</TabsTrigger>
           <TabsTrigger value="timings">Tiempos</TabsTrigger>
           <TabsTrigger value="sound">Sonido</TabsTrigger>
-          <TabsTrigger value="categoriesAndTeams">Categorías y Equipos</TabsTrigger>
+          <TabsTrigger value="teamsAndDisplay">Equipos y Display</TabsTrigger>
         </TabsList>
-        <TabsContent value="gameFormat" className="mt-6">
+        <TabsContent value="gameFormat" className={tabContentClassName}>
           <div className="space-y-6">
             <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} />
-            <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty} /> 
           </div>
         </TabsContent>
-        <TabsContent value="timings" className="mt-6">
+        <TabsContent value="timings" className={tabContentClassName}>
            <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
         </TabsContent>
-        <TabsContent value="sound" className="mt-6">
+        <TabsContent value="sound" className={tabContentClassName}>
            <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
         </TabsContent>
-        <TabsContent value="categoriesAndTeams" className="mt-6">
+        <TabsContent value="teamsAndDisplay" className={tabContentClassName}>
           <div className="space-y-8">
             <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
             <Separator />
             <TeamsManagementTab />
+            <Separator />
+            <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty} />
           </div>
         </TabsContent>
       </Tabs>

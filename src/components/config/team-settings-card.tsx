@@ -115,7 +115,7 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
 
 
   return (
-    <ControlCardWrapper title="Configuración de Equipos y Alias">
+    <ControlCardWrapper title="Configuración de Display (Alias y Selección)">
       <div className="space-y-6">
         {/* Master Switch */}
         <div className="flex items-center justify-between p-4 border rounded-md bg-card shadow-sm">
