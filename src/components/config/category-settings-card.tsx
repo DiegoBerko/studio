@@ -14,11 +14,9 @@ export interface CategorySettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-interface CategorySettingsCardProps {
-  onDirtyChange: (isDirty: boolean) => void;
-}
+// Interface CategorySettingsCardProps removida ya que onDirtyChange no se usa más
 
-export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, CategorySettingsCardProps>(({ onDirtyChange }, ref) => {
+export const CategorySettingsCard = forwardRef<CategorySettingsCardRef>((props, ref) => {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
 
@@ -26,17 +24,17 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
     state.availableCategories.map(c => c.name).join(", ")
   );
   
-  const [isDirty, setIsDirty] = useState(false);
+  const [isDirty, setIsDirty] = useState(false); // Flag local de "dirty"
 
   useEffect(() => {
+    // Este efecto se ejecuta cuando state.availableCategories cambia o cuando isDirty cambia.
+    // Si la tarjeta no está marcada como "dirty" por una edición del usuario,
+    // actualiza el string local para reflejar el estado global.
     if (!isDirty) {
       setLocalCategoriesString(state.availableCategories.map(c => c.name).join(", "));
     }
   }, [state.availableCategories, isDirty]);
 
-  useEffect(() => {
-    onDirtyChange(isDirty);
-  }, [isDirty, onDirtyChange]);
 
   const markDirty = () => {
     if (!isDirty) setIsDirty(true);
@@ -44,7 +42,10 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
 
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      if (!isDirty) return true;
+      if (!isDirty) { // Si el flag local indica que no hay cambios, no hagas nada
+        const globalCategoriesString = state.availableCategories.map(c => c.name).join(", ");
+        if (localCategoriesString === globalCategoriesString) return true; // Verifica por si acaso
+      }
 
       const categoryNames = localCategoriesString
         .split(',')
@@ -59,29 +60,33 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
             description: "Los nombres de las categorías deben ser únicos (ignorando mayúsculas/minúsculas y después de eliminar duplicados exactos).",
             variant: "destructive",
         });
+        // No retornamos false aquí, permitimos guardar lo que es válido si el usuario insiste,
+        // o podría implementarse una validación más estricta para retornar false.
+        // Por ahora, se guardarán los nombres únicos.
       }
       
       const finalCategories: CategoryData[] = Array.from(new Set(categoryNames)) 
           .map(name => ({ id: name, name })); 
 
-      if (finalCategories.length === 0 && localCategoriesString.trim() !== "") {
-          toast({
-              title: "Error en Categorías",
-              description: "La cadena de categorías no puede estar vacía si no se quiere tener ninguna categoría. Para eliminar todas, deje el campo vacío.",
-              variant: "destructive"
-          });
-      }
+      // Permitir string vacío para eliminar todas las categorías.
+      // La validación de "no puede estar vacío si no se quiere tener ninguna" es un poco confusa.
+      // Si el usuario quiere 0 categorías, el string local será "" y finalCategories.length será 0.
+      // Esto es válido.
 
       dispatch({ type: "SET_AVAILABLE_CATEGORIES", payload: finalCategories });
       
-      setIsDirty(false);
+      setIsDirty(false); // Resetea el flag "dirty" después de guardar
       return true; 
     },
     handleDiscard: () => {
       setLocalCategoriesString(state.availableCategories.map(c => c.name).join(", "));
-      setIsDirty(false);
+      setIsDirty(false); // Resetea el flag "dirty"
     },
-    getIsDirty: () => isDirty,
+    getIsDirty: () => {
+      // Compara activamente el valor local con el valor del estado global
+      const globalCategoriesString = state.availableCategories.map(c => c.name).join(", ");
+      return localCategoriesString !== globalCategoriesString;
+    },
   }));
 
   return (
@@ -94,11 +99,11 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
           <Input
             id="categoriesInput"
             type="text"
-            placeholder="Ej: A, B, C, Menores, Damas (separadas por coma)"
+            placeholder="Ej: A, B, C (separadas por coma)"
             value={localCategoriesString}
             onChange={(e) => {
               setLocalCategoriesString(e.target.value);
-              markDirty();
+              markDirty(); // Marca como "dirty" al editar
             }}
           />
         </div>
@@ -113,3 +118,4 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
 
 CategorySettingsCard.displayName = "CategorySettingsCard";
 
+    

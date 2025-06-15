@@ -40,16 +40,17 @@ export default function ConfigPage() {
 
   const [localConfigName, setLocalConfigName] = useState(state.configName || '');
   const [isConfigNameDirty, setIsConfigNameDirty] = useState(false);
-  const [isDurationDirty, setIsDurationDirty] = useState(false);
-  const [isPenaltyDirty, setIsPenaltyDirty] = useState(false);
-  const [isSoundDirty, setIsSoundDirty] = useState(false);
-  const [isTeamSettingsDirty, setIsTeamSettingsDirty] = useState(false);
-  const [isCategorySettingsDirty, setIsCategorySettingsDirty] = useState(false);
-
+  
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [currentExportFilename, setCurrentExportFilename] = useState('');
   const [isResetConfigDialogOpen, setIsResetConfigDialogOpen] = useState(false);
 
+  const isDurationDirty = durationSettingsRef.current?.getIsDirty() || false;
+  const isPenaltyDirty = penaltySettingsRef.current?.getIsDirty() || false;
+  const isSoundDirty = soundSettingsRef.current?.getIsDirty() || false;
+  const isTeamSettingsDirty = teamSettingsRef.current?.getIsDirty() || false;
+  const isCategorySettingsDirty = categorySettingsRef.current?.getIsDirty() || false;
+  
   const pageIsDirty = isConfigNameDirty || isDurationDirty || isPenaltyDirty || isSoundDirty || isTeamSettingsDirty || isCategorySettingsDirty;
 
   useEffect(() => {
@@ -310,17 +311,10 @@ export default function ConfigPage() {
     if (!isConfigNameDirty) {
         setLocalConfigName(state.configName || '');
     }
-  }, [
-    state.configName, state.defaultWarmUpDuration, state.defaultPeriodDuration, state.defaultOTPeriodDuration,
-    state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration,
-    state.maxConcurrentPenalties, state.autoStartWarmUp, state.autoStartBreaks, state.autoStartPreOTBreaks,
-    state.autoStartTimeouts, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, state.playersPerTeamOnIce,
-    state.playSoundAtPeriodEnd, state.customHornSoundDataUrl,
-    state.enableTeamSelectionInMiniScoreboard, state.enablePlayerSelectionForPenalties,
-    state.showAliasInPenaltyPlayerSelector, state.showAliasInControlsPenaltyList, state.showAliasInScoreboardPenalties,
-    state.availableCategories, state.selectedMatchCategory,
-    isConfigNameDirty
-  ]);
+    // This effect now only depends on state.configName and isConfigNameDirty
+    // It ensures localConfigName reflects state.configName unless the user has made changes to it.
+  }, [state.configName, isConfigNameDirty]);
+
 
   const tabContentClassName = "mt-6 p-6 border rounded-md bg-card/30 shadow-sm";
 
@@ -361,24 +355,24 @@ export default function ConfigPage() {
           <TabsTrigger value="sound">Sonido</TabsTrigger>
           <TabsTrigger value="teamsAndDisplay">Equipos y Display</TabsTrigger>
         </TabsList>
-        <TabsContent value="gameFormat" className={tabContentClassName}>
+        <TabsContent value="gameFormat" className={tabContentClassName} forceMount>
           <div className="space-y-6">
-            <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} />
+            <PenaltySettingsCard ref={penaltySettingsRef} />
           </div>
         </TabsContent>
-        <TabsContent value="timings" className={tabContentClassName}>
-           <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
+        <TabsContent value="timings" className={tabContentClassName} forceMount>
+           <DurationSettingsCard ref={durationSettingsRef} />
         </TabsContent>
-        <TabsContent value="sound" className={tabContentClassName}>
-           <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
+        <TabsContent value="sound" className={tabContentClassName} forceMount>
+           <SoundSettingsCard ref={soundSettingsRef} />
         </TabsContent>
-        <TabsContent value="teamsAndDisplay" className={tabContentClassName}>
+        <TabsContent value="teamsAndDisplay" className={tabContentClassName} forceMount>
           <div className="space-y-8">
-            <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
+            <CategorySettingsCard ref={categorySettingsRef} />
             <Separator />
             <TeamsManagementTab />
             <Separator />
-            <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty} />
+            <TeamSettingsCard ref={teamSettingsRef} />
           </div>
         </TabsContent>
       </Tabs>
@@ -467,3 +461,5 @@ export default function ConfigPage() {
     </div>
   );
 }
+
+    

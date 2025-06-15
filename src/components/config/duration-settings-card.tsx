@@ -19,13 +19,11 @@ export interface DurationSettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-interface DurationSettingsCardProps {
-  onDirtyChange: (isDirty: boolean) => void;
-}
+// Interface DurationSettingsCardProps removida
 
-const inputColumnStyle = "w-24 text-sm"; 
+const narrowInputStyle = "w-24 text-sm";
 
-export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, DurationSettingsCardProps>(({ onDirtyChange }, ref) => {
+export const DurationSettingsCard = forwardRef<DurationSettingsCardRef>((props, ref) => {
   const { state, dispatch } = useGameState();
 
   const [localWarmUpDurationInput, setLocalWarmUpDurationInput] = useState(centisecondsToDisplayMinutes(state.defaultWarmUpDuration));
@@ -43,9 +41,10 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
   const [localNumRegularPeriodsInput, setLocalNumRegularPeriodsInput] = useState(String(state.numberOfRegularPeriods));
   const [localNumOTPeriodsInput, setLocalNumOTPeriodsInput] = useState(String(state.numberOfOvertimePeriods));
 
-  const [isDirty, setIsDirty] = useState(false);
+  const [isDirty, setIsDirty] = useState(false); // Flag local de "dirty"
 
   useEffect(() => {
+    // Si la tarjeta no está marcada como "dirty", actualiza los valores locales para reflejar el estado global.
     if (!isDirty) {
       setLocalWarmUpDurationInput(centisecondsToDisplayMinutes(state.defaultWarmUpDuration));
       setLocalPeriodDurationInput(centisecondsToDisplayMinutes(state.defaultPeriodDuration));
@@ -61,24 +60,12 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       setLocalNumOTPeriodsInput(String(state.numberOfOvertimePeriods));
     }
   }, [
-    state.defaultWarmUpDuration,
-    state.defaultPeriodDuration, 
-    state.defaultOTPeriodDuration,
-    state.defaultBreakDuration, 
-    state.defaultPreOTBreakDuration, 
-    state.defaultTimeoutDuration,
-    state.autoStartWarmUp,
-    state.autoStartBreaks,
-    state.autoStartPreOTBreaks,
-    state.autoStartTimeouts,
-    state.numberOfRegularPeriods,
-    state.numberOfOvertimePeriods,
-    isDirty 
+    state.defaultWarmUpDuration, state.defaultPeriodDuration, state.defaultOTPeriodDuration,
+    state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration,
+    state.autoStartWarmUp, state.autoStartBreaks, state.autoStartPreOTBreaks, state.autoStartTimeouts,
+    state.numberOfRegularPeriods, state.numberOfOvertimePeriods,
+    isDirty // Dependencia importante para la condición
   ]);
-
-  useEffect(() => {
-    onDirtyChange(isDirty);
-  }, [isDirty, onDirtyChange]);
   
   const markDirty = () => {
     if (!isDirty) setIsDirty(true);
@@ -86,7 +73,9 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      if (!isDirty) return true;
+      // Solo guarda si hay cambios locales "dirty" o si los valores locales difieren del estado global
+      if (!isDirty && !getIsDirtyInternal()) return true;
+
 
       const warmUpDurationMin = parseInt(localWarmUpDurationInput, 10);
       const finalWarmUpDurationCs = (isNaN(warmUpDurationMin) || warmUpDurationMin < 1) ? (60 * 100) : warmUpDurationMin * 60 * 100;
@@ -133,7 +122,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         dispatch({ type: "SET_AUTO_START_TIMEOUTS_VALUE", payload: localAutoStartTimeouts });
       }
       
-      setIsDirty(false);
+      setIsDirty(false); // Resetea el flag "dirty"
       return true;
     },
     handleDiscard: () => {
@@ -149,54 +138,73 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       setLocalAutoStartTimeouts(state.autoStartTimeouts);
       setLocalNumRegularPeriodsInput(String(state.numberOfRegularPeriods));
       setLocalNumOTPeriodsInput(String(state.numberOfOvertimePeriods));
-      setIsDirty(false);
+      setIsDirty(false); // Resetea el flag "dirty"
     },
-    getIsDirty: () => isDirty,
+    getIsDirty: getIsDirtyInternal, // Usa la función de comparación activa
   }));
+
+  const getIsDirtyInternal = () => {
+    return (
+      localWarmUpDurationInput !== centisecondsToDisplayMinutes(state.defaultWarmUpDuration) ||
+      localPeriodDurationInput !== centisecondsToDisplayMinutes(state.defaultPeriodDuration) ||
+      localOTPeriodDurationInput !== centisecondsToDisplayMinutes(state.defaultOTPeriodDuration) ||
+      localBreakDurationInput !== centisecondsToDisplaySeconds(state.defaultBreakDuration) ||
+      localPreOTBreakDurationInput !== centisecondsToDisplaySeconds(state.defaultPreOTBreakDuration) ||
+      localTimeoutDurationInput !== centisecondsToDisplaySeconds(state.defaultTimeoutDuration) ||
+      localAutoStartWarmUp !== state.autoStartWarmUp ||
+      localAutoStartBreaks !== state.autoStartBreaks ||
+      localAutoStartPreOTBreaks !== state.autoStartPreOTBreaks ||
+      localAutoStartTimeouts !== state.autoStartTimeouts ||
+      localNumRegularPeriodsInput !== String(state.numberOfRegularPeriods) ||
+      localNumOTPeriodsInput !== String(state.numberOfOvertimePeriods)
+    );
+  };
+
 
   return (
     <ControlCardWrapper title="Configuración de Tiempos, Períodos y Arranque Automático">
-      <div className="grid grid-cols-[auto_minmax(0,theme(spacing.24))_auto_auto] items-center gap-x-3 sm:gap-x-4 gap-y-5">
-        {/* Regular Periods */}
+      <div className="grid grid-cols-[auto_minmax(0,theme(spacing.24))_auto_auto] items-center gap-x-3 sm:gap-x-4 gap-y-6">
+        
+        {/* Períodos Regulares */}
         <Label htmlFor="numRegularPeriods" className="text-sm whitespace-nowrap">Períodos Regulares (Cant)</Label>
         <Input
           id="numRegularPeriods"
           type="number"
           value={localNumRegularPeriodsInput}
           onChange={(e) => { setLocalNumRegularPeriodsInput(e.target.value); markDirty(); }}
-          className={inputColumnStyle}
+          className={narrowInputStyle}
           placeholder="ej. 3"
           min="1"
         />
-        <Label htmlFor="periodDuration" className="text-sm whitespace-nowrap">Duración (Min)</Label>
+        <Label htmlFor="periodDuration" className="text-sm whitespace-nowrap justify-self-end">Duración (Min)</Label>
         <Input
           id="periodDuration"
           type="number"
           value={localPeriodDurationInput}
           onChange={(e) => { setLocalPeriodDurationInput(e.target.value); markDirty(); }}
-          className={inputColumnStyle}
+          className={narrowInputStyle}
           placeholder="ej. 20"
           min="1"
         />
 
-        {/* Overtime Periods */}
+        {/* Períodos Overtime */}
         <Label htmlFor="numOTPeriods" className="text-sm whitespace-nowrap">Períodos Overtime (Cant)</Label>
         <Input
           id="numOTPeriods"
           type="number"
           value={localNumOTPeriodsInput}
           onChange={(e) => { setLocalNumOTPeriodsInput(e.target.value); markDirty(); }}
-          className={inputColumnStyle}
+          className={narrowInputStyle}
           placeholder="ej. 1"
           min="0"
         />
-        <Label htmlFor="otPeriodDuration" className="text-sm whitespace-nowrap">Duración (Min)</Label>
+        <Label htmlFor="otPeriodDuration" className="text-sm whitespace-nowrap justify-self-end">Duración (Min)</Label>
         <Input
           id="otPeriodDuration"
           type="number"
           value={localOTPeriodDurationInput}
           onChange={(e) => { setLocalOTPeriodDurationInput(e.target.value); markDirty(); }}
-          className={inputColumnStyle}
+          className={narrowInputStyle}
           placeholder="ej. 5"
           min="1"
         />
@@ -208,65 +216,65 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
           type="number"
           value={localTimeoutDurationInput}
           onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
-          className={inputColumnStyle}
+          className={narrowInputStyle}
           placeholder="ej. 30"
           min="1"
         />
-        <Label htmlFor="autoStartTimeoutsConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
+        <Label htmlFor="autoStartTimeoutsConfig" className="font-normal text-sm whitespace-nowrap justify-self-end">Iniciar Autom.</Label>
         <Switch
           id="autoStartTimeoutsConfig"
           checked={localAutoStartTimeouts}
           onCheckedChange={(checked) => { setLocalAutoStartTimeouts(checked); markDirty(); }}
         />
 
-        {/* Regular Breaks */}
+        {/* Descansos Regulares */}
         <Label htmlFor="breakDurationConfig" className="text-sm whitespace-nowrap">Descanso Reg. (seg)</Label>
         <Input
           id="breakDurationConfig"
           type="number"
           value={localBreakDurationInput}
           onChange={(e) => { setLocalBreakDurationInput(e.target.value); markDirty(); }}
-          className={inputColumnStyle}
+          className={narrowInputStyle}
           placeholder="ej. 120"
           min="1"
         />
-        <Label htmlFor="autoStartBreaksConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
+        <Label htmlFor="autoStartBreaksConfig" className="font-normal text-sm whitespace-nowrap justify-self-end">Iniciar Autom.</Label>
         <Switch
           id="autoStartBreaksConfig"
           checked={localAutoStartBreaks}
           onCheckedChange={(checked) => { setLocalAutoStartBreaks(checked); markDirty(); }}
         />
 
-        {/* Pre-OT Breaks */}
+        {/* Descansos Pre-OT */}
         <Label htmlFor="preOTBreakDurationConfig" className="text-sm whitespace-nowrap">Descanso Pre-OT (seg)</Label>
         <Input
           id="preOTBreakDurationConfig"
           type="number"
           value={localPreOTBreakDurationInput}
           onChange={(e) => { setLocalPreOTBreakDurationInput(e.target.value); markDirty(); }}
-          className={inputColumnStyle}
+          className={narrowInputStyle}
           placeholder="ej. 60"
           min="1"
         />
-        <Label htmlFor="autoStartPreOTBreaksConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
+        <Label htmlFor="autoStartPreOTBreaksConfig" className="font-normal text-sm whitespace-nowrap justify-self-end">Iniciar Autom.</Label>
         <Switch
           id="autoStartPreOTBreaksConfig"
           checked={localAutoStartPreOTBreaks}
           onCheckedChange={(checked) => { setLocalAutoStartPreOTBreaks(checked); markDirty(); }}
         />
 
-        {/* Warm-up */}
+        {/* Calentamiento */}
         <Label htmlFor="warmUpDurationConfig" className="text-sm whitespace-nowrap">Calentamiento (min)</Label>
         <Input
           id="warmUpDurationConfig"
           type="number"
           value={localWarmUpDurationInput}
           onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
-          className={inputColumnStyle}
+          className={narrowInputStyle}
           placeholder="ej. 5"
           min="1"
         />
-        <Label htmlFor="autoStartWarmUpConfig" className="text-sm whitespace-nowrap">Iniciar Autom.</Label>
+        <Label htmlFor="autoStartWarmUpConfig" className="font-normal text-sm whitespace-nowrap justify-self-end">Iniciar Autom.</Label>
         <Switch
           id="autoStartWarmUpConfig"
           checked={localAutoStartWarmUp}
@@ -278,4 +286,5 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
+
     

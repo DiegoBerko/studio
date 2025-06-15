@@ -13,35 +13,38 @@ export interface PenaltySettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-interface PenaltySettingsCardProps {
-  onDirtyChange: (isDirty: boolean) => void;
-}
+// Interface PenaltySettingsCardProps removida
 
-export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySettingsCardProps>(({ onDirtyChange }, ref) => {
+export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef>((props, ref) => {
   const { state, dispatch } = useGameState();
   
   const [localMaxPenaltiesInput, setLocalMaxPenaltiesInput] = useState(String(state.maxConcurrentPenalties));
   const [localPlayersPerTeamInput, setLocalPlayersPerTeamInput] = useState(String(state.playersPerTeamOnIce));
-  const [isDirty, setIsDirty] = useState(false);
+  const [isDirty, setIsDirty] = useState(false); // Flag local de "dirty"
 
   useEffect(() => {
+    // Si la tarjeta no está marcada como "dirty", actualiza los valores locales para reflejar el estado global.
     if (!isDirty) {
       setLocalMaxPenaltiesInput(String(state.maxConcurrentPenalties));
       setLocalPlayersPerTeamInput(String(state.playersPerTeamOnIce));
     }
   }, [state.maxConcurrentPenalties, state.playersPerTeamOnIce, isDirty]);
 
-  useEffect(() => {
-    onDirtyChange(isDirty);
-  }, [isDirty, onDirtyChange]);
 
   const markDirty = () => {
     if (!isDirty) setIsDirty(true);
   };
 
+  const getIsDirtyInternal = () => {
+    return (
+      localMaxPenaltiesInput !== String(state.maxConcurrentPenalties) ||
+      localPlayersPerTeamInput !== String(state.playersPerTeamOnIce)
+    );
+  };
+
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      if (!isDirty) return true;
+      if (!isDirty && !getIsDirtyInternal()) return true;
 
       const maxPenNum = parseInt(localMaxPenaltiesInput, 10);
       const finalMaxPenalties = (isNaN(maxPenNum) || maxPenNum < 1) ? 1 : maxPenNum;
@@ -51,22 +54,22 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySet
       const finalPlayersPerTeam = (isNaN(playersNum) || playersNum < 1) ? 1 : playersNum;
       dispatch({ type: "SET_PLAYERS_PER_TEAM_ON_ICE", payload: finalPlayersPerTeam });
       
-      setIsDirty(false);
+      setIsDirty(false); // Resetea el flag "dirty"
       return true;
     },
     handleDiscard: () => {
       setLocalMaxPenaltiesInput(String(state.maxConcurrentPenalties));
       setLocalPlayersPerTeamInput(String(state.playersPerTeamOnIce));
-      setIsDirty(false);
+      setIsDirty(false); // Resetea el flag "dirty"
     },
-    getIsDirty: () => isDirty,
+    getIsDirty: getIsDirtyInternal, // Usa la función de comparación activa
   }));
 
   return (
     <ControlCardWrapper title="Formato de Juego y Penalidades">
       <div className="space-y-6">
         <div>
-          <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 sm:gap-x-4">
+          <div className="grid grid-cols-[auto_auto] items-center gap-x-3 sm:gap-x-4">
             <Label htmlFor="playersPerTeam">Jugadores en Cancha</Label>
             <Input
               id="playersPerTeam"
@@ -84,8 +87,8 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySet
         </div>
         
         <div>
-          <div className="grid grid-cols-[1fr_auto] items-center gap-x-3 sm:gap-x-4">
-            <Label htmlFor="maxConcurrentPenalties">Máximo Penalidades Concurrentes por Equipo</Label>
+          <div className="grid grid-cols-[auto_auto] items-center gap-x-3 sm:gap-x-4">
+            <Label htmlFor="maxConcurrentPenalties">Máximo Penalidades Concurrentes</Label>
             <Input
               id="maxConcurrentPenalties"
               type="number"
@@ -97,7 +100,7 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySet
             />
           </div>
           <p className="text-xs text-muted-foreground mt-1.5">
-            Define cuántas penalidades pueden correr su tiempo simultáneamente para un mismo equipo. (Ligado a cuántos jugadores menos en cancha puede tener un equipo)
+            Define cuántas penalidades pueden correr su tiempo simultáneamente para un mismo equipo. (Ligado a cuantos jugadores menos en cancha puede tener un equipo)
           </p>
         </div>
       </div>
@@ -106,4 +109,5 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySet
 });
 
 PenaltySettingsCard.displayName = "PenaltySettingsCard";
+
     

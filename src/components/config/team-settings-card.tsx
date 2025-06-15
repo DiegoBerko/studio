@@ -15,26 +15,22 @@ export interface TeamSettingsCardRef {
   getIsDirty: () => boolean;
 }
 
-interface TeamSettingsCardProps {
-  onDirtyChange: (isDirty: boolean) => void;
-}
+// Interface TeamSettingsCardProps removida
 
-export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCardProps>(({ onDirtyChange }, ref) => {
+export const TeamSettingsCard = forwardRef<TeamSettingsCardRef>((props, ref) => {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
 
-  // Local state for "Habilitar el uso de Equipos" (master switch)
   const [localEnableTeamUsage, setLocalEnableTeamUsage] = useState(state.enableTeamSelectionInMiniScoreboard);
-  
-  // Local states for dependent switches
   const [localEnablePlayerSelection, setLocalEnablePlayerSelection] = useState(state.enablePlayerSelectionForPenalties);
   const [localShowAliasInSelector, setLocalShowAliasInSelector] = useState(state.showAliasInPenaltyPlayerSelector);
   const [localShowAliasInControlsList, setLocalShowAliasInControlsList] = useState(state.showAliasInControlsPenaltyList);
   const [localShowAliasInScoreboard, setLocalShowAliasInScoreboard] = useState(state.showAliasInScoreboardPenalties);
   
-  const [isDirty, setIsDirty] = useState(false);
+  const [isDirty, setIsDirty] = useState(false); // Flag local de "dirty"
 
   useEffect(() => {
+    // Si la tarjeta no está marcada como "dirty", actualiza los valores locales para reflejar el estado global.
     if (!isDirty) {
       setLocalEnableTeamUsage(state.enableTeamSelectionInMiniScoreboard);
       setLocalEnablePlayerSelection(state.enablePlayerSelectionForPenalties);
@@ -48,37 +44,42 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
     state.showAliasInPenaltyPlayerSelector,
     state.showAliasInControlsPenaltyList,
     state.showAliasInScoreboardPenalties,
-    isDirty
+    isDirty // Dependencia importante para la condición
   ]);
-
-  useEffect(() => {
-    onDirtyChange(isDirty);
-  }, [isDirty, onDirtyChange]);
 
   const markDirty = () => {
     if (!isDirty) setIsDirty(true);
   };
 
+  const getIsDirtyInternal = () => {
+    // Compara activamente los valores locales con los valores del estado global
+    return (
+      localEnableTeamUsage !== state.enableTeamSelectionInMiniScoreboard ||
+      localEnablePlayerSelection !== state.enablePlayerSelectionForPenalties ||
+      localShowAliasInSelector !== state.showAliasInPenaltyPlayerSelector ||
+      localShowAliasInControlsList !== state.showAliasInControlsPenaltyList ||
+      localShowAliasInScoreboard !== state.showAliasInScoreboardPenalties
+    );
+  };
+
   useImperativeHandle(ref, () => ({
     handleSave: () => {
-      if (!isDirty) return true;
+      if (!isDirty && !getIsDirtyInternal()) return true;
 
       dispatch({ type: "SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD", payload: localEnableTeamUsage });
-      // If team usage is disabled, other settings are forced to false by the reducer.
-      // If team usage is enabled, dispatch the individual values.
       if (localEnableTeamUsage) {
         dispatch({ type: "SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES", payload: localEnablePlayerSelection });
         if (localEnablePlayerSelection) {
             dispatch({ type: "SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR", payload: localShowAliasInSelector });
             dispatch({ type: "SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST", payload: localShowAliasInControlsList });
         } else {
-            dispatch({ type: "SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR", payload: false });
-            dispatch({ type: "SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST", payload: false });
+            // El reducer se encargará de forzar estos a false si enablePlayerSelection es false
         }
         dispatch({ type: "SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES", payload: localShowAliasInScoreboard });
       }
+      // El reducer se encargará de forzar los switches dependientes a false si localEnableTeamUsage es false.
       
-      setIsDirty(false);
+      setIsDirty(false); // Resetea el flag "dirty"
       return true; 
     },
     handleDiscard: () => {
@@ -87,16 +88,15 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
       setLocalShowAliasInSelector(state.showAliasInPenaltyPlayerSelector);
       setLocalShowAliasInControlsList(state.showAliasInControlsPenaltyList);
       setLocalShowAliasInScoreboard(state.showAliasInScoreboardPenalties);
-      setIsDirty(false);
+      setIsDirty(false); // Resetea el flag "dirty"
     },
-    getIsDirty: () => isDirty,
+    getIsDirty: getIsDirtyInternal, // Usa la función de comparación activa
   }));
   
   const handleMasterToggleChange = (checked: boolean) => {
     setLocalEnableTeamUsage(checked);
     markDirty();
     if (!checked) {
-      // If master is turned off, also turn off dependent local states for immediate UI feedback
       setLocalEnablePlayerSelection(false);
       setLocalShowAliasInSelector(false);
       setLocalShowAliasInControlsList(false);
@@ -117,7 +117,6 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
   return (
     <ControlCardWrapper title="Configuración de Display (Alias y Selección)">
       <div className="space-y-6">
-        {/* Master Switch */}
         <div className="flex items-center justify-between p-4 border rounded-md bg-card shadow-sm">
           <Label htmlFor="enableTeamUsageSwitch" className="flex flex-col space-y-1">
             <span className="font-semibold text-base">Habilitar el uso de Equipos</span>
@@ -132,12 +131,10 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
           />
         </div>
 
-        {/* Dependent Settings Container */}
         <div className={cn(
           "space-y-4 transition-opacity duration-300",
           !localEnableTeamUsage && "opacity-50 pointer-events-none"
         )}>
-            {/* Enable Player Selection for Penalties */}
             <div className="flex items-center justify-between p-4 border rounded-md bg-muted/20">
               <Label htmlFor="enablePlayerSelectionSwitch" className="flex flex-col space-y-1">
                 <span>Habilitar selector de jugador para penalidades</span>
@@ -153,7 +150,6 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
               />
             </div>
 
-            {/* Conditional Switches for Player Selection Aliases */}
             <div className={cn(
                 "space-y-4 transition-opacity duration-300 ml-0 sm:ml-4",
                 (!localEnableTeamUsage || !localEnablePlayerSelection) && "opacity-60 pointer-events-none"
@@ -189,7 +185,6 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
                 </div>
             </div>
             
-            {/* Show Alias in Scoreboard Penalties */}
             <div className="flex items-center justify-between p-4 border rounded-md bg-muted/20">
             <Label htmlFor="showAliasInScoreboardSwitch" className="flex flex-col space-y-1">
                 <span>Mostrar alias en penalidades del Scoreboard</span>
@@ -211,3 +206,5 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
 });
 
 TeamSettingsCard.displayName = "TeamSettingsCard";
+
+    
