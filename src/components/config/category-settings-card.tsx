@@ -59,12 +59,10 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
             description: "Los nombres de las categorías deben ser únicos (ignorando mayúsculas/minúsculas y después de eliminar duplicados exactos).",
             variant: "destructive",
         });
-        // Still save the unique ones if desired, or return false. For now, let's allow saving unique ones.
-        // To prevent saving, return false here.
       }
       
-      const finalCategories: CategoryData[] = Array.from(new Set(categoryNames)) // Get unique names respecting case initially
-          .map(name => ({ id: name, name })); // Using name as ID for simplicity
+      const finalCategories: CategoryData[] = Array.from(new Set(categoryNames)) 
+          .map(name => ({ id: name, name })); 
 
       if (finalCategories.length === 0 && localCategoriesString.trim() !== "") {
           toast({
@@ -72,9 +70,7 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
               description: "La cadena de categorías no puede estar vacía si no se quiere tener ninguna categoría. Para eliminar todas, deje el campo vacío.",
               variant: "destructive"
           });
-          // return false; // Uncomment to prevent saving if this is an error
       }
-
 
       dispatch({ type: "SET_AVAILABLE_CATEGORIES", payload: finalCategories });
       
@@ -90,21 +86,23 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
 
   return (
     <ControlCardWrapper title="Configuración de Categorías Disponibles">
-      <div className="space-y-3 p-4 border rounded-md bg-muted/20">
-        <Label htmlFor="categoriesInput" className="text-base font-medium">
-          Nombres de Categorías (separadas por coma)
-        </Label>
-        <Input
-          id="categoriesInput"
-          type="text"
-          placeholder="Ej: A, B, C, Menores, Damas"
-          value={localCategoriesString}
-          onChange={(e) => {
-            setLocalCategoriesString(e.target.value);
-            markDirty();
-          }}
-        />
-        <p className="text-xs text-muted-foreground">
+      <div className="space-y-2 p-4 border rounded-md bg-muted/20">
+        <div className="grid grid-cols-[auto_1fr] items-center gap-x-4">
+          <Label htmlFor="categoriesInput" className="text-base font-medium whitespace-nowrap">
+            Nombres de Categorías
+          </Label>
+          <Input
+            id="categoriesInput"
+            type="text"
+            placeholder="Ej: A, B, C, Menores, Damas (separadas por coma)"
+            value={localCategoriesString}
+            onChange={(e) => {
+              setLocalCategoriesString(e.target.value);
+              markDirty();
+            }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground pl-1">
           Estas categorías estarán disponibles al crear o editar equipos, y para seleccionar la categoría del partido.
           Los nombres deben ser únicos (se ignoran mayúsculas/minúsculas para la unicidad).
         </p>
@@ -114,3 +112,4 @@ export const CategorySettingsCard = forwardRef<CategorySettingsCardRef, Category
 });
 
 CategorySettingsCard.displayName = "CategorySettingsCard";
+
