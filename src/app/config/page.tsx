@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Undo2, Upload, Download, RotateCcw } from 'lucide-react';
-import { useGameState, type ConfigFields } from '@/contexts/game-state-context';
+import { useGameState, type ConfigFields, type GameState } from '@/contexts/game-state-context'; // GameState for initialGlobalState
 import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
@@ -26,6 +27,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
+
+// Helper to get initial state for ConfigPage's configName reset
+// (Simplified as full initialGlobalState is complex and not fully needed here)
+const initialConfigStateForReset = {
+  configName: "Configuración Predeterminada",
+};
+
 
 export default function ConfigPage() {
   const { state, dispatch } = useGameState();
@@ -50,9 +58,11 @@ export default function ConfigPage() {
   const [isResetConfigDialogOpen, setIsResetConfigDialogOpen] = useState(false);
 
   useEffect(() => {
-    setLocalConfigName(state.configName || '');
-    setIsConfigNameDirty(false);
-  }, [state.configName]);
+    // Sync local config name if global state changes and this component isn't dirty for configName
+    if (!isConfigNameDirty) {
+      setLocalConfigName(state.configName || '');
+    }
+  }, [state.configName, isConfigNameDirty]);
 
   const handleLocalConfigNameChange = (newName: string) => {
     setLocalConfigName(newName);
@@ -110,7 +120,7 @@ export default function ConfigPage() {
         description: "Todos los cambios de configuración han sido guardados exitosamente.",
       });
     } else if (!configNameSaveSuccess) {
-      // Toast already shown
+      // Toast already shown for config name
     } else {
       toast({
         title: "Error al Guardar Configuración",
@@ -276,7 +286,7 @@ export default function ConfigPage() {
         setIsSoundDirty(false);
         setIsTeamSettingsDirty(false);
         setIsCategorySettingsDirty(false);
-        // Card specific discards will be handled by their useEffects reacting to global state change
+        // Cards will re-sync due to global state change and their internal useEffects
 
         toast({
           title: "Configuración Importada",
@@ -304,14 +314,14 @@ export default function ConfigPage() {
 
   const performConfigReset = () => {
     dispatch({ type: 'RESET_CONFIG_TO_DEFAULTS' });
-    setLocalConfigName(initialGlobalState.configName); // initialGlobalState or derived default name
+    setLocalConfigName(initialConfigStateForReset.configName);
     setIsConfigNameDirty(false);
     setIsDurationDirty(false);
     setIsPenaltyDirty(false);
     setIsSoundDirty(false);
     setIsTeamSettingsDirty(false);
     setIsCategorySettingsDirty(false);
-    // Card specific discards will be handled by their useEffects reacting to global state change
+    // Cards will re-sync due to global state change
 
     toast({
       title: "Configuración Restablecida",
@@ -359,18 +369,18 @@ export default function ConfigPage() {
           <TabsTrigger value="sound">Sonido</TabsTrigger>
           <TabsTrigger value="teamsAndDisplay">Equipos y Display</TabsTrigger>
         </TabsList>
-        <TabsContent value="gameFormat" className={tabContentClassName} forceMount>
+        <TabsContent value="gameFormat" className={tabContentClassName} /* Removed forceMount */>
           <div className="space-y-6">
             <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} />
           </div>
         </TabsContent>
-        <TabsContent value="timings" className={tabContentClassName} forceMount>
+        <TabsContent value="timings" className={tabContentClassName} /* Removed forceMount */>
            <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
         </TabsContent>
-        <TabsContent value="sound" className={tabContentClassName} forceMount>
+        <TabsContent value="sound" className={tabContentClassName} /* Removed forceMount */>
            <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
         </TabsContent>
-        <TabsContent value="teamsAndDisplay" className={tabContentClassName} forceMount>
+        <TabsContent value="teamsAndDisplay" className={tabContentClassName} /* Removed forceMount */>
           <div className="space-y-8">
             <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
             <Separator />
@@ -465,10 +475,3 @@ export default function ConfigPage() {
     </div>
   );
 }
-
-// Helper to get initial state for ConfigPage (if needed)
-// This can be expanded or used if more complex default logic is required outside of GameStateContext
-const initialGlobalState = {
-  configName: "Configuración Predeterminada",
-  // Add other default values if needed for comparison or reset independent of GameStateContext
-};
