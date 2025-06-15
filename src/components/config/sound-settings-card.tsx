@@ -149,45 +149,49 @@ export const SoundSettingsCard = forwardRef<SoundSettingsCardRef, SoundSettingsC
 
         <div className="space-y-3 p-4 border rounded-md bg-muted/20">
           <Label htmlFor="customSoundFile" className="text-base font-medium">Sonido de Bocina Personalizado</Label>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Sonido actual:</span>
-            <span className="font-semibold text-card-foreground truncate max-w-[200px] sm:max-w-xs" title={currentSoundDisplayName}>
-              {currentSoundDisplayName}
-            </span>
-             <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                        <p>
-                         El sonido predeterminado requiere que el archivo <code>{DEFAULT_SOUND_PATH}</code> exista en la carpeta <code>public</code> de tu aplicación.
-                         Si no está, o para usar tu propio sonido, cárgalo a continuación.
-                        </p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+          
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground flex-grow min-w-0">
+              <span>Sonido actual:</span>
+              <span className="font-semibold text-card-foreground truncate max-w-[160px] xs:max-w-[200px] sm:max-w-xs md:max-w-sm" title={currentSoundDisplayName}>
+                {currentSoundDisplayName}
+              </span>
+              <TooltipProvider>
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help shrink-0" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                          <p>
+                           El sonido predeterminado requiere que el archivo <code>{DEFAULT_SOUND_PATH}</code> exista en la carpeta <code>public</code> de tu aplicación.
+                           Si no está, o para usar tu propio sonido, cárgalo a continuación.
+                          </p>
+                      </TooltipContent>
+                  </Tooltip>
+              </TooltipProvider>
+            </div>
+            
+            <div className="flex gap-2 shrink-0">
+              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="h-9">
+                <UploadCloud className="mr-2 h-4 w-4" /> Cargar Sonido (max 2MB)
+              </Button>
+              {localCustomSoundDataUrl && (
+                <Button type="button" variant="destructive" onClick={handleClearCustomSound} className="h-9">
+                  <XCircle className="mr-2 h-4 w-4" /> Usar Predeterminado
+                </Button>
+              )}
+            </div>
           </div>
           
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-            <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full sm:w-auto">
-              <UploadCloud className="mr-2 h-4 w-4" /> Cargar Sonido (max 2MB)
-            </Button>
-            <Input
-              id="customSoundFile"
-              type="file"
-              accept="audio/*"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            {localCustomSoundDataUrl && (
-              <Button type="button" variant="destructive" onClick={handleClearCustomSound} className="w-full sm:w-auto">
-                <XCircle className="mr-2 h-4 w-4" /> Usar Predeterminado
-              </Button>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">
+          <Input
+            id="customSoundFile"
+            type="file"
+            accept="audio/*"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <p className="text-xs text-muted-foreground pt-1">
             Formatos recomendados: MP3, WAV, OGG. Si no cargas uno, se intentará usar el predeterminado.
           </p>
         </div>
@@ -197,3 +201,4 @@ export const SoundSettingsCard = forwardRef<SoundSettingsCardRef, SoundSettingsC
 });
 
 SoundSettingsCard.displayName = "SoundSettingsCard";
+
