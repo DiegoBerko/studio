@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
@@ -58,13 +59,26 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
       if (!isDirtyLocal) return true;
 
       dispatch({ type: "SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD", payload: localEnableTeamUsage });
+      
       if (localEnableTeamUsage) {
         dispatch({ type: "SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES", payload: localEnablePlayerSelection });
+        
         if (localEnablePlayerSelection) {
             dispatch({ type: "SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR", payload: localShowAliasInSelector });
             dispatch({ type: "SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST", payload: localShowAliasInControlsList });
+            dispatch({ type: "SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES", payload: localShowAliasInScoreboard });
+        } else {
+            // Player selection is OFF, but team usage is ON
+            dispatch({ type: "SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR", payload: false });
+            dispatch({ type: "SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST", payload: false });
+            dispatch({ type: "SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES", payload: false });
         }
-        dispatch({ type: "SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES", payload: localShowAliasInScoreboard });
+      } else {
+        // Team usage is OFF, all sub-settings must be OFF
+        dispatch({ type: "SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES", payload: false });
+        dispatch({ type: "SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR", payload: false });
+        dispatch({ type: "SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST", payload: false });
+        dispatch({ type: "SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES", payload: false });
       }
       
       setIsDirtyLocal(false);
@@ -78,7 +92,14 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
       setLocalShowAliasInScoreboard(state.showAliasInScoreboardPenalties);
       setIsDirtyLocal(false);
     },
-    getIsDirty: () => isDirtyLocal,
+    getIsDirty: () => {
+      if (localEnableTeamUsage !== state.enableTeamSelectionInMiniScoreboard) return true;
+      if (localEnablePlayerSelection !== state.enablePlayerSelectionForPenalties) return true;
+      if (localShowAliasInSelector !== state.showAliasInPenaltyPlayerSelector) return true;
+      if (localShowAliasInControlsList !== state.showAliasInControlsPenaltyList) return true;
+      if (localShowAliasInScoreboard !== state.showAliasInScoreboardPenalties) return true;
+      return false;
+    },
   }));
   
   const handleMasterToggleChange = (checked: boolean) => {
@@ -98,6 +119,7 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
     if (!checked) {
         setLocalShowAliasInSelector(false);
         setLocalShowAliasInControlsList(false);
+        setLocalShowAliasInScoreboard(false); // Also disable scoreboard alias if player selection is off
     }
   };
 
@@ -142,49 +164,49 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
                 (!localEnableTeamUsage || !localEnablePlayerSelection) && "opacity-60 pointer-events-none"
             )}>
                 <div className="flex items-center justify-between p-4 border rounded-md bg-muted/30">
-                <Label htmlFor="showAliasInSelectorSwitch" className="flex flex-col space-y-1">
-                    <span>Mostrar alias en lista del selector de jugador</span>
-                    <span className="font-normal leading-snug text-muted-foreground text-xs">
-                    Muestra el nombre/alias junto al número en el desplegable.
-                    </span>
-                </Label>
-                <Switch
-                    id="showAliasInSelectorSwitch"
-                    checked={localShowAliasInSelector}
-                    onCheckedChange={(checked) => { setLocalShowAliasInSelector(checked); markDirty(); }}
-                    disabled={!localEnableTeamUsage || !localEnablePlayerSelection}
-                />
+                  <Label htmlFor="showAliasInSelectorSwitch" className="flex flex-col space-y-1">
+                      <span>Mostrar alias en lista del selector de jugador</span>
+                      <span className="font-normal leading-snug text-muted-foreground text-xs">
+                      Muestra el nombre/alias junto al número en el desplegable.
+                      </span>
+                  </Label>
+                  <Switch
+                      id="showAliasInSelectorSwitch"
+                      checked={localShowAliasInSelector}
+                      onCheckedChange={(checked) => { setLocalShowAliasInSelector(checked); markDirty(); }}
+                      disabled={!localEnableTeamUsage || !localEnablePlayerSelection}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between p-4 border rounded-md bg-muted/30">
-                <Label htmlFor="showAliasInControlsListSwitch" className="flex flex-col space-y-1">
-                    <span>Mostrar alias en lista de penalidades del tablero de Controles</span>
-                    <span className="font-normal leading-snug text-muted-foreground text-xs">
-                    Muestra el alias en la lista de penalidades activas en la página de Controles.
-                    </span>
-                </Label>
-                <Switch
-                    id="showAliasInControlsListSwitch"
-                    checked={localShowAliasInControlsList}
-                    onCheckedChange={(checked) => { setLocalShowAliasInControlsList(checked); markDirty(); }}
-                    disabled={!localEnableTeamUsage || !localEnablePlayerSelection}
-                />
+                  <Label htmlFor="showAliasInControlsListSwitch" className="flex flex-col space-y-1">
+                      <span>Mostrar alias en lista de penalidades del tablero de Controles</span>
+                      <span className="font-normal leading-snug text-muted-foreground text-xs">
+                      Muestra el alias en la lista de penalidades activas en la página de Controles.
+                      </span>
+                  </Label>
+                  <Switch
+                      id="showAliasInControlsListSwitch"
+                      checked={localShowAliasInControlsList}
+                      onCheckedChange={(checked) => { setLocalShowAliasInControlsList(checked); markDirty(); }}
+                      disabled={!localEnableTeamUsage || !localEnablePlayerSelection}
+                  />
                 </div>
-            </div>
-            
-            <div className="flex items-center justify-between p-4 border rounded-md bg-muted/20">
-            <Label htmlFor="showAliasInScoreboardSwitch" className="flex flex-col space-y-1">
-                <span>Mostrar alias en penalidades del Scoreboard</span>
-                <span className="font-normal leading-snug text-muted-foreground text-xs">
-                Muestra el alias del jugador en las tarjetas de penalidad del Scoreboard principal.
-                </span>
-            </Label>
-            <Switch
-                id="showAliasInScoreboardSwitch"
-                checked={localShowAliasInScoreboard}
-                onCheckedChange={(checked) => { setLocalShowAliasInScoreboard(checked); markDirty(); }}
-                disabled={!localEnableTeamUsage}
-            />
+                
+                <div className="flex items-center justify-between p-4 border rounded-md bg-muted/30">
+                  <Label htmlFor="showAliasInScoreboardSwitch" className="flex flex-col space-y-1">
+                      <span>Mostrar alias en penalidades del Scoreboard</span>
+                      <span className="font-normal leading-snug text-muted-foreground text-xs">
+                      Muestra el alias del jugador en las tarjetas de penalidad del Scoreboard principal.
+                      </span>
+                  </Label>
+                  <Switch
+                      id="showAliasInScoreboardSwitch"
+                      checked={localShowAliasInScoreboard}
+                      onCheckedChange={(checked) => { setLocalShowAliasInScoreboard(checked); markDirty(); }}
+                      disabled={!localEnableTeamUsage || !localEnablePlayerSelection}
+                  />
+                </div>
             </div>
         </div>
       </div>
