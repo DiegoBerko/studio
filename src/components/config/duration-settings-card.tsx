@@ -154,13 +154,11 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
     getIsDirty: () => isDirty,
   }));
 
-  const commonInputStyle = "w-20 mt-0";
-
   return (
     <ControlCardWrapper title="Configuración de Tiempos, Períodos y Arranque Automático">
       <div className="space-y-6">
         {/* Regular Periods */}
-        <div className="grid grid-cols-[auto_80px_auto_80px] items-end gap-x-3 sm:gap-x-4 gap-y-1">
+        <div className="grid grid-cols-[auto_80px_1fr_80px] items-center gap-x-3 sm:gap-x-4">
             <Label htmlFor="numRegularPeriods" className="text-sm whitespace-nowrap">Períodos Regulares (Cant)</Label>
             <Input
             id="numRegularPeriods"
@@ -171,7 +169,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             placeholder="ej. 3"
             min="1"
             />
-            <Label htmlFor="periodDuration" className="text-sm whitespace-nowrap">Duración (Min)</Label>
+            <Label htmlFor="periodDuration" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Duración (Min)</Label>
             <Input
             id="periodDuration"
             type="number"
@@ -184,7 +182,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
         </div>
 
         {/* Overtime Periods */}
-        <div className="grid grid-cols-[auto_80px_auto_80px] items-end gap-x-3 sm:gap-x-4 gap-y-1">
+        <div className="grid grid-cols-[auto_80px_1fr_80px] items-center gap-x-3 sm:gap-x-4">
             <Label htmlFor="numOTPeriods" className="text-sm whitespace-nowrap">Períodos Overtime (Cant)</Label>
             <Input
             id="numOTPeriods"
@@ -195,7 +193,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             placeholder="ej. 1"
             min="0"
             />
-            <Label htmlFor="otPeriodDuration" className="text-sm whitespace-nowrap">Duración (Min)</Label>
+            <Label htmlFor="otPeriodDuration" className="font-normal text-sm justify-self-start sm:justify-self-end whitespace-nowrap">Duración (Min)</Label>
             <Input
             id="otPeriodDuration"
             type="number"
@@ -215,7 +213,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             type="number"
             value={localTimeoutDurationInput}
             onChange={(e) => { setLocalTimeoutDurationInput(e.target.value); markDirty(); }}
-            className={commonInputStyle}
+            className={narrowInputStyle}
             placeholder="ej. 30"
             min="1"
           />
@@ -235,7 +233,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             type="number"
             value={localBreakDurationInput}
             onChange={(e) => { setLocalBreakDurationInput(e.target.value); markDirty(); }}
-            className={commonInputStyle}
+            className={narrowInputStyle}
             placeholder="ej. 120"
             min="1"
           />
@@ -255,7 +253,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
             type="number"
             value={localPreOTBreakDurationInput}
             onChange={(e) => { setLocalPreOTBreakDurationInput(e.target.value); markDirty(); }}
-            className={commonInputStyle}
+            className={narrowInputStyle}
             placeholder="ej. 60"
             min="1"
           />
@@ -275,7 +273,7 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
               type="number"
               value={localWarmUpDurationInput}
               onChange={(e) => { setLocalWarmUpDurationInput(e.target.value); markDirty(); }}
-              className={commonInputStyle}
+              className={narrowInputStyle}
               placeholder="ej. 5"
               min="1"
             />
@@ -292,6 +290,8 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
 });
 
 DurationSettingsCard.displayName = "DurationSettingsCard";
+    
+
     
 
     
