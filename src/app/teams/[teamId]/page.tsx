@@ -71,8 +71,8 @@ export default function ManageTeamPage() {
         <p className="text-muted-foreground mb-6">
           El equipo que estás buscando no existe o ha sido eliminado.
         </p>
-        <Button onClick={() => router.push('/teams')}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Equipos
+        <Button onClick={() => router.push('/config')}> {/* Changed to /config */}
+          <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Gestión de Equipos
         </Button>
       </div>
     );
@@ -93,15 +93,15 @@ export default function ManageTeamPage() {
       description: `El equipo "${team.name}" ha sido eliminado.`,
       variant: "destructive",
     });
-    router.push('/teams');
+    router.push('/config'); // Changed to /config
   };
   
   const categoryName = getCategoryNameById(team.category, state.availableCategories);
 
   return (
     <div className="w-full max-w-3xl mx-auto space-y-8">
-      <Button variant="outline" onClick={() => router.push('/teams')} className="mb-6">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Equipos
+      <Button variant="outline" onClick={() => router.push('/config')} className="mb-6"> {/* Changed to /config */}
+        <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Gestión de Equipos
       </Button>
 
       <div className="flex flex-col sm:flex-row items-center gap-6 p-6 border rounded-lg bg-card shadow-md">
@@ -189,6 +189,3 @@ export default function ManageTeamPage() {
     </div>
   );
 }
-
-
-    
