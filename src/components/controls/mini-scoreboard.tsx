@@ -513,7 +513,8 @@ export function MiniScoreboard() {
               )}
             </div>
              <div className="relative w-full max-w-xs mx-auto my-1">
-                <div className="flex items-center justify-center">
+                {/* Removed justify-center from this div */}
+                <div className="flex items-center">
                     <Input
                         id="homeTeamNameInput"
                         value={localHomeTeamName}
@@ -528,7 +529,7 @@ export function MiniScoreboard() {
                         placeholder="Nombre Local"
                         className={cn(
                             "flex-grow h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                            state.enableTeamSelectionInMiniScoreboard ? "px-8" : "px-2" // Adjust padding based on icon presence
+                            state.enableTeamSelectionInMiniScoreboard ? "pl-2" : "px-2"
                         )}
                         aria-label="Nombre del equipo local"
                         autoComplete="off"
@@ -609,7 +610,7 @@ export function MiniScoreboard() {
                     )}
                 </div>
             </div>
-            <p className="text-sm text-muted-foreground text-center">({state.enableTeamSelectionInMiniScoreboard ? 'Local' : state.homeTeamName.trim() || 'Local'})</p>
+            <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard ? 'Local' : state.homeTeamName.trim() || 'Local'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               <Button
                 variant="ghost"
@@ -816,7 +817,8 @@ export function MiniScoreboard() {
               )}
             </div>
             <div className="relative w-full max-w-xs mx-auto my-1">
-             <div className="flex items-center justify-center">
+             {/* Removed justify-center from this div */}
+             <div className="flex items-center">
                 <Input
                     id="awayTeamNameInput"
                     value={localAwayTeamName}
@@ -831,7 +833,7 @@ export function MiniScoreboard() {
                     placeholder="Nombre Visitante"
                     className={cn(
                     "flex-grow h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                     state.enableTeamSelectionInMiniScoreboard ? "px-8" : "px-2"
+                     state.enableTeamSelectionInMiniScoreboard ? "pl-2" : "px-2"
                     )}
                     aria-label="Nombre del equipo visitante"
                     autoComplete="off"
@@ -912,7 +914,7 @@ export function MiniScoreboard() {
                 )}
                 </div>
             </div>
-            <p className="text-sm text-muted-foreground text-center">({state.enableTeamSelectionInMiniScoreboard ? 'Visitante' : state.awayTeamName.trim() || 'Visitante'})</p>
+            <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard ? 'Visitante' : state.awayTeamName.trim() || 'Visitante'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               <Button
                 variant="ghost"
