@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useRef } from "react";
@@ -7,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlusCircle, Search, Users, Info, Upload, Download, ListFilter, FileText, Trash2, X } from "lucide-react";
 import { TeamListItem } from "@/components/teams/team-list-item";
-import { CreateEditTeamDialog } from "@/components/teams/create-edit-team-dialog";
+import { CreateEditTeamDialog, getSpecificDefaultLogoUrlForCsv } from "@/components/teams/create-edit-team-dialog"; // Import new getSpecificDefaultLogoUrlForCsv
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import type { TeamData, PlayerData, PlayerType } from "@/types";
@@ -30,26 +29,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const ALL_CATEGORIES_FILTER_KEY = "__ALL_CATEGORIES_TAB__";
+const ALL_CATEGORIES_FILTER_KEY = "__ALL_CATEGORIES_FILTER_KEY__";
 const NO_CATEGORIES_PLACEHOLDER_VALUE_TAB = "__NO_CATEGORIES_DEFINED_TAB__";
-
-const SPECIFIC_DEFAULT_LOGOS_CSV: Record<string, string> = {
-  'HAZAD': '/logos/Logo-Hazad.png',
-  'OVEJAS NEGRAS': '/logos/Logo-OvejasNegras.png',
-  'FANTASY SKATE': '/logos/Logo-FantasySkate.png',
-  'ACEMHH': '/logos/Logo-ACEMHH.png',
-};
-
-function getSpecificDefaultLogoUrlCsv(teamName: string): string | null {
-  if (!teamName) return null;
-  const upperTeamName = teamName.toUpperCase();
-  for (const keyword in SPECIFIC_DEFAULT_LOGOS_CSV) {
-    if (upperTeamName.includes(keyword)) {
-      return SPECIFIC_DEFAULT_LOGOS_CSV[keyword];
-    }
-  }
-  return null;
-}
 
 
 export function TeamsManagementTab() {
@@ -146,7 +127,7 @@ export function TeamsManagementTab() {
         if (!Array.isArray(importedData) || !importedData.every(item =>
             item && typeof item.id === 'string' &&
             typeof item.name === 'string' &&
-            (typeof item.category === 'string' || item.category === undefined || item.category === null) && // Allow null category
+            (typeof item.category === 'string' || item.category === undefined || item.category === null) && 
             Array.isArray(item.players))
            ) {
           throw new Error("Archivo de equipos no válido o formato incorrecto. Se esperaba un array de equipos.");
@@ -155,7 +136,7 @@ export function TeamsManagementTab() {
         const validatedTeams = importedData.map(team => ({
           id: team.id,
           name: team.name,
-          logoDataUrl: team.logoDataUrl || getSpecificDefaultLogoUrlCsv(team.name),
+          logoDataUrl: team.logoDataUrl || getSpecificDefaultLogoUrlForCsv(team.name),
           category: team.category || (state.availableCategories.length > 0 ? state.availableCategories[0].id : ''),
           players: Array.isArray(team.players) ? team.players.map((player: any) => ({
             id: player.id || crypto.randomUUID(),
@@ -234,7 +215,7 @@ export function TeamsManagementTab() {
                 id: crypto.randomUUID(),
                 name: currentTeamData.name,
                 category: currentTeamData.categoryId,
-                logoDataUrl: getSpecificDefaultLogoUrlCsv(currentTeamData.name),
+                logoDataUrl: getSpecificDefaultLogoUrlForCsv(currentTeamData.name),
                 players: currentTeamData.players,
               });
             }
@@ -285,7 +266,7 @@ export function TeamsManagementTab() {
               throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): Nombre y Rol son obligatorios.`);
             }
 
-            if (playerNumber && !/^\d*$/.test(playerNumber)) { // Allow empty, but if not empty, must be numeric
+            if (playerNumber && !/^\d*$/.test(playerNumber)) { 
               throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): El número de jugador "${playerNumber}" debe ser numérico si se proporciona.`);
             }
             if (playerNumber && playerNumbersInCurrentTeam.has(playerNumber)) {
@@ -306,7 +287,7 @@ export function TeamsManagementTab() {
 
             currentTeamData.players.push({
               id: crypto.randomUUID(),
-              number: playerNumber,
+              number: playerNumber, // Can be empty string if not provided in CSV
               name: playerName,
               type: playerType,
             });
@@ -318,7 +299,7 @@ export function TeamsManagementTab() {
             id: crypto.randomUUID(),
             name: currentTeamData.name,
             category: currentTeamData.categoryId,
-            logoDataUrl: getSpecificDefaultLogoUrlCsv(currentTeamData.name),
+            logoDataUrl: getSpecificDefaultLogoUrlForCsv(currentTeamData.name),
             players: currentTeamData.players,
           });
         }
@@ -604,6 +585,3 @@ export function TeamsManagementTab() {
     </div>
   );
 }
-
-
-    

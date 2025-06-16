@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -24,6 +23,7 @@ import { DefaultTeamLogo } from "./default-team-logo";
 
 const NO_CATEGORIES_PLACEHOLDER_VALUE_DIALOG = "__NO_CATEGORIES_DIALOG__";
 
+// Moved outside the component for potential reuse
 const SPECIFIC_DEFAULT_LOGOS: Record<string, string> = {
   'HAZAD': '/logos/Logo-Hazad.png',
   'OVEJAS NEGRAS': '/logos/Logo-OvejasNegras.png',
@@ -59,8 +59,7 @@ export function CreateEditTeamDialog({
   const { toast } = useToast();
   const [teamName, setTeamName] = useState("");
   const [teamCategory, setTeamCategory] = useState("");
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  // No necesitamos logoFile state aquí, el logoPreview es suficiente para la lógica
+  const [logoPreview, setLogoPreview] = useState<string | null>(null); // Can be dataURI or null (if cleared)
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isEditing = !!teamToEdit;
@@ -71,13 +70,12 @@ export function CreateEditTeamDialog({
       if (isEditing && teamToEdit) {
         setTeamName(teamToEdit.name);
         setTeamCategory(teamToEdit.category || (availableCategories.length > 0 ? availableCategories[0].id : ""));
-        setLogoPreview(teamToEdit.logoDataUrl || null);
+        setLogoPreview(teamToEdit.logoDataUrl || null); // Initialize with existing logo or null
       } else {
         setTeamName("");
         setTeamCategory(availableCategories.length > 0 ? availableCategories[0].id : "");
-        setLogoPreview(null);
+        setLogoPreview(null); // Start fresh for new team
       }
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -87,12 +85,9 @@ export function CreateEditTeamDialog({
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) {
-      // Si el usuario cancela la selección de archivo, no borrar el logo existente si está editando
-      if (isEditing && teamToEdit && !logoPreview) {
-        // No hacer nada, mantener el logo actual si lo había o el específico si se aplicó
-      } else if (!isEditing && !logoPreview) {
-        // Si es nuevo y no había preview, no hacer nada.
-      }
+      // If user cancels file selection, logoPreview remains as it was.
+      // If it was null, it stays null. If it had a dataURI, it keeps it.
+      // If it was showing a default teamToEdit.logoDataUrl, that state is managed by logoPreview being the original URL or null.
       return;
     }
 
@@ -118,13 +113,13 @@ export function CreateEditTeamDialog({
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      setLogoPreview(e.target?.result as string); // Esto será una data URI base64
+      setLogoPreview(e.target?.result as string); // This will be a data URI base64
     };
     reader.readAsDataURL(file);
   };
 
   const handleClearLogo = () => {
-    setLogoPreview(null);
+    setLogoPreview(null); // Explicitly set to null to indicate user wants no logo or default by name
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -172,26 +167,31 @@ export function CreateEditTeamDialog({
       return;
     }
 
-    let finalLogoDataUrl = logoPreview; // Si el usuario cargó uno (será data URI) o borró uno (será null)
-    
-    if (!finalLogoDataUrl && (!isEditing || !teamToEdit?.logoDataUrl || logoPreview === null)) { 
-      // Si no hay preview (porque no se cargó uno nuevo, o se borró el existente),
-      // o si es un equipo nuevo sin logo cargado,
-      // intentar obtener un logo específico por nombre.
-      const specificLogo = getSpecificDefaultLogoUrl(trimmedTeamName);
-      if (specificLogo) {
-        finalLogoDataUrl = specificLogo; // Esto será una ruta como /logos/Logo-Hazad.png
+    let finalLogoDataUrl: string | null = null;
+
+    if (logoPreview && logoPreview.startsWith('data:image')) {
+      // 1. User uploaded a new logo (logoPreview is a data URI)
+      finalLogoDataUrl = logoPreview;
+    } else {
+      // User did not upload a new logo, or cleared the existing one (logoPreview is null or a path string)
+      const specificLogoByName = getSpecificDefaultLogoUrl(trimmedTeamName);
+      if (specificLogoByName) {
+        // 2. Name matches a specific default logo
+        finalLogoDataUrl = specificLogoByName;
+      } else if (isEditing && teamToEdit?.logoDataUrl && logoPreview !== null) {
+        // 3. Editing, there was an original logo, AND user did NOT explicitly clear it (logoPreview isn't null).
+        // This means logoPreview might be the original teamToEdit.logoDataUrl if not touched, or a specific logo if name matched.
+        // If logoPreview is the original path, it's fine. If it was null and we're here, it means no specific by name was found.
+        finalLogoDataUrl = teamToEdit.logoDataUrl;
       }
-    } else if (isEditing && teamToEdit?.logoDataUrl && logoPreview === teamToEdit.logoDataUrl) {
-      // Si se está editando y el logoPreview no ha cambiado del original, mantener el original.
-      finalLogoDataUrl = teamToEdit.logoDataUrl;
+      // 4. Otherwise, finalLogoDataUrl remains null (e.g., new team, no specific logo, no upload; or editing, user cleared logo, no specific found)
     }
 
 
     const teamPayload = {
       name: trimmedTeamName,
       category: teamCategory,
-      logoDataUrl: finalLogoDataUrl,
+      logoDataUrl: finalLogoDataUrl, // This will be dataURI, path, or null
     };
 
     if (isEditing && teamToEdit) {
@@ -218,8 +218,23 @@ export function CreateEditTeamDialog({
     }
     onOpenChange(false);
   };
-  
-  const displayLogoPreview = logoPreview || (isEditing && teamToEdit?.logoDataUrl && logoPreview !== null ? teamToEdit.logoDataUrl : null) || getSpecificDefaultLogoUrl(teamName);
+
+  // Determine what to display in the preview area
+  let currentDisplayLogoSrc: string | null = null;
+  if (logoPreview && logoPreview.startsWith('data:image')) { // User uploaded or has a pending dataURI
+    currentDisplayLogoSrc = logoPreview;
+  } else if (logoPreview === null) { // User cleared the logo, try specific by name
+    currentDisplayLogoSrc = getSpecificDefaultLogoUrl(teamName);
+  } else if (isEditing && teamToEdit?.logoDataUrl && !logoPreview) { // Editing, no user interaction with logo uploader yet, use existing
+    currentDisplayLogoSrc = teamToEdit.logoDataUrl;
+  } else if (!isEditing && !logoPreview) { // New team, no user interaction yet, try specific by name
+     currentDisplayLogoSrc = getSpecificDefaultLogoUrl(teamName);
+  } else if (logoPreview) { // logoPreview might be an old path if editing and user hasn't re-uploaded
+    currentDisplayLogoSrc = logoPreview;
+  }
+  if (!currentDisplayLogoSrc) { // Fallback if all else fails for current teamName
+      currentDisplayLogoSrc = getSpecificDefaultLogoUrl(teamName);
+  }
 
 
   return (
@@ -241,7 +256,13 @@ export function CreateEditTeamDialog({
             <Input
               id="teamName"
               value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
+              onChange={(e) => {
+                setTeamName(e.target.value);
+                // If logoPreview is not a dataURI (i.e., not user-uploaded), allow dynamic update of specific logo
+                if (!(logoPreview && logoPreview.startsWith('data:image'))) {
+                  setLogoPreview(null); // Reset preview to allow specific logo by name to take effect or clear previous path
+                }
+              }}
               className="col-span-3"
               placeholder="Nombre del Equipo"
             />
@@ -276,13 +297,19 @@ export function CreateEditTeamDialog({
             </Label>
             <div className="col-span-3 space-y-2">
               <div className="flex items-center gap-4">
-                {displayLogoPreview ? (
+                {currentDisplayLogoSrc ? (
                   <Image
-                    src={displayLogoPreview} // Puede ser data URI o ruta /logos/
+                    src={currentDisplayLogoSrc}
                     alt="Vista previa del logo"
                     width={64}
                     height={64}
                     className="rounded-md border object-contain w-16 h-16"
+                    onError={() => {
+                        // If an image path fails (e.g. specific logo not found in public), clear it for DefaultTeamLogo
+                        console.warn("Error loading image for preview: ", currentDisplayLogoSrc);
+                        setLogoPreview(null); // This will trigger re-evaluation of currentDisplayLogoSrc in next render.
+                                            // If it was a specific logo that failed, it will try DefaultTeamLogo.
+                    }}
                   />
                 ) : teamName.trim() ? (
                   <DefaultTeamLogo teamName={teamName} size="lg" />
@@ -295,7 +322,7 @@ export function CreateEditTeamDialog({
                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                     <UploadCloud className="mr-2 h-4 w-4" /> Cargar Logo
                   </Button>
-                  {logoPreview && ( // Solo mostrar "Quitar Logo" si hay un logo cargado por el usuario (data URI)
+                  { (logoPreview && logoPreview.startsWith('data:image')) && ( // Show "Quitar" only if a data URI is in preview
                     <Button type="button" variant="ghost" size="sm" onClick={handleClearLogo} className="text-destructive hover:text-destructive">
                       <XCircle className="mr-2 h-4 w-4" /> Quitar Logo Cargado
                     </Button>
@@ -332,5 +359,5 @@ export function CreateEditTeamDialog({
   );
 }
     
-
-    
+// Exporting helper for CSV import use in teams-management-tab
+export { getSpecificDefaultLogoUrl as getSpecificDefaultLogoUrlForCsv };
