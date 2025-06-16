@@ -26,7 +26,7 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
 
   const handlePlayerNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Allow only digits
+    // Allow only digits or empty string
     if (/^\d*$/.test(value)) {
       setPlayerNumber(value);
     }
@@ -37,32 +37,34 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
     const trimmedPlayerNumber = playerNumber.trim();
     const trimmedPlayerName = playerName.trim();
 
-    if (!trimmedPlayerNumber || !trimmedPlayerName) {
+    if (!trimmedPlayerName) { // Only name is strictly required
       toast({
-        title: "Campos Requeridos",
-        description: "El número y el nombre/apodo del jugador son obligatorios.",
+        title: "Nombre Requerido",
+        description: "El nombre/apodo del jugador es obligatorio.",
         variant: "destructive",
       });
       return;
     }
 
-    if (!/^\d+$/.test(trimmedPlayerNumber)) {
-        toast({
-            title: "Número de Jugador Inválido",
-            description: "El número del jugador solo debe contener dígitos.",
+    if (trimmedPlayerNumber) { // Validate number only if provided
+        if (!/^\d+$/.test(trimmedPlayerNumber)) {
+            toast({
+                title: "Número de Jugador Inválido",
+                description: "El número del jugador solo debe contener dígitos si se proporciona.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        const currentTeam = state.teams.find(t => t.id === teamId);
+        if (currentTeam && currentTeam.players.some(p => p.number === trimmedPlayerNumber)) {
+          toast({
+            title: "Número de Jugador Duplicado",
+            description: `El número #${trimmedPlayerNumber} ya existe en este equipo. Por favor, elige otro.`,
             variant: "destructive",
-        });
-        return;
-    }
-
-    const currentTeam = state.teams.find(t => t.id === teamId);
-    if (currentTeam && currentTeam.players.some(p => p.number === trimmedPlayerNumber)) {
-      toast({
-        title: "Número de Jugador Duplicado",
-        description: `El número #${trimmedPlayerNumber} ya existe en este equipo. Por favor, elige otro.`,
-        variant: "destructive",
-      });
-      return;
+          });
+          return;
+        }
     }
 
 
@@ -71,7 +73,7 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
       payload: {
         teamId,
         player: {
-          number: trimmedPlayerNumber,
+          number: trimmedPlayerNumber, // Can be empty
           name: trimmedPlayerName,
           type: playerType,
         },
@@ -80,7 +82,7 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
 
     toast({
       title: "Jugador Añadido",
-      description: `Jugador #${trimmedPlayerNumber} ${trimmedPlayerName} añadido al equipo.`,
+      description: `Jugador ${trimmedPlayerNumber ? `#${trimmedPlayerNumber} ` : ''}${trimmedPlayerName} añadido al equipo.`,
     });
 
     // Reset form
@@ -98,15 +100,14 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="playerNumber">Número</Label>
+              <Label htmlFor="playerNumber">Número (Opcional)</Label>
               <Input
                 id="playerNumber"
                 type="text" 
                 inputMode="numeric"
                 value={playerNumber}
                 onChange={handlePlayerNumberChange}
-                placeholder="Ej: 10"
-                required
+                placeholder="Ej: 10 (o dejar vacío)"
               />
             </div>
              <div>
@@ -147,7 +148,3 @@ export function AddPlayerForm({ teamId }: AddPlayerFormProps) {
     </Card>
   );
 }
-
-    
-
-    

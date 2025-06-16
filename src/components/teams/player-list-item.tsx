@@ -31,7 +31,6 @@ export function PlayerListItem({ player, teamId, onRemovePlayer }: PlayerListIte
       setEditableNumber(player.number);
       setEditableName(player.name);
     } else {
-      // Focus the number input when editing starts
       numberInputRef.current?.focus();
       numberInputRef.current?.select();
     }
@@ -53,27 +52,7 @@ export function PlayerListItem({ player, teamId, onRemovePlayer }: PlayerListIte
     let changesMade = false;
     const updates: Partial<Pick<PlayerData, 'name' | 'number'>> = {};
 
-    // Validate Number
-    if (!trimmedNumber) {
-      toast({ title: "Número Requerido", description: "El número no puede estar vacío.", variant: "destructive" });
-      // Do not setEditableNumber(player.number) here, allow user to correct
-      return; 
-    }
-    if (!/^\d+$/.test(trimmedNumber)) {
-      toast({ title: "Número Inválido", description: "El número solo debe contener dígitos.", variant: "destructive" });
-      return;
-    }
-    const currentTeam = state.teams.find(t => t.id === teamId);
-    if (currentTeam && currentTeam.players.some(p => p.id !== player.id && p.number === trimmedNumber)) {
-      toast({ title: "Número Duplicado", description: `El número #${trimmedNumber} ya existe en este equipo.`, variant: "destructive" });
-      return;
-    }
-    if (trimmedNumber !== player.number) {
-      updates.number = trimmedNumber;
-      changesMade = true;
-    }
-
-    // Validate Name
+    // Validate Name (still required)
     if (!trimmedName) {
       toast({ title: "Nombre Requerido", description: "El nombre no puede estar vacío.", variant: "destructive" });
       return;
@@ -82,13 +61,34 @@ export function PlayerListItem({ player, teamId, onRemovePlayer }: PlayerListIte
       updates.name = trimmedName;
       changesMade = true;
     }
+    
+    // Validate Number only if provided
+    if (trimmedNumber) {
+        if (!/^\d+$/.test(trimmedNumber)) {
+          toast({ title: "Número Inválido", description: "El número solo debe contener dígitos si se proporciona.", variant: "destructive" });
+          return;
+        }
+        const currentTeam = state.teams.find(t => t.id === teamId);
+        if (currentTeam && currentTeam.players.some(p => p.id !== player.id && p.number === trimmedNumber)) {
+          toast({ title: "Número Duplicado", description: `El número #${trimmedNumber} ya existe en este equipo.`, variant: "destructive" });
+          return;
+        }
+    }
+    // Update number if it changed (even if it becomes empty or was empty and now has a value)
+    if (trimmedNumber !== player.number) {
+        updates.number = trimmedNumber;
+        changesMade = true;
+    }
+
 
     if (changesMade) {
       dispatch({ type: "UPDATE_PLAYER_IN_TEAM", payload: { teamId, playerId: player.id, updates } });
-      toast({ title: "Jugador Actualizado", description: `Datos del jugador #${updates.number || player.number} actualizados.` });
+      toast({ title: "Jugador Actualizado", description: `Datos del jugador ${updates.number || player.number || 'S/N'} actualizados.` });
     }
     setIsEditing(false);
   };
+  
+  const displayPlayerNumber = player.number ? `#${player.number}` : 'S/N';
 
   return (
     <Card className="bg-muted/30">
@@ -116,6 +116,7 @@ export function PlayerListItem({ player, teamId, onRemovePlayer }: PlayerListIte
                     }}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSave(); } if (e.key === 'Escape') handleCancel();}}
                     className="h-7 px-1 py-0 w-16 text-sm"
+                    placeholder="S/N"
                   />
                 </div>
                 <Input
@@ -129,7 +130,7 @@ export function PlayerListItem({ player, teamId, onRemovePlayer }: PlayerListIte
               </div>
             ) : (
               <p className="font-semibold text-card-foreground truncate">
-                #{player.number} - {player.name}
+                {displayPlayerNumber} - {player.name}
               </p>
             )}
             <p className="text-xs text-muted-foreground capitalize">
@@ -169,5 +170,3 @@ export function PlayerListItem({ player, teamId, onRemovePlayer }: PlayerListIte
     </Card>
   );
 }
-
-    

@@ -165,7 +165,7 @@ export type GameAction =
   | { type: 'RESET_CONFIG_TO_DEFAULTS' }
   | { type: 'RESET_GAME_STATE' }
   // Team Actions
-  | { type: 'ADD_TEAM'; payload: Omit<TeamData, 'id'> } // Changed: Now allows players in payload
+  | { type: 'ADD_TEAM'; payload: TeamData } // Changed: payload is full TeamData
   | { type: 'UPDATE_TEAM_DETAILS'; payload: { teamId: string; name: string; category: string; logoDataUrl?: string | null } }
   | { type: 'DELETE_TEAM'; payload: { teamId: string } }
   | { type: 'ADD_PLAYER_TO_TEAM'; payload: { teamId: string; player: Omit<PlayerData, 'id'> } }
@@ -381,11 +381,13 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
       continue;
     }
 
-    if (activePlayerTickets.has(p.playerNumber)) {
+    if (p.playerNumber && activePlayerTickets.has(p.playerNumber)) { // Check if playerNumber exists before adding to Set
       currentStatus = 'pending_player';
     } else if (concurrentRunningCount < maxConcurrent) {
       currentStatus = 'running';
-      activePlayerTickets.add(p.playerNumber);
+      if (p.playerNumber) { // Check if playerNumber exists
+          activePlayerTickets.add(p.playerNumber);
+      }
       concurrentRunningCount++;
     } else {
       currentStatus = 'pending_concurrent';
@@ -786,12 +788,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
                 let status: Penalty['_status'] = undefined;
                 let newRemainingTimeForPenaltySec = p.remainingTime;
 
-                if (activePlayerTickets.has(p.playerNumber)) {
+                if (p.playerNumber && activePlayerTickets.has(p.playerNumber)) {
                   status = 'pending_player';
                 } else if (concurrentRunningCount < maxConcurrent) {
                   status = 'running';
                   newRemainingTimeForPenaltySec = Math.max(0, p.remainingTime - 1);
-                  if (newRemainingTimeForPenaltySec > 0) {
+                  if (newRemainingTimeForPenaltySec > 0 && p.playerNumber) {
                       activePlayerTickets.add(p.playerNumber);
                   }
                   concurrentRunningCount++;
@@ -1056,6 +1058,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       if (!action.payload) {
         newStateWithoutMeta.showAliasInPenaltyPlayerSelector = false;
         newStateWithoutMeta.showAliasInControlsPenaltyList = false;
+        newStateWithoutMeta.showAliasInScoreboardPenalties = false; // Also turn off scoreboard alias if player selection is off
       }
       break;
     case 'SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR':
@@ -1095,6 +1098,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       if (!enablePlayerSelection){
         showAliasInSelector = false;
         showAliasInControls = false;
+        showAliasInScoreboard = false; 
       }
 
       // Robust category handling from file
@@ -1210,17 +1214,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     case 'ADD_TEAM': {
-      // action.payload is Omit<TeamData, 'id'>
-      // This ensures players from payload (e.g., CSV import) are used, or defaults to [] for manual creation.
-      const teamPlayers = Array.isArray(action.payload.players) ? action.payload.players : [];
-      const newTeam: TeamData = {
-        ...action.payload,
-        players: teamPlayers,
-        id: crypto.randomUUID(), // Always generate a new ID
-      };
+      const newTeamWithId: TeamData = { ...action.payload, id: action.payload.id || crypto.randomUUID() };
       newStateWithoutMeta = {
         ...state,
-        teams: [...state.teams, newTeam],
+        teams: [...state.teams, newTeamWithId],
       };
       break;
     }
@@ -1249,11 +1246,18 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
       newStateWithoutMeta = {
         ...state,
-        teams: state.teams.map(team =>
-          team.id === action.payload.teamId
-            ? { ...team, players: [...team.players, newPlayer] }
-            : team
-        ),
+        teams: state.teams.map(team => {
+          if (team.id === action.payload.teamId) {
+            // Check for duplicate number only if number is provided
+            if (newPlayer.number && team.players.some(p => p.number === newPlayer.number)) {
+              // Optionally, show a toast or handle error here instead of silently not adding
+              console.warn(`Duplicate player number ${newPlayer.number} for team ${team.name}`);
+              return team; // Return team unchanged
+            }
+            return { ...team, players: [...team.players, newPlayer] };
+          }
+          return team;
+        }),
       };
       break;
     }
@@ -1263,6 +1267,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         teams: state.teams.map(team => {
           if (team.id === teamId) {
+            // Check for duplicate number only if number is being updated and is provided
+            if (updates.number && team.players.some(p => p.id !== playerId && p.number === updates.number)) {
+              console.warn(`Duplicate player number ${updates.number} for team ${team.name} during update`);
+              return { // Return team with player unchanged regarding number if duplicate
+                ...team,
+                players: team.players.map(player => 
+                    player.id === playerId ? { ...player, name: updates.name ?? player.name } : player
+                )
+              }; 
+            }
             return {
               ...team,
               players: team.players.map(player =>
@@ -1583,4 +1597,3 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
   const category = availableCategories.find(cat => cat && typeof cat === 'object' && cat.id === categoryId);
   return category ? category.name : undefined;
 };
-

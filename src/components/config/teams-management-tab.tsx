@@ -140,7 +140,7 @@ export function TeamsManagementTab() {
           category: team.category || (state.availableCategories.length > 0 ? state.availableCategories[0].id : ''),
           players: Array.isArray(team.players) ? team.players.map((player: any) => ({
             id: player.id || crypto.randomUUID(),
-            number: String(player.number || '0'),
+            number: String(player.number || ''), // Allow empty number
             name: String(player.name || 'Jugador Desconocido'),
             type: player.type === 'goalkeeper' ? 'goalkeeper' : 'player',
           })) : [],
@@ -196,92 +196,130 @@ export function TeamsManagementTab() {
 
     const reader = new FileReader();
     reader.onload = (e) => {
+      const importedTeams: TeamData[] = [];
+      let currentTeamData: { name: string; categoryId: string; players: PlayerData[] } | null = null;
+      let playerNumbersInCurrentTeam: Set<string> = new Set();
+      let lineCounter = 0;
+
       try {
         const text = e.target?.result as string;
-        const lines = text.split(/\r\n|\n/).map(line => line.trim()).filter(line => line);
+        const lines = text.split(/\r\n|\n/); // Keep empty lines for separation
 
-        if (lines.length < 2) {
-          throw new Error("Archivo CSV demasiado corto. Se esperan al menos 2 líneas (1 de datos de equipo, 1+ de jugadores).");
+        for (const line of lines) {
+          lineCounter++;
+          const trimmedLine = line.trim();
+
+          if (!trimmedLine) { // Empty line indicates end of current team / start of new one
+            if (currentTeamData && currentTeamData.players.length > 0) {
+              importedTeams.push({
+                id: crypto.randomUUID(),
+                name: currentTeamData.name,
+                category: currentTeamData.categoryId,
+                logoDataUrl: null,
+                players: currentTeamData.players,
+              });
+            }
+            currentTeamData = null;
+            playerNumbersInCurrentTeam = new Set();
+            continue;
+          }
+
+          if (!currentTeamData) { // This must be a team header line
+            const teamDataParts = trimmedLine.split(',');
+            if (teamDataParts.length !== 2 || !teamDataParts[0]?.trim() || !teamDataParts[1]?.trim()) {
+              throw new Error(`Error en la línea ${lineCounter} del CSV (encabezado de equipo): Formato incorrecto. Esperado 'NombreEquipo,NombreCategoria'.`);
+            }
+            const teamNameCsv = teamDataParts[0].trim();
+            const categoryNameCsv = teamDataParts[1].trim();
+
+            const category = state.availableCategories.find(
+              (cat) => cat.name.toLowerCase() === categoryNameCsv.toLowerCase()
+            );
+            if (!category) {
+              throw new Error(`Categoría "${categoryNameCsv}" (línea ${lineCounter}) no encontrada. Por favor, crea la categoría primero o corrige el CSV.`);
+            }
+            const categoryId = category.id;
+
+            // Check for duplicate team name *within this CSV import session*
+            if (importedTeams.some(t => t.name.toLowerCase() === teamNameCsv.toLowerCase() && t.category === categoryId)) {
+                 throw new Error(`Equipo duplicado en CSV: "${teamNameCsv}" en categoría "${categoryNameCsv}" (línea ${lineCounter}) ya fue definido en este archivo.`);
+            }
+            // Also check against existing teams in state
+            const existingTeamInState = state.teams.find(
+              (t) => t.name.toLowerCase() === teamNameCsv.toLowerCase() && t.category === categoryId
+            );
+            if (existingTeamInState) {
+              throw new Error(`El equipo "${teamNameCsv}" en la categoría "${categoryNameCsv}" (línea ${lineCounter}) ya existe en la aplicación.`);
+            }
+
+            currentTeamData = { name: teamNameCsv, categoryId: categoryId, players: [] };
+            playerNumbersInCurrentTeam = new Set();
+
+          } else { // This must be a player line for the current team
+            const playerDataParts = trimmedLine.split(',');
+            if (playerDataParts.length !== 3) {
+              throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): Se esperan 3 columnas (Número,Nombre,Rol).`);
+            }
+            const playerNumber = playerDataParts[0].trim(); // Can be empty
+            const playerName = playerDataParts[1].trim();
+            const playerRoleStr = playerDataParts[2].trim().toLowerCase();
+
+            if (!playerName || !playerRoleStr) { // Number can be empty, name and role cannot
+              throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): Nombre y Rol son obligatorios.`);
+            }
+
+            if (playerNumber && !/^\d+$/.test(playerNumber)) {
+              throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): El número de jugador "${playerNumber}" debe ser numérico si se proporciona.`);
+            }
+            if (playerNumber && playerNumbersInCurrentTeam.has(playerNumber)) {
+              throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): Número de jugador "${playerNumber}" duplicado en este equipo dentro del archivo.`);
+            }
+            if (playerNumber) {
+                playerNumbersInCurrentTeam.add(playerNumber);
+            }
+
+
+            let playerType: PlayerType;
+            if (playerRoleStr === 'arquero') {
+              playerType = 'goalkeeper';
+            } else if (playerRoleStr === 'jugador') {
+              playerType = 'player';
+            } else {
+              throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): Rol "${playerDataParts[2]}" no válido. Usar "Arquero" o "Jugador".`);
+            }
+
+            currentTeamData.players.push({
+              id: crypto.randomUUID(),
+              number: playerNumber, // Store as empty string if not provided
+              name: playerName,
+              type: playerType,
+            });
+          }
         }
-        
-        const teamDataParts = lines[0].split(',');
-        if (teamDataParts.length !== 2 || !teamDataParts[0]?.trim() || !teamDataParts[1]?.trim()) {
-          throw new Error("Error en la línea 1 del CSV: Formato incorrecto. Esperado 'NombreEquipo,NombreCategoria'.");
-        }
-        const teamNameCsv = teamDataParts[0].trim();
-        const categoryNameCsv = teamDataParts[1].trim();
 
-        const category = state.availableCategories.find(
-          (cat) => cat.name.toLowerCase() === categoryNameCsv.toLowerCase()
-        );
-        if (!category) {
-          throw new Error(`Categoría "${categoryNameCsv}" no encontrada. Por favor, crea la categoría primero o corrige el CSV.`);
-        }
-        const categoryId = category.id;
-
-        const existingTeam = state.teams.find(
-          (t) => t.name.toLowerCase() === teamNameCsv.toLowerCase() && t.category === categoryId
-        );
-        if (existingTeam) {
-          throw new Error(`El equipo "${teamNameCsv}" en la categoría "${categoryNameCsv}" ya existe.`);
-        }
-
-        const players: PlayerData[] = [];
-        const playerNumbers = new Set<string>();
-
-        for (let i = 1; i < lines.length; i++) {
-          const playerDataParts = lines[i].split(',');
-          if (playerDataParts.length !== 3) {
-            throw new Error(`Error en la línea ${i + 1} del CSV: Se esperan 3 columnas para datos de jugador (Número,Nombre,Rol).`);
-          }
-          const playerNumber = playerDataParts[0].trim();
-          const playerName = playerDataParts[1].trim();
-          const playerRoleStr = playerDataParts[2].trim().toLowerCase();
-
-          if (!playerNumber || !playerName || !playerRoleStr) {
-            throw new Error(`Error en la línea ${i + 1} del CSV: Datos faltantes para el jugador.`);
-          }
-          if (!/^\d+$/.test(playerNumber)) {
-            throw new Error(`Error en la línea ${i + 1} del CSV: El número de jugador "${playerNumber}" debe ser numérico.`);
-          }
-          if (playerNumbers.has(playerNumber)) {
-            throw new Error(`Error en la línea ${i + 1} del CSV: Número de jugador "${playerNumber}" duplicado en este archivo.`);
-          }
-          playerNumbers.add(playerNumber);
-
-          let playerType: PlayerType;
-          if (playerRoleStr === 'arquero') {
-            playerType = 'goalkeeper';
-          } else if (playerRoleStr === 'jugador') {
-            playerType = 'player';
-          } else {
-            throw new Error(`Error en la línea ${i + 1} del CSV: Rol de jugador "${playerDataParts[2]}" no válido. Usar "Arquero" o "Jugador".`);
-          }
-
-          players.push({
+        // Add the last processed team if it exists
+        if (currentTeamData && currentTeamData.players.length > 0) {
+          importedTeams.push({
             id: crypto.randomUUID(),
-            number: playerNumber,
-            name: playerName,
-            type: playerType,
+            name: currentTeamData.name,
+            category: currentTeamData.categoryId,
+            logoDataUrl: null,
+            players: currentTeamData.players,
           });
         }
 
-        if (players.length === 0) {
-            throw new Error("No se encontraron jugadores en el archivo CSV.");
+        if (importedTeams.length === 0) {
+            throw new Error("No se encontraron equipos válidos en el archivo CSV.");
         }
 
-        const newTeam: TeamData = {
-          id: crypto.randomUUID(),
-          name: teamNameCsv,
-          category: categoryId,
-          logoDataUrl: null,
-          players,
-        };
-
-        dispatch({ type: 'ADD_TEAM', payload: newTeam });
+        // Dispatch all imported teams at once
+        importedTeams.forEach(team => {
+            dispatch({ type: 'ADD_TEAM', payload: team });
+        });
+        
         toast({
-          title: "Equipo Importado desde CSV",
-          description: `Equipo "${teamNameCsv}" con ${players.length} jugadores añadido exitosamente.`,
+          title: "Equipos Importados desde CSV",
+          description: `${importedTeams.length} equipo(s) añadido(s) exitosamente.`,
         });
 
       } catch (error) {
@@ -383,6 +421,7 @@ export function TeamsManagementTab() {
         <h2 className="text-xl font-semibold text-primary-foreground">Acciones de Datos de Equipos</h2>
         <p className="text-sm text-muted-foreground">
           Exporta todos tus equipos a un archivo JSON, o importa equipos desde un archivo JSON o CSV.
+          Formato CSV: Una línea vacía entre cada equipo. Cada equipo: NombreEquipo,NombreCategoría en la primera línea, seguido de Número,Nombre,Rol (Jugador/Arquero) para cada jugador en líneas subsiguientes.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Button onClick={prepareExportTeams} variant="outline" className="flex-1" disabled={state.teams.length === 0}>
@@ -405,7 +444,7 @@ export function TeamsManagementTab() {
             type="file"
             ref={csvFileInputRef}
             onChange={handleCsvFileChange}
-            accept=".csv"
+            accept=".csv,text/csv"
             className="hidden"
           />
         </div>
