@@ -528,8 +528,7 @@ export function MiniScoreboard() {
                         placeholder="Nombre Local"
                         className={cn(
                             "h-8 text-sm uppercase text-center bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                            "flex-grow", // Ensure input takes available space
-                            "bg-yellow-200 text-black" // Temporary debug background
+                            "bg-yellow-200 text-black" 
                         )}
                         aria-label="Nombre del equipo local"
                         autoComplete="off"
@@ -832,8 +831,7 @@ export function MiniScoreboard() {
                     placeholder="Nombre Visitante"
                     className={cn(
                         "h-8 text-sm uppercase text-center bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                        "flex-grow", // Ensure input takes available space
-                        "bg-yellow-200 text-black" // Temporary debug background
+                         "bg-yellow-200 text-black" 
                     )}
                     aria-label="Nombre del equipo visitante"
                     autoComplete="off"
