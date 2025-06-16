@@ -503,7 +503,7 @@ export function MiniScoreboard() {
       <Card className="mb-8 bg-card shadow-lg pt-12 sm:pt-10 md:pt-12">
         <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8 py-6">
           {/* Home Team Section */}
-          <div className="flex-1 space-y-1 w-full sm:w-auto">
+          <div className="flex-1 w-full sm:w-auto">
             <div className="flex justify-center items-center gap-1 mb-1 h-5">
               {playersOnIceForHome > 0 && Array(playersOnIceForHome).fill(null).map((_, index) => (
                 <User key={`home-player-${index}`} className="h-5 w-5 text-primary-foreground/80" />
@@ -609,8 +609,8 @@ export function MiniScoreboard() {
                     )}
                 </div>
             </div>
-            <p className="text-sm text-muted-foreground -mt-0.5 text-center">(Local)</p>
-            <div className="flex items-center justify-center gap-1 mt-1">
+            <p className="text-sm text-muted-foreground text-center mb-1">({state.enableTeamSelectionInMiniScoreboard ? 'Local' : state.homeTeamName.trim() || 'Local'})</p>
+            <div className="flex items-center justify-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
@@ -806,7 +806,7 @@ export function MiniScoreboard() {
           </div>
 
           {/* Away Team Section */}
-          <div className="flex-1 space-y-1 w-full sm:w-auto">
+          <div className="flex-1 w-full sm:w-auto">
             <div className="flex justify-center items-center gap-1 mb-1 h-5">
               {playersOnIceForAway > 0 && Array(playersOnIceForAway).fill(null).map((_, index) => (
                 <User key={`away-player-${index}`} className="h-5 w-5 text-primary-foreground/80" />
@@ -912,8 +912,8 @@ export function MiniScoreboard() {
                 )}
                 </div>
             </div>
-            <p className="text-sm text-muted-foreground -mt-0.5 text-center">(Visitante)</p>
-            <div className="flex items-center justify-center gap-1 mt-1">
+            <p className="text-sm text-muted-foreground text-center mb-1">({state.enableTeamSelectionInMiniScoreboard ? 'Visitante' : state.awayTeamName.trim() || 'Visitante'})</p>
+            <div className="flex items-center justify-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
