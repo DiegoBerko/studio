@@ -513,7 +513,7 @@ export function MiniScoreboard() {
               )}
             </div>
              <div className="relative w-full max-w-xs mx-auto my-1">
-                <div className="flex items-center justify-center">
+                <div className="flex items-center">
                     <Input
                         id="homeTeamNameInput"
                         value={localHomeTeamName}
@@ -527,8 +527,9 @@ export function MiniScoreboard() {
                         }}
                         placeholder="Nombre Local"
                         className={cn(
-                            "h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                            "w-auto"
+                            "h-8 text-sm uppercase text-center bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                            "flex-grow", // Ensure input takes available space
+                            "bg-yellow-200 text-black" // Temporary debug background
                         )}
                         aria-label="Nombre del equipo local"
                         autoComplete="off"
@@ -816,7 +817,7 @@ export function MiniScoreboard() {
               )}
             </div>
             <div className="relative w-full max-w-xs mx-auto my-1">
-             <div className="flex items-center justify-center">
+             <div className="flex items-center">
                 <Input
                     id="awayTeamNameInput"
                     value={localAwayTeamName}
@@ -830,8 +831,9 @@ export function MiniScoreboard() {
                     }}
                     placeholder="Nombre Visitante"
                     className={cn(
-                        "h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                        "w-auto"
+                        "h-8 text-sm uppercase text-center bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                        "flex-grow", // Ensure input takes available space
+                        "bg-yellow-200 text-black" // Temporary debug background
                     )}
                     aria-label="Nombre del equipo visitante"
                     autoComplete="off"
