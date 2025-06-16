@@ -2,14 +2,13 @@
 "use client";
 
 import React, { useState, useMemo, useRef } from "react";
-import Link from "next/link";
-import { useGameState, getCategoryNameById } from "@/contexts/game-state-context";
+import { useGameState } from "@/contexts/game-state-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search, Users, Info, Upload, Download, ListFilter, FileText } from "lucide-react";
+import { PlusCircle, Search, Users, Info, Upload, Download, ListFilter, FileText, Trash2, X } from "lucide-react";
 import { TeamListItem } from "@/components/teams/team-list-item";
 import { CreateEditTeamDialog } from "@/components/teams/create-edit-team-dialog";
-import { useRouter } from "next/navigation"; // Still needed for navigating to /teams/[teamId]
+import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import type { TeamData, PlayerData, PlayerType } from "@/types";
 import { Separator } from "@/components/ui/separator";
@@ -31,13 +30,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const ALL_CATEGORIES_FILTER_KEY = "__ALL_CATEGORIES_TAB__"; // Renamed to avoid potential clashes
-const NO_CATEGORIES_PLACEHOLDER_VALUE_TAB = "__NO_CATEGORIES_DEFINED_TAB__"; // Renamed
+const ALL_CATEGORIES_FILTER_KEY = "__ALL_CATEGORIES_TAB__";
+const NO_CATEGORIES_PLACEHOLDER_VALUE_TAB = "__NO_CATEGORIES_DEFINED_TAB__";
+
+const SPECIFIC_DEFAULT_LOGOS_CSV: Record<string, string> = {
+  'HAZAD': '/logos/Logo-Hazad.png',
+  'OVEJAS NEGRAS': '/logos/Logo-OvejasNegras.png',
+  'FANTASY SKATE': '/logos/Logo-FantasySkate.png',
+  'ACEMHH': '/logos/Logo-ACEMHH.png',
+};
+
+function getSpecificDefaultLogoUrlCsv(teamName: string): string | null {
+  if (!teamName) return null;
+  const upperTeamName = teamName.toUpperCase();
+  for (const keyword in SPECIFIC_DEFAULT_LOGOS_CSV) {
+    if (upperTeamName.includes(keyword)) {
+      return SPECIFIC_DEFAULT_LOGOS_CSV[keyword];
+    }
+  }
+  return null;
+}
 
 
 export function TeamsManagementTab() {
   const { state, dispatch } = useGameState();
-  const router = useRouter(); // Kept for navigation to specific team pages
+  const router = useRouter();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES_FILTER_KEY);
@@ -49,6 +66,9 @@ export function TeamsManagementTab() {
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
   const [pendingImportData, setPendingImportData] = useState<TeamData[] | null>(null);
 
+  const [isDeleteSelectionMode, setIsDeleteSelectionMode] = useState(false);
+  const [selectedTeamIdsForDeletion, setSelectedTeamIdsForDeletion] = useState<string[]>([]);
+  const [isConfirmMassDeleteOpen, setIsConfirmMassDeleteOpen] = useState(false);
 
   const filteredTeams = useMemo(() => {
     let teamsToFilter = state.teams;
@@ -58,16 +78,15 @@ export function TeamsManagementTab() {
     }
 
     if (!searchTerm.trim()) {
-      return teamsToFilter;
+      return teamsToFilter.sort((a, b) => a.name.localeCompare(b.name));
     }
     return teamsToFilter.filter((team) =>
       team.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    ).sort((a, b) => a.name.localeCompare(b.name));
   }, [state.teams, searchTerm, categoryFilter]);
 
   const handleTeamSaved = (teamId: string) => {
     // Potentially navigate to the new/edited team's page, or just close dialog
-    // For now, just closes dialog, list will update.
   };
 
   const prepareExportTeams = () => {
@@ -127,7 +146,7 @@ export function TeamsManagementTab() {
         if (!Array.isArray(importedData) || !importedData.every(item =>
             item && typeof item.id === 'string' &&
             typeof item.name === 'string' &&
-            (typeof item.category === 'string' || item.category === undefined) &&
+            (typeof item.category === 'string' || item.category === undefined || item.category === null) && // Allow null category
             Array.isArray(item.players))
            ) {
           throw new Error("Archivo de equipos no válido o formato incorrecto. Se esperaba un array de equipos.");
@@ -136,11 +155,11 @@ export function TeamsManagementTab() {
         const validatedTeams = importedData.map(team => ({
           id: team.id,
           name: team.name,
-          logoDataUrl: team.logoDataUrl || null,
+          logoDataUrl: team.logoDataUrl || getSpecificDefaultLogoUrlCsv(team.name),
           category: team.category || (state.availableCategories.length > 0 ? state.availableCategories[0].id : ''),
           players: Array.isArray(team.players) ? team.players.map((player: any) => ({
             id: player.id || crypto.randomUUID(),
-            number: String(player.number || ''), // Allow empty number
+            number: String(player.number || ''),
             name: String(player.name || 'Jugador Desconocido'),
             type: player.type === 'goalkeeper' ? 'goalkeeper' : 'player',
           })) : [],
@@ -203,19 +222,19 @@ export function TeamsManagementTab() {
 
       try {
         const text = e.target?.result as string;
-        const lines = text.split(/\r\n|\n/); // Keep empty lines for separation
+        const lines = text.split(/\r\n|\n/);
 
         for (const line of lines) {
           lineCounter++;
           const trimmedLine = line.trim();
 
-          if (!trimmedLine) { // Empty line indicates end of current team / start of new one
+          if (!trimmedLine) {
             if (currentTeamData && currentTeamData.players.length > 0) {
               importedTeams.push({
                 id: crypto.randomUUID(),
                 name: currentTeamData.name,
                 category: currentTeamData.categoryId,
-                logoDataUrl: null,
+                logoDataUrl: getSpecificDefaultLogoUrlCsv(currentTeamData.name),
                 players: currentTeamData.players,
               });
             }
@@ -224,7 +243,7 @@ export function TeamsManagementTab() {
             continue;
           }
 
-          if (!currentTeamData) { // This must be a team header line
+          if (!currentTeamData) {
             const teamDataParts = trimmedLine.split(',');
             if (teamDataParts.length !== 2 || !teamDataParts[0]?.trim() || !teamDataParts[1]?.trim()) {
               throw new Error(`Error en la línea ${lineCounter} del CSV (encabezado de equipo): Formato incorrecto. Esperado 'NombreEquipo,NombreCategoria'.`);
@@ -240,11 +259,9 @@ export function TeamsManagementTab() {
             }
             const categoryId = category.id;
 
-            // Check for duplicate team name *within this CSV import session*
             if (importedTeams.some(t => t.name.toLowerCase() === teamNameCsv.toLowerCase() && t.category === categoryId)) {
                  throw new Error(`Equipo duplicado en CSV: "${teamNameCsv}" en categoría "${categoryNameCsv}" (línea ${lineCounter}) ya fue definido en este archivo.`);
             }
-            // Also check against existing teams in state
             const existingTeamInState = state.teams.find(
               (t) => t.name.toLowerCase() === teamNameCsv.toLowerCase() && t.category === categoryId
             );
@@ -255,20 +272,20 @@ export function TeamsManagementTab() {
             currentTeamData = { name: teamNameCsv, categoryId: categoryId, players: [] };
             playerNumbersInCurrentTeam = new Set();
 
-          } else { // This must be a player line for the current team
+          } else {
             const playerDataParts = trimmedLine.split(',');
             if (playerDataParts.length !== 3) {
               throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): Se esperan 3 columnas (Número,Nombre,Rol).`);
             }
-            const playerNumber = playerDataParts[0].trim(); // Can be empty
+            const playerNumber = playerDataParts[0].trim();
             const playerName = playerDataParts[1].trim();
             const playerRoleStr = playerDataParts[2].trim().toLowerCase();
 
-            if (!playerName || !playerRoleStr) { // Number can be empty, name and role cannot
+            if (!playerName || !playerRoleStr) {
               throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): Nombre y Rol son obligatorios.`);
             }
 
-            if (playerNumber && !/^\d+$/.test(playerNumber)) {
+            if (playerNumber && !/^\d*$/.test(playerNumber)) { // Allow empty, but if not empty, must be numeric
               throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): El número de jugador "${playerNumber}" debe ser numérico si se proporciona.`);
             }
             if (playerNumber && playerNumbersInCurrentTeam.has(playerNumber)) {
@@ -277,7 +294,6 @@ export function TeamsManagementTab() {
             if (playerNumber) {
                 playerNumbersInCurrentTeam.add(playerNumber);
             }
-
 
             let playerType: PlayerType;
             if (playerRoleStr === 'arquero') {
@@ -290,20 +306,19 @@ export function TeamsManagementTab() {
 
             currentTeamData.players.push({
               id: crypto.randomUUID(),
-              number: playerNumber, // Store as empty string if not provided
+              number: playerNumber,
               name: playerName,
               type: playerType,
             });
           }
         }
 
-        // Add the last processed team if it exists
         if (currentTeamData && currentTeamData.players.length > 0) {
           importedTeams.push({
             id: crypto.randomUUID(),
             name: currentTeamData.name,
             category: currentTeamData.categoryId,
-            logoDataUrl: null,
+            logoDataUrl: getSpecificDefaultLogoUrlCsv(currentTeamData.name),
             players: currentTeamData.players,
           });
         }
@@ -312,7 +327,6 @@ export function TeamsManagementTab() {
             throw new Error("No se encontraron equipos válidos en el archivo CSV.");
         }
 
-        // Dispatch all imported teams at once
         importedTeams.forEach(team => {
             dispatch({ type: 'ADD_TEAM', payload: team });
         });
@@ -338,17 +352,40 @@ export function TeamsManagementTab() {
     reader.readAsText(file);
   };
 
+  const handleToggleTeamSelectionForDeletion = (teamId: string) => {
+    setSelectedTeamIdsForDeletion(prev =>
+      prev.includes(teamId) ? prev.filter(id => id !== teamId) : [...prev, teamId]
+    );
+  };
+
+  const handleConfirmMassDelete = () => {
+    if (selectedTeamIdsForDeletion.length === 0) return;
+    selectedTeamIdsForDeletion.forEach(teamId => {
+      dispatch({ type: "DELETE_TEAM", payload: { teamId } });
+    });
+    toast({
+      title: "Equipos Eliminados",
+      description: `${selectedTeamIdsForDeletion.length} equipo(s) han sido eliminados.`,
+      variant: "destructive"
+    });
+    setSelectedTeamIdsForDeletion([]);
+    setIsDeleteSelectionMode(false);
+    setIsConfirmMassDeleteOpen(false);
+  };
+
 
   return (
-    <div className="w-full space-y-8"> {/* Removed max-w-4xl and mx-auto for tab integration */}
+    <div className="w-full space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-3">
           <Users className="h-8 w-8 text-primary" />
           <h1 className="text-2xl font-bold text-primary-foreground">Gestión de Equipos</h1>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <PlusCircle className="mr-2 h-5 w-5" /> Crear Nuevo Equipo
-        </Button>
+        {!isDeleteSelectionMode && (
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <PlusCircle className="mr-2 h-5 w-5" /> Crear Nuevo Equipo
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
@@ -360,10 +397,11 @@ export function TeamsManagementTab() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 text-base"
+                disabled={isDeleteSelectionMode}
             />
         </div>
         <div className="sm:w-auto min-w-[200px]">
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter} disabled={isDeleteSelectionMode}>
                 <SelectTrigger className="w-full text-base h-10">
                     <ListFilter className="mr-2 h-4 w-4 text-muted-foreground" />
                     <SelectValue placeholder="Filtrar por categoría..." />
@@ -389,7 +427,13 @@ export function TeamsManagementTab() {
       ) : filteredTeams.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTeams.map((team) => (
-            <TeamListItem key={team.id} team={team} />
+            <TeamListItem 
+                key={team.id} 
+                team={team} 
+                isSelectionMode={isDeleteSelectionMode}
+                isSelected={selectedTeamIdsForDeletion.includes(team.id)}
+                onToggleSelection={handleToggleTeamSelectionForDeletion}
+            />
           ))}
         </div>
       ) : (
@@ -409,7 +453,7 @@ export function TeamsManagementTab() {
                 ? "Intenta con otros filtros o crea un nuevo equipo."
                 : "Crea un nuevo equipo para empezar."}
           </p>
-          {(searchTerm || (categoryFilter && categoryFilter !== ALL_CATEGORIES_FILTER_KEY)) && state.teams.length > 0 && (
+          {(searchTerm || (categoryFilter && categoryFilter !== ALL_CATEGORIES_FILTER_KEY)) && state.teams.length > 0 && !isDeleteSelectionMode && (
              <Button variant="outline" onClick={() => { setSearchTerm(""); setCategoryFilter(ALL_CATEGORIES_FILTER_KEY); }}>Limpiar filtros</Button>
           )}
         </div>
@@ -418,36 +462,75 @@ export function TeamsManagementTab() {
       <Separator className="my-10" />
 
       <div className="space-y-6 p-6 border rounded-md bg-card">
-        <h2 className="text-xl font-semibold text-primary-foreground">Acciones de Datos de Equipos</h2>
-        <p className="text-sm text-muted-foreground">
-          Exporta todos tus equipos a un archivo JSON, o importa equipos desde un archivo JSON o CSV.
-          Formato CSV: Una línea vacía entre cada equipo. Cada equipo: NombreEquipo,NombreCategoría en la primera línea, seguido de Número,Nombre,Rol (Jugador/Arquero) para cada jugador en líneas subsiguientes.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Button onClick={prepareExportTeams} variant="outline" className="flex-1" disabled={state.teams.length === 0}>
-            <Download className="mr-2 h-4 w-4" /> Exportar (JSON)
-          </Button>
-          <Button onClick={handleImportJsonClick} variant="outline" className="flex-1">
-            <Upload className="mr-2 h-4 w-4" /> Importar (JSON)
-          </Button>
-           <Button onClick={handleImportCsvClick} variant="outline" className="flex-1">
-            <FileText className="mr-2 h-4 w-4" /> Importar (CSV)
-          </Button>
-          <input
-            type="file"
-            ref={jsonFileInputRef}
-            onChange={handleJsonFileChange}
-            accept=".json"
-            className="hidden"
-          />
-          <input
-            type="file"
-            ref={csvFileInputRef}
-            onChange={handleCsvFileChange}
-            accept=".csv,text/csv"
-            className="hidden"
-          />
+        <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-primary-foreground">Acciones de Datos de Equipos</h2>
+            {isDeleteSelectionMode ? (
+                <div className="flex gap-2">
+                    <Button
+                        variant="destructive"
+                        onClick={() => setIsConfirmMassDeleteOpen(true)}
+                        disabled={selectedTeamIdsForDeletion.length === 0}
+                    >
+                        <Trash2 className="mr-2 h-4 w-4" /> Confirmar Eliminación ({selectedTeamIdsForDeletion.length})
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                        setIsDeleteSelectionMode(false);
+                        setSelectedTeamIdsForDeletion([]);
+                        }}
+                    >
+                        <X className="mr-2 h-4 w-4" /> Cancelar Selección
+                    </Button>
+                </div>
+            ) : (
+                <Button
+                    variant="outline"
+                    onClick={() => setIsDeleteSelectionMode(true)}
+                    disabled={state.teams.length === 0}
+                >
+                    <Trash2 className="mr-2 h-4 w-4" /> Seleccionar para Eliminar
+                </Button>
+            )}
         </div>
+        {!isDeleteSelectionMode && (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Exporta todos tus equipos a un archivo JSON, o importa equipos desde un archivo JSON o CSV.
+              Formato CSV: Una línea vacía entre cada equipo. Cada equipo: NombreEquipo,NombreCategoría en la primera línea, seguido de Número,Nombre,Rol (Jugador/Arquero) para cada jugador en líneas subsiguientes.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Button onClick={prepareExportTeams} variant="outline" className="flex-1" disabled={state.teams.length === 0}>
+                <Download className="mr-2 h-4 w-4" /> Exportar (JSON)
+              </Button>
+              <Button onClick={handleImportJsonClick} variant="outline" className="flex-1">
+                <Upload className="mr-2 h-4 w-4" /> Importar (JSON)
+              </Button>
+              <Button onClick={handleImportCsvClick} variant="outline" className="flex-1">
+                <FileText className="mr-2 h-4 w-4" /> Importar (CSV)
+              </Button>
+              <input
+                type="file"
+                ref={jsonFileInputRef}
+                onChange={handleJsonFileChange}
+                accept=".json"
+                className="hidden"
+              />
+              <input
+                type="file"
+                ref={csvFileInputRef}
+                onChange={handleCsvFileChange}
+                accept=".csv,text/csv"
+                className="hidden"
+              />
+            </div>
+          </>
+        )}
+         {isDeleteSelectionMode && (
+             <p className="text-sm text-muted-foreground">
+                Selecciona los equipos que deseas eliminar de la lista de arriba. Luego confirma la eliminación o cancela.
+            </p>
+         )}
       </div>
 
 
@@ -500,6 +583,27 @@ export function TeamsManagementTab() {
             </AlertDialogContent>
         </AlertDialog>
       )}
+      {isConfirmMassDeleteOpen && (
+        <AlertDialog open={isConfirmMassDeleteOpen} onOpenChange={setIsConfirmMassDeleteOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar Eliminación Múltiple</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        ¿Estás seguro de que quieres eliminar los {selectedTeamIdsForDeletion.length} equipos seleccionados? Esta acción no se puede deshacer.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setIsConfirmMassDeleteOpen(false)}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmMassDelete} className="bg-destructive hover:bg-destructive/90">
+                        Eliminar Equipos
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
+
+
+    
