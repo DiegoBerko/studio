@@ -426,8 +426,6 @@ export function MiniScoreboard() {
 
   const showHomeSearchPopover = state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0;
   const showAwaySearchPopover = state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0;
-  const showHomePlayersDialogButton = state.enableTeamSelectionInMiniScoreboard && matchedHomeTeamId;
-  const showAwayPlayersDialogButton = state.enableTeamSelectionInMiniScoreboard && matchedAwayTeamId;
 
 
   return (
@@ -469,8 +467,8 @@ export function MiniScoreboard() {
                 <span className="text-xs text-destructive animate-pulse">0 JUGADORES</span>
               )}
             </div>
-            <div className="relative w-full max-w-xs mx-auto my-1 flex items-center justify-center">
-                <div className="flex items-center">
+            <div className="relative w-full max-w-xs mx-auto my-1">
+                <div className="flex items-center justify-center">
                     {showHomeSearchPopover && (
                         <Popover open={isHomeTeamSearchOpen} onOpenChange={setIsHomeTeamSearchOpen}>
                             <PopoverTrigger asChild>
@@ -513,24 +511,33 @@ export function MiniScoreboard() {
                         }}
                         placeholder="Nombre Local"
                         className={cn(
-                            "h-8 text-sm uppercase bg-yellow-200 text-black w-auto text-center",
+                            "h-8 text-sm uppercase w-auto text-center",
                             showHomeSearchPopover && "ml-1",
-                            showHomePlayersDialogButton && "mr-1"
+                             state.enableTeamSelectionInMiniScoreboard && "mr-1" 
                         )}
                         aria-label="Nombre del equipo local"
                         autoComplete="off"
                     />
-                    {showHomePlayersDialogButton && (
+                    {state.enableTeamSelectionInMiniScoreboard && (
                         <>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setIsHomePlayersDialogOpen(true)}>
-                                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-7 w-7 shrink-0" 
+                                onClick={() => setIsHomePlayersDialogOpen(true)}
+                                disabled={!matchedHomeTeamId}
+                                aria-label="Editar jugadores del equipo local"
+                            >
+                                <ClipboardList className={cn("h-4 w-4", matchedHomeTeamId ? "text-muted-foreground" : "text-muted-foreground/50 opacity-60")} />
                             </Button>
-                            <EditTeamPlayersDialog
-                                isOpen={isHomePlayersDialogOpen}
-                                onOpenChange={setIsHomePlayersDialogOpen}
-                                teamId={matchedHomeTeamId || ''}
-                                teamName={localHomeTeamName}
-                            />
+                            {matchedHomeTeamId && (
+                                <EditTeamPlayersDialog
+                                    isOpen={isHomePlayersDialogOpen}
+                                    onOpenChange={setIsHomePlayersDialogOpen}
+                                    teamId={matchedHomeTeamId}
+                                    teamName={localHomeTeamName}
+                                />
+                            )}
                         </>
                     )}
                 </div>
@@ -741,8 +748,8 @@ export function MiniScoreboard() {
                 <span className="text-xs text-destructive animate-pulse">0 JUGADORES</span>
               )}
             </div>
-            <div className="relative w-full max-w-xs mx-auto my-1 flex items-center justify-center">
-                <div className="flex items-center">
+             <div className="relative w-full max-w-xs mx-auto my-1">
+                <div className="flex items-center justify-center">
                     {showAwaySearchPopover && (
                         <Popover open={isAwayTeamSearchOpen} onOpenChange={setIsAwayTeamSearchOpen}>
                             <PopoverTrigger asChild>
@@ -784,25 +791,34 @@ export function MiniScoreboard() {
                         }
                         }}
                         placeholder="Nombre Visitante"
-                        className={cn(
-                            "h-8 text-sm uppercase bg-yellow-200 text-black w-auto text-center",
+                         className={cn(
+                            "h-8 text-sm uppercase w-auto text-center",
                             showAwaySearchPopover && "ml-1",
-                            showAwayPlayersDialogButton && "mr-1"
+                            state.enableTeamSelectionInMiniScoreboard && "mr-1"
                         )}
                         aria-label="Nombre del equipo visitante"
                         autoComplete="off"
                     />
-                    {showAwayPlayersDialogButton && (
+                    {state.enableTeamSelectionInMiniScoreboard && (
                         <>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setIsAwayPlayersDialogOpen(true)}>
-                                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-7 w-7 shrink-0" 
+                                onClick={() => setIsAwayPlayersDialogOpen(true)}
+                                disabled={!matchedAwayTeamId}
+                                aria-label="Editar jugadores del equipo visitante"
+                            >
+                                <ClipboardList className={cn("h-4 w-4", matchedAwayTeamId ? "text-muted-foreground" : "text-muted-foreground/50 opacity-60")} />
                             </Button>
-                            <EditTeamPlayersDialog
-                                isOpen={isAwayPlayersDialogOpen}
-                                onOpenChange={setIsAwayPlayersDialogOpen}
-                                teamId={matchedAwayTeamId || ''}
-                                teamName={localAwayTeamName}
-                            />
+                            {matchedAwayTeamId && (
+                                <EditTeamPlayersDialog
+                                    isOpen={isAwayPlayersDialogOpen}
+                                    onOpenChange={setIsAwayPlayersDialogOpen}
+                                    teamId={matchedAwayTeamId}
+                                    teamName={localAwayTeamName}
+                                />
+                            )}
                         </>
                     )}
                 </div>
@@ -854,4 +870,3 @@ export function MiniScoreboard() {
     </div>
   );
 }
-
