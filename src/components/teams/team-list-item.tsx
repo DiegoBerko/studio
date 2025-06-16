@@ -93,8 +93,8 @@ export function TeamListItem({ team, isSelectionMode = false, isSelected = false
   }
 
   return (
-    <Link href={`/teams/${team.id}`} passHref legacyBehavior>
-      <a className="contents">{cardContent}</a>
+    <Link href={`/teams/${team.id}`} className="contents">
+      {cardContent}
     </Link>
   );
 }
