@@ -504,7 +504,7 @@ export function MiniScoreboard() {
         <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8 py-6">
           {/* Home Team Section */}
           <div className="flex-1 w-full sm:w-auto">
-            <div className="flex justify-center items-center gap-1 h-5">
+            <div className="flex justify-center items-center gap-1">
               {playersOnIceForHome > 0 && Array(playersOnIceForHome).fill(null).map((_, index) => (
                 <User key={`home-player-${index}`} className="h-5 w-5 text-primary-foreground/80" />
               ))}
@@ -527,7 +527,7 @@ export function MiniScoreboard() {
                         }}
                         placeholder="Nombre Local"
                         className={cn(
-                            "h-8 text-sm uppercase text-center bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                            "h-8 text-sm uppercase text-center bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 w-48",
                             "bg-yellow-200 text-black" 
                         )}
                         aria-label="Nombre del equipo local"
@@ -609,7 +609,7 @@ export function MiniScoreboard() {
                     )}
                 </div>
             </div>
-            <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard ? 'Local' : state.homeTeamName.trim() || 'Local'})</p>
+            <p className="text-sm text-muted-foreground text-center mb-1">({state.enableTeamSelectionInMiniScoreboard ? 'Local' : state.homeTeamName.trim() || 'Local'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               <Button
                 variant="ghost"
@@ -807,7 +807,7 @@ export function MiniScoreboard() {
 
           {/* Away Team Section */}
           <div className="flex-1 w-full sm:w-auto">
-            <div className="flex justify-center items-center gap-1 h-5">
+            <div className="flex justify-center items-center gap-1">
               {playersOnIceForAway > 0 && Array(playersOnIceForAway).fill(null).map((_, index) => (
                 <User key={`away-player-${index}`} className="h-5 w-5 text-primary-foreground/80" />
               ))}
@@ -830,7 +830,7 @@ export function MiniScoreboard() {
                     }}
                     placeholder="Nombre Visitante"
                     className={cn(
-                        "h-8 text-sm uppercase text-center bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
+                        "h-8 text-sm uppercase text-center bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 w-48",
                          "bg-yellow-200 text-black" 
                     )}
                     aria-label="Nombre del equipo visitante"
@@ -912,7 +912,7 @@ export function MiniScoreboard() {
                 )}
                 </div>
             </div>
-            <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard ? 'Visitante' : state.awayTeamName.trim() || 'Visitante'})</p>
+            <p className="text-sm text-muted-foreground text-center mb-1">({state.enableTeamSelectionInMiniScoreboard ? 'Visitante' : state.awayTeamName.trim() || 'Visitante'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               <Button
                 variant="ghost"
