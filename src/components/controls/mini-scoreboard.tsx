@@ -513,7 +513,6 @@ export function MiniScoreboard() {
               )}
             </div>
              <div className="relative w-full max-w-xs mx-auto my-1">
-                {/* Removed justify-center from this div */}
                 <div className="flex items-center">
                     <Input
                         id="homeTeamNameInput"
@@ -528,8 +527,7 @@ export function MiniScoreboard() {
                         }}
                         placeholder="Nombre Local"
                         className={cn(
-                            "flex-grow h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                            state.enableTeamSelectionInMiniScoreboard ? "pl-2" : "px-2"
+                            "flex-grow h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                         )}
                         aria-label="Nombre del equipo local"
                         autoComplete="off"
@@ -817,7 +815,6 @@ export function MiniScoreboard() {
               )}
             </div>
             <div className="relative w-full max-w-xs mx-auto my-1">
-             {/* Removed justify-center from this div */}
              <div className="flex items-center">
                 <Input
                     id="awayTeamNameInput"
@@ -832,8 +829,7 @@ export function MiniScoreboard() {
                     }}
                     placeholder="Nombre Visitante"
                     className={cn(
-                    "flex-grow h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-                     state.enableTeamSelectionInMiniScoreboard ? "pl-2" : "px-2"
+                        "flex-grow h-8 text-sm uppercase text-center text-card-foreground bg-transparent border-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                     )}
                     aria-label="Nombre del equipo visitante"
                     autoComplete="off"
