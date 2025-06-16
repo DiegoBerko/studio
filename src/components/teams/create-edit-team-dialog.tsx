@@ -25,10 +25,11 @@ import { DefaultTeamLogo } from "./default-team-logo";
 const NO_CATEGORIES_PLACEHOLDER_VALUE_DIALOG = "__NO_CATEGORIES_DIALOG__";
 
 const SPECIFIC_DEFAULT_LOGOS: Record<string, string> = {
-  'HAZARD': '/logos/Logo-Hazard.png', // Key corrected to 'HAZARD'
+  'HAZARD': '/logos/Logo-Hazard.png',
   'OVEJAS NEGRAS': '/logos/Logo-OvejasNegras.png',
   'FANTASY SKATE': '/logos/Logo-FantasySkate.png',
   'ACEMHH': '/logos/Logo-ACEMHH.png',
+  'CAHHL': '/logos/Logo-CAHHL.png', // Added CAHHL logo
 };
 
 function getSpecificDefaultLogoUrl(teamName: string): string | null {
@@ -293,6 +294,7 @@ export function CreateEditTeamDialog({
                     width={64}
                     height={64}
                     className="rounded-md border object-contain w-16 h-16"
+                    data-ai-hint="team logo"
                     onError={() => {
                     }}
                   />
