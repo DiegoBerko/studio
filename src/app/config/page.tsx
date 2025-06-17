@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation'; // Import useSearchParams
 import { DurationSettingsCard, type DurationSettingsCardRef } from "@/components/config/duration-settings-card";
 import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/config/penalty-settings-card";
 import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card";
@@ -34,10 +35,13 @@ const initialConfigStateForReset = {
   configName: "Configuración Predeterminada",
 };
 
+const VALID_TAB_VALUES = ["gameFormat", "timings", "sound", "teamsAndDisplay"];
 
 export default function ConfigPage() {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
+  const searchParams = useSearchParams(); // Get search params
+
   const durationSettingsRef = useRef<DurationSettingsCardRef>(null);
   const penaltySettingsRef = useRef<PenaltySettingsCardRef>(null);
   const soundSettingsRef = useRef<SoundSettingsCardRef>(null);
@@ -56,6 +60,11 @@ export default function ConfigPage() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [currentExportFilename, setCurrentExportFilename] = useState('');
   const [isResetConfigDialogOpen, setIsResetConfigDialogOpen] = useState(false);
+
+  // Determine default tab based on URL parameter
+  const urlTab = searchParams.get('tab');
+  const initialTab = urlTab && VALID_TAB_VALUES.includes(urlTab) ? urlTab : "gameFormat";
+  const [activeTab, setActiveTab] = useState(initialTab); // State to control active tab
 
   useEffect(() => {
     // Sync local config name if global state changes and this component isn't dirty for configName
@@ -362,25 +371,25 @@ export default function ConfigPage() {
         </p>
       </div>
       
-      <Tabs defaultValue="gameFormat" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
           <TabsTrigger value="gameFormat">Formato Juego</TabsTrigger>
           <TabsTrigger value="timings">Tiempos</TabsTrigger>
           <TabsTrigger value="sound">Sonido</TabsTrigger>
           <TabsTrigger value="teamsAndDisplay">Equipos y Display</TabsTrigger>
         </TabsList>
-        <TabsContent value="gameFormat" className={tabContentClassName} /* Removed forceMount */>
+        <TabsContent value="gameFormat" className={tabContentClassName}>
           <div className="space-y-6">
             <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} />
           </div>
         </TabsContent>
-        <TabsContent value="timings" className={tabContentClassName} /* Removed forceMount */>
+        <TabsContent value="timings" className={tabContentClassName}>
            <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
         </TabsContent>
-        <TabsContent value="sound" className={tabContentClassName} /* Removed forceMount */>
+        <TabsContent value="sound" className={tabContentClassName}>
            <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
         </TabsContent>
-        <TabsContent value="teamsAndDisplay" className={tabContentClassName} /* Removed forceMount */>
+        <TabsContent value="teamsAndDisplay" className={tabContentClassName}>
           <div className="space-y-8">
             <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
             <Separator />
