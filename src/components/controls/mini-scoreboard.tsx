@@ -155,12 +155,30 @@ export function MiniScoreboard() {
 
   const handlePreviousPeriod = () => {
     setEditingSegment(null);
-    if (state.periodDisplayOverride === "Time Out" || state.periodDisplayOverride === "End of Game") {
-      if (state.periodDisplayOverride === "Time Out") {
-        toast({ title: "Time Out Activo", description: "Finaliza el Time Out para cambiar de período.", variant: "destructive" });
+
+    if (state.periodDisplayOverride === "End of Game") {
+      const lastGamePeriod = MAX_TOTAL_GAME_PERIODS;
+      if (lastGamePeriod >= 1) {
+        dispatch({ type: 'SET_PERIOD', payload: lastGamePeriod });
+        toast({
+          title: "Regreso al Último Período",
+          description: `Se ha vuelto a ${getPeriodText(lastGamePeriod, state.numberOfRegularPeriods)}. El reloj está pausado.`,
+        });
+      } else { // Only Warm-up was configured, or MAX_TOTAL_GAME_PERIODS is 0
+        dispatch({ type: 'SET_PERIOD', payload: 0 });
+        toast({
+          title: "Regreso a Entrada en Calor",
+          description: `Se ha vuelto a la Entrada en Calor. El reloj está pausado (a menos que autoStartWarmUp esté activo).`,
+        });
       }
       return;
     }
+
+    if (state.periodDisplayOverride === "Time Out") {
+      toast({ title: "Time Out Activo", description: "Finaliza el Time Out para cambiar de período.", variant: "destructive" });
+      return;
+    }
+
     if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
       const actionToConfirm = () => {
         dispatch({ type: 'SET_PERIOD', payload: state.currentPeriod });
@@ -276,7 +294,7 @@ export function MiniScoreboard() {
         );
       }
     } else if (state.periodDisplayOverride === null) { // Active game period
-      if (state.currentPeriod >= MAX_TOTAL_GAME_PERIODS) { // Is it the last possible period?
+      if (state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) { // Is it the last possible period (and there are periods)
         const actionToConfirm = () => {
           dispatch({ type: 'MANUAL_END_GAME' });
           toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
@@ -286,6 +304,18 @@ export function MiniScoreboard() {
           shouldConfirm,
           "Confirmar Finalizar Partido",
           "El reloj del último período aún tiene tiempo. ¿Estás seguro de que quieres finalizar el partido ahora?",
+          actionToConfirm
+        );
+      } else if (MAX_TOTAL_GAME_PERIODS === 0 && state.currentPeriod === 0) { // Only warm-up, next action should be end game
+         const actionToConfirm = () => {
+          dispatch({ type: 'MANUAL_END_GAME' });
+          toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
+        };
+        const shouldConfirm = state.currentTime > 0;
+         checkAndConfirm(
+          shouldConfirm,
+          "Confirmar Finalizar Partido",
+          "La entrada en calor aún tiene tiempo. ¿Estás seguro de que quieres finalizar el partido ahora?",
           actionToConfirm
         );
       } else { // Not the last period, start a break
@@ -319,7 +349,7 @@ export function MiniScoreboard() {
     }
   };
 
-  const isPreviousPeriodDisabled = (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up") || state.periodDisplayOverride === "Time Out" || state.periodDisplayOverride === "End of Game";
+  const isPreviousPeriodDisabled = (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up") || state.periodDisplayOverride === "Time Out";
 
   let isNextActionDisabled = false;
   if (state.periodDisplayOverride === "Time Out" && state.currentTime > 0) {
@@ -329,17 +359,21 @@ export function MiniScoreboard() {
   }
 
 
-  const showNextActionButton = (state.currentTime <= 0 && !state.isClockRunning && state.periodDisplayOverride !== "End of Game") || (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS);
+  const showNextActionButton = (state.currentTime <= 0 && !state.isClockRunning && state.periodDisplayOverride !== "End of Game") || (state.periodDisplayOverride === null && ((state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) || (MAX_TOTAL_GAME_PERIODS === 0 && state.currentPeriod === 0)));
 
 
   let nextActionButtonText = "Siguiente";
   if (state.periodDisplayOverride === "Time Out" && state.currentTime <=0) {
     nextActionButtonText = "Finalizar Time Out";
   } else if (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up" && state.currentTime <= 0) {
-    nextActionButtonText = "Iniciar 1er Período";
+    if (MAX_TOTAL_GAME_PERIODS > 0) {
+        nextActionButtonText = "Iniciar 1er Período";
+    } else {
+        nextActionButtonText = "Finalizar Partido"; // Only warm-up exists
+    }
   } else if (state.periodDisplayOverride === null && state.currentPeriod < MAX_TOTAL_GAME_PERIODS && state.currentTime <= 0) {
     nextActionButtonText = "Iniciar Descanso";
-  } else if (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS) {
+  } else if (state.periodDisplayOverride === null && ((state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) || (MAX_TOTAL_GAME_PERIODS === 0 && state.currentPeriod === 0))) {
      nextActionButtonText = "Finalizar Partido";
   } else if ((state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") && state.currentTime <= 0) {
      if (state.currentPeriod + 1 <= MAX_TOTAL_GAME_PERIODS) {
@@ -476,19 +510,22 @@ export function MiniScoreboard() {
     return matched ? matched.id : null;
   }, [state.awayTeamName, state.awayTeamSubName, state.teams, state.selectedMatchCategory, state.enableTeamSelectionInMiniScoreboard]);
 
-  const showHomeSearchPopover = state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0;
-  const showAwaySearchPopover = state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0;
+  const showHomeSearchIcon = state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0;
+  const showAwaySearchIcon = state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0;
+  const showHomePlayersIcon = state.enableTeamSelectionInMiniScoreboard;
+  const showAwayPlayersIcon = state.enableTeamSelectionInMiniScoreboard;
+
 
   const handleTeamNameInputBlur = (teamType: 'home' | 'away', currentLocalName: string) => {
     if (teamType === 'home') {
-      if (currentLocalName.trim() !== state.homeTeamName) { // Only dispatch if name actually changed from state
+      if (currentLocalName.trim() !== state.homeTeamName) { 
         dispatch({ type: 'SET_HOME_TEAM_NAME', payload: currentLocalName.trim() || 'Local' });
-        dispatch({ type: 'SET_HOME_TEAM_SUB_NAME', payload: undefined }); // Clear subName on manual edit
+        dispatch({ type: 'SET_HOME_TEAM_SUB_NAME', payload: undefined }); 
       }
     } else {
       if (currentLocalName.trim() !== state.awayTeamName) {
         dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: currentLocalName.trim() || 'Visitante' });
-        dispatch({ type: 'SET_AWAY_TEAM_SUB_NAME', payload: undefined }); // Clear subName on manual edit
+        dispatch({ type: 'SET_AWAY_TEAM_SUB_NAME', payload: undefined }); 
       }
     }
   };
@@ -548,8 +585,8 @@ export function MiniScoreboard() {
             </div>
              <div className="relative w-full max-w-xs mx-auto my-1">
                 <div className="flex items-center justify-center">
-                    {showHomeSearchPopover && (
-                        <Button variant="ghost" size="icon" className={cn("h-7 w-7 shrink-0", localHomeTeamName.trim() && "mr-1")} asChild>
+                    {showHomeSearchIcon && (
+                        <Button variant="ghost" size="icon" className={cn("h-7 w-7 shrink-0")} asChild>
                              <Popover open={isHomeTeamSearchOpen} onOpenChange={setIsHomeTeamSearchOpen}>
                                 <PopoverTrigger asChild>
                                     <Search className="h-4 w-4 text-muted-foreground" />
@@ -585,16 +622,18 @@ export function MiniScoreboard() {
                         onKeyDown={(e) => handleTeamNameInputKeyDown('home', localHomeTeamName, e)}
                         placeholder="Nombre Local"
                         className={cn(
-                            "h-8 text-sm uppercase w-auto text-center"
+                            "h-8 text-sm uppercase w-auto text-center",
+                             showHomeSearchIcon && "ml-1", 
+                             showHomePlayersIcon && "mr-1"
                         )}
                         aria-label="Nombre del equipo local"
                         autoComplete="off"
                     />
-                    {state.enableTeamSelectionInMiniScoreboard && (
+                    {showHomePlayersIcon && (
                         <Button
                             variant="ghost"
                             size="icon"
-                            className={cn("h-7 w-7 shrink-0", localHomeTeamName.trim() && "ml-1")}
+                            className={cn("h-7 w-7 shrink-0")}
                             onClick={() => setIsHomePlayersDialogOpen(true)}
                             disabled={!matchedHomeTeamId}
                             aria-label="Editar jugadores del equipo local"
@@ -834,8 +873,8 @@ export function MiniScoreboard() {
             </div>
              <div className="relative w-full max-w-xs mx-auto my-1">
                 <div className="flex items-center justify-center">
-                    {showAwaySearchPopover && (
-                        <Button variant="ghost" size="icon" className={cn("h-7 w-7 shrink-0", localAwayTeamName.trim() && "mr-1")} asChild>
+                    {showAwaySearchIcon && (
+                        <Button variant="ghost" size="icon" className={cn("h-7 w-7 shrink-0")} asChild>
                             <Popover open={isAwayTeamSearchOpen} onOpenChange={setIsAwayTeamSearchOpen}>
                                 <PopoverTrigger asChild>
                                     <Search className="h-4 w-4 text-muted-foreground" />
@@ -871,16 +910,18 @@ export function MiniScoreboard() {
                         onKeyDown={(e) => handleTeamNameInputKeyDown('away', localAwayTeamName, e)}
                         placeholder="Nombre Visitante"
                          className={cn(
-                            "h-8 text-sm uppercase w-auto text-center"
+                            "h-8 text-sm uppercase w-auto text-center",
+                            showAwaySearchIcon && "ml-1",
+                            showAwayPlayersIcon && "mr-1"
                         )}
                         aria-label="Nombre del equipo visitante"
                         autoComplete="off"
                     />
-                     {state.enableTeamSelectionInMiniScoreboard && (
+                     {showAwayPlayersIcon && (
                         <Button
                             variant="ghost"
                             size="icon"
-                            className={cn("h-7 w-7 shrink-0", localAwayTeamName.trim() && "ml-1")}
+                            className={cn("h-7 w-7 shrink-0")}
                             onClick={() => setIsAwayPlayersDialogOpen(true)}
                             disabled={!matchedAwayTeamId}
                             aria-label="Editar jugadores del equipo visitante"
