@@ -102,6 +102,7 @@ export function MiniScoreboard() {
   };
 
   const handleTimeAdjust = (deltaSeconds: number) => {
+    if (state.periodDisplayOverride === "End of Game") return;
     dispatch({ type: 'ADJUST_TIME', payload: deltaSeconds * 100 });
     toast({
       title: "Reloj Ajustado",
@@ -110,6 +111,7 @@ export function MiniScoreboard() {
   };
 
   const handleToggleClock = () => {
+    if (state.periodDisplayOverride === "End of Game") return;
     setEditingSegment(null);
     const isFirstGameAction = state.currentPeriod === 0 &&
                               state.periodDisplayOverride === 'Warm-up' &&
@@ -153,8 +155,10 @@ export function MiniScoreboard() {
 
   const handlePreviousPeriod = () => {
     setEditingSegment(null);
-    if (state.periodDisplayOverride === "Time Out") {
-      toast({ title: "Time Out Activo", description: "Finaliza el Time Out para cambiar de período.", variant: "destructive" });
+    if (state.periodDisplayOverride === "Time Out" || state.periodDisplayOverride === "End of Game") {
+      if (state.periodDisplayOverride === "Time Out") {
+        toast({ title: "Time Out Activo", description: "Finaliza el Time Out para cambiar de período.", variant: "destructive" });
+      }
       return;
     }
     if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
@@ -216,6 +220,8 @@ export function MiniScoreboard() {
 
   const handleNextAction = () => {
     setEditingSegment(null);
+    if (state.periodDisplayOverride === "End of Game") return;
+
     if (state.periodDisplayOverride === "Time Out") {
       if (state.currentTime <= 0) {
         dispatch({ type: 'END_TIMEOUT' });
@@ -255,11 +261,34 @@ export function MiniScoreboard() {
             `El descanso no ha finalizado. ¿Estás seguro de que quieres iniciar ${getPeriodText(nextNumericPeriod, state.numberOfRegularPeriods)}?`,
             actionToConfirm
         );
-      } else {
-        toast({ title: "Límite de Período Alcanzado", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}.`, variant: "destructive" });
+      } else { // Trying to advance beyond the last configured period from a break
+        const actionToConfirm = () => {
+          dispatch({ type: 'MANUAL_END_GAME' });
+          toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
+        };
+        const currentBreakDurationCs = state.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
+        const shouldConfirm = state.currentTime > 0 && state.currentTime < currentBreakDurationCs;
+         checkAndConfirm(
+            shouldConfirm,
+            "Confirmar Finalizar Partido",
+            `El descanso no ha finalizado. ¿Estás seguro de que quieres finalizar el partido?`,
+            actionToConfirm
+        );
       }
-    } else {
-      if (state.currentPeriod < MAX_TOTAL_GAME_PERIODS) {
+    } else if (state.periodDisplayOverride === null) { // Active game period
+      if (state.currentPeriod >= MAX_TOTAL_GAME_PERIODS) { // Is it the last possible period?
+        const actionToConfirm = () => {
+          dispatch({ type: 'MANUAL_END_GAME' });
+          toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
+        };
+        const shouldConfirm = state.currentTime > 0;
+        checkAndConfirm(
+          shouldConfirm,
+          "Confirmar Finalizar Partido",
+          "El reloj del último período aún tiene tiempo. ¿Estás seguro de que quieres finalizar el partido ahora?",
+          actionToConfirm
+        );
+      } else { // Not the last period, start a break
         const actionToConfirm = () => {
           const isPreOT = state.currentPeriod >= state.numberOfRegularPeriods;
           const breakType = isPreOT ? "Pre-OT Break" : "Break";
@@ -276,7 +305,6 @@ export function MiniScoreboard() {
               description: `${breakType} iniciado después de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)} (${centisecondsToDisplayMinutes(durationCs)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
           });
         };
-
         const isCurrentPeriodOT = state.currentPeriod > state.numberOfRegularPeriods;
         const currentPeriodExpectedDurationCs = isCurrentPeriodOT ? state.defaultOTPeriodDuration : state.defaultPeriodDuration;
         const shouldConfirm = state.currentTime > 0 && state.currentTime < currentPeriodExpectedDurationCs;
@@ -284,26 +312,25 @@ export function MiniScoreboard() {
         checkAndConfirm(
           shouldConfirm,
           "Confirmar Acción",
-          "El reloj del período actual ha corrido. ¿Estás seguro de que quieres iniciar el descanso/ir al siguiente período?",
+          "El reloj del período actual ha corrido. ¿Estás seguro de que quieres iniciar el descanso?",
           actionToConfirm
         );
-      } else {
-         toast({ title: "Fin del Juego", description: `No se puede avanzar más allá de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}.`, variant: "destructive" });
       }
     }
   };
 
-  const isPreviousPeriodDisabled = (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up") || state.periodDisplayOverride === "Time Out";
+  const isPreviousPeriodDisabled = (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up") || state.periodDisplayOverride === "Time Out" || state.periodDisplayOverride === "End of Game";
 
   let isNextActionDisabled = false;
   if (state.periodDisplayOverride === "Time Out" && state.currentTime > 0) {
       isNextActionDisabled = true;
-  } else if (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && state.currentTime <= 0) {
+  } else if (state.periodDisplayOverride === "End of Game") {
       isNextActionDisabled = true;
   }
 
 
-  const showNextActionButton = state.currentTime <= 0 && !state.isClockRunning;
+  const showNextActionButton = (state.currentTime <= 0 && !state.isClockRunning && state.periodDisplayOverride !== "End of Game") || (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS);
+
 
   let nextActionButtonText = "Siguiente";
   if (state.periodDisplayOverride === "Time Out" && state.currentTime <=0) {
@@ -312,19 +339,26 @@ export function MiniScoreboard() {
     nextActionButtonText = "Iniciar 1er Período";
   } else if (state.periodDisplayOverride === null && state.currentPeriod < MAX_TOTAL_GAME_PERIODS && state.currentTime <= 0) {
     nextActionButtonText = "Iniciar Descanso";
+  } else if (state.periodDisplayOverride === null && state.currentPeriod >= MAX_TOTAL_GAME_PERIODS) {
+     nextActionButtonText = "Finalizar Partido";
   } else if ((state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") && state.currentTime <= 0) {
-    nextActionButtonText = `Iniciar ${getPeriodText(state.currentPeriod + 1, state.numberOfRegularPeriods)}`;
+     if (state.currentPeriod + 1 <= MAX_TOTAL_GAME_PERIODS) {
+        nextActionButtonText = `Iniciar ${getPeriodText(state.currentPeriod + 1, state.numberOfRegularPeriods)}`;
+     } else {
+        nextActionButtonText = "Finalizar Partido";
+     }
   }
 
 
   const isMainClockLastMinute = state.currentTime < 6000 && state.currentTime >= 0 &&
-                               (state.periodDisplayOverride !== null || state.currentPeriod >= 0);
+                               (state.periodDisplayOverride !== null || state.currentPeriod >= 0) &&
+                               state.periodDisplayOverride !== "End of Game";
 
   const preTimeoutTimeCs = state.preTimeoutState?.time;
   const isPreTimeoutLastMinute = typeof preTimeoutTimeCs === 'number' && preTimeoutTimeCs < 6000 && preTimeoutTimeCs >= 0;
 
   const handleSegmentClick = (segment: EditingSegment) => {
-    if (state.isClockRunning) return;
+    if (state.isClockRunning || state.periodDisplayOverride === "End of Game") return;
     setEditingSegment(segment);
     switch (segment) {
       case 'minutes': setEditValue(String(timeParts.minutes).padStart(2, '0')); break;
@@ -334,7 +368,7 @@ export function MiniScoreboard() {
   };
 
   const handleTimeEditConfirm = () => {
-    if (!editingSegment) return;
+    if (!editingSegment || state.periodDisplayOverride === "End of Game") return;
 
     const { minutes: currentMins, seconds: currentSecs, tenths: currentTenths } = timeParts;
     let newTimeCs = state.currentTime;
@@ -380,7 +414,7 @@ export function MiniScoreboard() {
     "text-5xl font-bold",
     isMainClockLastMinute ? "text-orange-500" : "text-accent"
   );
-  const commonSpanClass = cn(!state.isClockRunning && "cursor-pointer hover:underline");
+  const commonSpanClass = cn(!(state.isClockRunning || state.periodDisplayOverride === "End of Game") && "cursor-pointer hover:underline");
 
   const activeHomePenaltiesCount = state.homePenalties.filter(p => p._status === 'running').length;
   const playersOnIceForHome = Math.max(0, state.playersPerTeamOnIce - activeHomePenaltiesCount);
@@ -512,7 +546,7 @@ export function MiniScoreboard() {
                 <span className="text-xs text-destructive animate-pulse">0 JUGADORES</span>
               )}
             </div>
-            <div className="relative w-full max-w-xs mx-auto my-1">
+             <div className="relative w-full max-w-xs mx-auto my-1">
                 <div className="flex items-center justify-center">
                     {showHomeSearchPopover && (
                         <Button variant="ghost" size="icon" className={cn("h-7 w-7 shrink-0", localHomeTeamName.trim() && "mr-1")} asChild>
@@ -551,8 +585,7 @@ export function MiniScoreboard() {
                         onKeyDown={(e) => handleTeamNameInputKeyDown('home', localHomeTeamName, e)}
                         placeholder="Nombre Local"
                         className={cn(
-                            "h-8 text-sm uppercase w-auto text-center",
-                            state.enableTeamSelectionInMiniScoreboard && localHomeTeamName.trim() && "mr-1"
+                            "h-8 text-sm uppercase w-auto text-center"
                         )}
                         aria-label="Nombre del equipo local"
                         autoComplete="off"
@@ -561,7 +594,7 @@ export function MiniScoreboard() {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 shrink-0"
+                            className={cn("h-7 w-7 shrink-0", localHomeTeamName.trim() && "ml-1")}
                             onClick={() => setIsHomePlayersDialogOpen(true)}
                             disabled={!matchedHomeTeamId}
                             aria-label="Editar jugadores del equipo local"
@@ -576,7 +609,7 @@ export function MiniScoreboard() {
                     </p>
                 )}
             </div>
-            <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0 ? 'Local' : state.homeTeamName.trim() || 'Local'})</p>
+            <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0 && state.homeTeamName.trim() ? 'Local' : state.homeTeamName.trim() || 'Local'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               <Button
                 variant="ghost"
@@ -626,80 +659,35 @@ export function MiniScoreboard() {
                 className="w-full max-w-[180px] mx-auto mb-2"
                 variant={state.isClockRunning ? "destructive" : "default"}
                 aria-label={state.isClockRunning ? "Pausar Reloj" : "Iniciar Reloj"}
-                disabled={state.currentTime <= 0 && !state.isClockRunning && state.periodDisplayOverride !== "Time Out"}
+                disabled={(state.currentTime <= 0 && !state.isClockRunning && state.periodDisplayOverride !== "Time Out") || state.periodDisplayOverride === "End of Game"}
               >
                 {state.isClockRunning ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
                 {state.isClockRunning ? 'Pausar' : 'Iniciar'} Reloj
               </Button>
             )}
 
-            <div className={cn("text-5xl font-bold tabular-nums flex items-baseline justify-center gap-0.5", isMainClockLastMinute ? "text-orange-500" : "text-accent")}>
-              {!state.isClockRunning && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-accent self-center mr-1"
-                  onClick={() => handleTimeAdjust(-1)}
-                  aria-label="Restar 1 segundo al reloj"
-                  disabled={state.currentTime <=0 || editingSegment !== null}
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-              )}
+            {state.periodDisplayOverride === "End of Game" ? (
+                <div className={cn(
+                    "text-3xl font-bold tabular-nums flex items-baseline justify-center gap-0.5 text-accent py-4"
+                  )}>
+                    FIN
+                </div>
+            ) : (
+                <div className={cn("text-5xl font-bold tabular-nums flex items-baseline justify-center gap-0.5", isMainClockLastMinute ? "text-orange-500" : "text-accent")}>
+                  {!(state.isClockRunning || state.periodDisplayOverride === "End of Game") && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-accent self-center mr-1"
+                      onClick={() => handleTimeAdjust(-1)}
+                      aria-label="Restar 1 segundo al reloj"
+                      disabled={state.currentTime <=0 || editingSegment !== null || state.periodDisplayOverride === "End of Game"}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </Button>
+                  )}
 
-              {editingSegment === 'minutes' ? (
-                <Input
-                  ref={inputRef}
-                  type="text"
-                  inputMode="numeric"
-                  value={editValue}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (/^\d*$/.test(val) && val.length <= 2) setEditValue(val);
-                  }}
-                  onBlur={handleTimeEditConfirm}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleTimeEditConfirm();
-                    if (e.key === 'Escape') setEditingSegment(null);
-                  }}
-                  className={cn(commonInputClass, "w-[60px] px-0")}
-                  maxLength={2}
-                  autoComplete="off"
-                />
-              ) : (
-                <span onClick={() => handleSegmentClick('minutes')} className={commonSpanClass}>
-                  {String(timeParts.minutes).padStart(2, '0')}
-                </span>
-              )}
-              <span className={isMainClockLastMinute ? "text-orange-500" : "text-accent"}>:</span>
-              {editingSegment === 'seconds' ? (
-                <Input
-                  ref={inputRef}
-                  type="text"
-                  inputMode="numeric"
-                  value={editValue}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (/^\d*$/.test(val) && val.length <= 2) setEditValue(val);
-                  }}
-                  onBlur={handleTimeEditConfirm}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleTimeEditConfirm();
-                    if (e.key === 'Escape') setEditingSegment(null);
-                  }}
-                  className={cn(commonInputClass, "w-[60px] px-0")}
-                  maxLength={2}
-                  autoComplete="off"
-                />
-              ) : (
-                <span onClick={() => handleSegmentClick('seconds')} className={commonSpanClass}>
-                  {String(timeParts.seconds).padStart(2, '0')}
-                </span>
-              )}
-              {isMainClockLastMinute && (
-                <>
-                  <span className="text-orange-500">.</span>
-                  {editingSegment === 'tenths' ? (
+                  {editingSegment === 'minutes' ? (
                     <Input
                       ref={inputRef}
                       type="text"
@@ -707,37 +695,91 @@ export function MiniScoreboard() {
                       value={editValue}
                       onChange={(e) => {
                         const val = e.target.value;
-                        if (/^\d*$/.test(val) && val.length <= 1) setEditValue(val);
+                        if (/^\d*$/.test(val) && val.length <= 2) setEditValue(val);
                       }}
                       onBlur={handleTimeEditConfirm}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleTimeEditConfirm();
                         if (e.key === 'Escape') setEditingSegment(null);
                       }}
-                      className={cn(commonInputClass, "w-[30px] text-orange-500 px-0")}
-                      maxLength={1}
+                      className={cn(commonInputClass, "w-[60px] px-0")}
+                      maxLength={2}
                       autoComplete="off"
                     />
                   ) : (
-                    <span onClick={() => handleSegmentClick('tenths')} className={cn(commonSpanClass, "text-orange-500")}>
-                      {String(timeParts.tenths)}
+                    <span onClick={() => handleSegmentClick('minutes')} className={commonSpanClass}>
+                      {String(timeParts.minutes).padStart(2, '0')}
                     </span>
                   )}
-                </>
-              )}
-              {!state.isClockRunning && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground hover:text-accent self-center ml-1"
-                  onClick={() => handleTimeAdjust(1)}
-                  aria-label="Sumar 1 segundo al reloj"
-                  disabled={editingSegment !== null}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
+                  <span className={isMainClockLastMinute ? "text-orange-500" : "text-accent"}>:</span>
+                  {editingSegment === 'seconds' ? (
+                    <Input
+                      ref={inputRef}
+                      type="text"
+                      inputMode="numeric"
+                      value={editValue}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (/^\d*$/.test(val) && val.length <= 2) setEditValue(val);
+                      }}
+                      onBlur={handleTimeEditConfirm}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleTimeEditConfirm();
+                        if (e.key === 'Escape') setEditingSegment(null);
+                      }}
+                      className={cn(commonInputClass, "w-[60px] px-0")}
+                      maxLength={2}
+                      autoComplete="off"
+                    />
+                  ) : (
+                    <span onClick={() => handleSegmentClick('seconds')} className={commonSpanClass}>
+                      {String(timeParts.seconds).padStart(2, '0')}
+                    </span>
+                  )}
+                  {isMainClockLastMinute && (
+                    <>
+                      <span className="text-orange-500">.</span>
+                      {editingSegment === 'tenths' ? (
+                        <Input
+                          ref={inputRef}
+                          type="text"
+                          inputMode="numeric"
+                          value={editValue}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (/^\d*$/.test(val) && val.length <= 1) setEditValue(val);
+                          }}
+                          onBlur={handleTimeEditConfirm}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleTimeEditConfirm();
+                            if (e.key === 'Escape') setEditingSegment(null);
+                          }}
+                          className={cn(commonInputClass, "w-[30px] text-orange-500 px-0")}
+                          maxLength={1}
+                          autoComplete="off"
+                        />
+                      ) : (
+                        <span onClick={() => handleSegmentClick('tenths')} className={cn(commonSpanClass, "text-orange-500")}>
+                          {String(timeParts.tenths)}
+                        </span>
+                      )}
+                    </>
+                  )}
+                  {!(state.isClockRunning || state.periodDisplayOverride === "End of Game") && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-accent self-center ml-1"
+                      onClick={() => handleTimeAdjust(1)}
+                      aria-label="Sumar 1 segundo al reloj"
+                      disabled={editingSegment !== null || state.periodDisplayOverride === "End of Game"}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+            )}
+            
 
             <div className="relative mt-1 flex items-center justify-center gap-2">
                <Button
@@ -763,13 +805,13 @@ export function MiniScoreboard() {
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
-              {!state.isClockRunning && state.currentTime > 0 && !showNextActionButton && editingSegment === null && (
+              {!state.isClockRunning && state.currentTime > 0 && state.periodDisplayOverride !== "End of Game" && !showNextActionButton && editingSegment === null && (
                 <span className="absolute top-[-0.25rem] right-1 text-[0.6rem] font-normal text-muted-foreground normal-case px-1 rounded-sm bg-background/30">
                   Paused
                 </span>
               )}
             </div>
-            {state.preTimeoutState && (
+            {state.preTimeoutState && state.periodDisplayOverride !== "End of Game" && (
               <div className={cn(
                   "text-xs mt-1 normal-case",
                   isPreTimeoutLastMinute ? "text-orange-500/80" : "text-muted-foreground"
@@ -829,8 +871,7 @@ export function MiniScoreboard() {
                         onKeyDown={(e) => handleTeamNameInputKeyDown('away', localAwayTeamName, e)}
                         placeholder="Nombre Visitante"
                          className={cn(
-                            "h-8 text-sm uppercase w-auto text-center",
-                            state.enableTeamSelectionInMiniScoreboard && localAwayTeamName.trim() && "mr-1"
+                            "h-8 text-sm uppercase w-auto text-center"
                         )}
                         aria-label="Nombre del equipo visitante"
                         autoComplete="off"
@@ -839,7 +880,7 @@ export function MiniScoreboard() {
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 shrink-0"
+                            className={cn("h-7 w-7 shrink-0", localAwayTeamName.trim() && "ml-1")}
                             onClick={() => setIsAwayPlayersDialogOpen(true)}
                             disabled={!matchedAwayTeamId}
                             aria-label="Editar jugadores del equipo visitante"
@@ -854,7 +895,7 @@ export function MiniScoreboard() {
                     </p>
                 )}
             </div>
-            <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0 ? 'Visitante' : state.awayTeamName.trim() || 'Visitante'})</p>
+            <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0 && state.awayTeamName.trim() ? 'Visitante' : state.awayTeamName.trim() || 'Visitante'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               <Button
                 variant="ghost"
@@ -909,3 +950,5 @@ export function MiniScoreboard() {
     </div>
   );
 }
+
+    
