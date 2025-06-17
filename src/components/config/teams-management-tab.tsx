@@ -241,18 +241,13 @@ export function TeamsManagementTab() {
                 categoryNameCsv = teamDataParts[2].trim();
             } else if (teamDataParts.length === 2) { // Legacy format or subName is empty
                 teamNameCsv = teamDataParts[0].trim();
-                // Check if the second part looks like a known category name to distinguish
-                // between (Team, Category) and (Team, SubName_empty, Category)
                 const potentialCategory = state.availableCategories.find(
                     (cat) => cat.name.toLowerCase() === teamDataParts[1].trim().toLowerCase()
                 );
-                if (potentialCategory) { // Likely (Team, Category)
+                if (potentialCategory) { 
                     subNameCsv = undefined;
                     categoryNameCsv = teamDataParts[1].trim();
-                } else { // Assume (Team, SubName_empty, Category_is_actually_subname) is an error or needs clearer CSV structure
-                      // For simplicity, if 2 parts, assume subName is empty and second part is category.
-                      // More robust would be to check if teamDataParts[1] is a valid category.
-                      // If user intended (Team, SubName, Category) but SubName is empty they must use (Team,,Category)
+                } else { 
                     subNameCsv = undefined;
                     categoryNameCsv = teamDataParts[1].trim();
                 }
@@ -272,14 +267,20 @@ export function TeamsManagementTab() {
             }
             const categoryId = category.id;
 
-            if (importedTeams.some(t => t.name.toLowerCase() === teamNameCsv.toLowerCase() && t.category === categoryId)) {
-                 throw new Error(`Equipo duplicado en CSV: "${teamNameCsv}" en categoría "${categoryNameCsv}" (línea ${lineCounter}) ya fue definido en este archivo.`);
+            if (importedTeams.some(t =>
+                t.name.toLowerCase() === teamNameCsv.toLowerCase() &&
+                (t.subName?.toLowerCase() || '') === (subNameCsv?.toLowerCase() || '') &&
+                t.category === categoryId
+            )) {
+                 throw new Error(`Equipo duplicado en CSV: "${teamNameCsv}" ${subNameCsv ? `(sub: "${subNameCsv}") ` : ''}en categoría "${categoryNameCsv}" (línea ${lineCounter}) ya fue definido en este archivo.`);
             }
             const existingTeamInState = state.teams.find(
-              (t) => t.name.toLowerCase() === teamNameCsv.toLowerCase() && t.category === categoryId
+              (t) => t.name.toLowerCase() === teamNameCsv.toLowerCase() &&
+                     (t.subName?.toLowerCase() || '') === (subNameCsv?.toLowerCase() || '') &&
+                     t.category === categoryId
             );
             if (existingTeamInState) {
-              throw new Error(`El equipo "${teamNameCsv}" en la categoría "${categoryNameCsv}" (línea ${lineCounter}) ya existe en la aplicación.`);
+              throw new Error(`El equipo "${teamNameCsv}" ${subNameCsv ? `(sub: "${subNameCsv}") ` : ''}en la categoría "${categoryNameCsv}" (línea ${lineCounter}) ya existe en la aplicación.`);
             }
 
             currentTeamData = { name: teamNameCsv, subName: subNameCsv, categoryId: categoryId, players: [] };

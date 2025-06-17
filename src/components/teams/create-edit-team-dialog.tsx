@@ -166,6 +166,7 @@ export function CreateEditTeamDialog({
       (t) =>
         t.id !== teamToEdit?.id &&
         t.name.toLowerCase() === trimmedTeamName.toLowerCase() &&
+        (t.subName?.toLowerCase() || '') === (trimmedTeamSubName?.toLowerCase() || '') &&
         t.category === teamCategory
     );
 
@@ -173,7 +174,7 @@ export function CreateEditTeamDialog({
       const categoryName = availableCategories.find(c => c.id === teamCategory)?.name || teamCategory;
       toast({
         title: "Equipo Duplicado",
-        description: `Ya existe un equipo con el nombre "${trimmedTeamName}" en la categoría "${categoryName}".`,
+        description: `Ya existe un equipo con el nombre "${trimmedTeamName}" ${trimmedTeamSubName ? `y sub-nombre "${trimmedTeamSubName}" ` : ''}en la categoría "${categoryName}".`,
         variant: "destructive",
       });
       return;
@@ -367,5 +368,6 @@ export function CreateEditTeamDialog({
     
 
     
+
 
 

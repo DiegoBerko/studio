@@ -53,7 +53,10 @@ export function MiniScoreboard() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [localHomeTeamName, setLocalHomeTeamName] = useState(state.homeTeamName);
+  const [localHomeTeamSubName, setLocalHomeTeamSubName] = useState(state.homeTeamSubName);
   const [localAwayTeamName, setLocalAwayTeamName] = useState(state.awayTeamName);
+  const [localAwayTeamSubName, setLocalAwayTeamSubName] = useState(state.awayTeamSubName);
+
 
   const [isHomeTeamSearchOpen, setIsHomeTeamSearchOpen] = useState(false);
   const [isAwayTeamSearchOpen, setIsAwayTeamSearchOpen] = useState(false);
@@ -65,11 +68,13 @@ export function MiniScoreboard() {
 
   useEffect(() => {
     setLocalHomeTeamName(state.homeTeamName);
-  }, [state.homeTeamName]);
+    setLocalHomeTeamSubName(state.homeTeamSubName);
+  }, [state.homeTeamName, state.homeTeamSubName]);
 
   useEffect(() => {
     setLocalAwayTeamName(state.awayTeamName);
-  }, [state.awayTeamName]);
+    setLocalAwayTeamSubName(state.awayTeamSubName);
+  }, [state.awayTeamName, state.awayTeamSubName]);
 
 
   const getTimeParts = useCallback((timeCs: number) => {
@@ -392,7 +397,10 @@ export function MiniScoreboard() {
     if (!state.teams) return [];
     return state.teams.filter(team =>
       team.category === state.selectedMatchCategory &&
-      team.name.toLowerCase().includes(searchTerm.toLowerCase())
+      (
+        team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (team.subName && team.subName.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
     ).sort((a,b) => a.name.localeCompare(b.name));
   };
 
@@ -402,30 +410,67 @@ export function MiniScoreboard() {
   const handleSelectTeam = (teamType: 'home' | 'away', teamData: TeamData) => {
     if (teamType === 'home') {
       dispatch({ type: 'SET_HOME_TEAM_NAME', payload: teamData.name });
+      dispatch({ type: 'SET_HOME_TEAM_SUB_NAME', payload: teamData.subName });
       setIsHomeTeamSearchOpen(false);
       setHomeTeamSearchTerm('');
     } else {
       dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: teamData.name });
+      dispatch({ type: 'SET_AWAY_TEAM_SUB_NAME', payload: teamData.subName });
       setIsAwayTeamSearchOpen(false);
       setAwayTeamSearchTerm('');
     }
-    toast({ title: `Equipo ${teamType === 'home' ? 'Local' : 'Visitante'} Establecido`, description: `Equipo seleccionado: ${teamData.name}` });
+    toast({ title: `Equipo ${teamType === 'home' ? 'Local' : 'Visitante'} Establecido`, description: `Equipo seleccionado: ${teamData.name}${teamData.subName ? ` - ${teamData.subName}` : ''}` });
   };
 
   const matchedHomeTeamId = useMemo(() => {
     if (!state.enableTeamSelectionInMiniScoreboard) return null;
-    const matched = state.teams.find(t => t.name === localHomeTeamName && t.category === state.selectedMatchCategory);
+    const matched = state.teams.find(t =>
+      t.name === state.homeTeamName &&
+      (t.subName || undefined) === (state.homeTeamSubName || undefined) &&
+      t.category === state.selectedMatchCategory
+    );
     return matched ? matched.id : null;
-  }, [localHomeTeamName, state.teams, state.selectedMatchCategory, state.enableTeamSelectionInMiniScoreboard]);
+  }, [state.homeTeamName, state.homeTeamSubName, state.teams, state.selectedMatchCategory, state.enableTeamSelectionInMiniScoreboard]);
 
   const matchedAwayTeamId = useMemo(() => {
      if (!state.enableTeamSelectionInMiniScoreboard) return null;
-    const matched = state.teams.find(t => t.name === localAwayTeamName && t.category === state.selectedMatchCategory);
+    const matched = state.teams.find(t =>
+      t.name === state.awayTeamName &&
+      (t.subName || undefined) === (state.awayTeamSubName || undefined) &&
+      t.category === state.selectedMatchCategory
+    );
     return matched ? matched.id : null;
-  }, [localAwayTeamName, state.teams, state.selectedMatchCategory, state.enableTeamSelectionInMiniScoreboard]);
+  }, [state.awayTeamName, state.awayTeamSubName, state.teams, state.selectedMatchCategory, state.enableTeamSelectionInMiniScoreboard]);
 
   const showHomeSearchPopover = state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0;
   const showAwaySearchPopover = state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0;
+
+  const handleTeamNameInputBlur = (teamType: 'home' | 'away', currentLocalName: string) => {
+    if (teamType === 'home') {
+      if (currentLocalName.trim() !== state.homeTeamName) { // Only dispatch if name actually changed from state
+        dispatch({ type: 'SET_HOME_TEAM_NAME', payload: currentLocalName.trim() || 'Local' });
+        dispatch({ type: 'SET_HOME_TEAM_SUB_NAME', payload: undefined }); // Clear subName on manual edit
+      }
+    } else {
+      if (currentLocalName.trim() !== state.awayTeamName) {
+        dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: currentLocalName.trim() || 'Visitante' });
+        dispatch({ type: 'SET_AWAY_TEAM_SUB_NAME', payload: undefined }); // Clear subName on manual edit
+      }
+    }
+  };
+
+  const handleTeamNameInputKeyDown = (teamType: 'home' | 'away', currentLocalName: string, event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      if (teamType === 'home') {
+        dispatch({ type: 'SET_HOME_TEAM_NAME', payload: currentLocalName.trim() || 'Local' });
+        dispatch({ type: 'SET_HOME_TEAM_SUB_NAME', payload: undefined });
+      } else {
+        dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: currentLocalName.trim() || 'Visitante' });
+        dispatch({ type: 'SET_AWAY_TEAM_SUB_NAME', payload: undefined });
+      }
+      (event.target as HTMLInputElement).blur();
+    }
+  };
 
 
   return (
@@ -459,9 +504,9 @@ export function MiniScoreboard() {
         <CardContent className="flex flex-col sm:flex-row justify-around items-center text-center gap-4 sm:gap-8 py-6">
           {/* Home Team Section */}
           <div className="flex-1 w-full sm:w-auto">
-            <div className="flex justify-center items-center gap-1 my-1 h-5">
+            <div className="flex justify-center items-center gap-1 mb-1 h-5 md:h-6 lg:h-7">
               {playersOnIceForHome > 0 && Array(playersOnIceForHome).fill(null).map((_, index) => (
-                <User key={`home-player-${index}`} className="h-5 w-5 text-primary-foreground/80" />
+                <User key={`home-player-${index}`} className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary-foreground/80" />
               ))}
               {playersOnIceForHome === 0 && state.playersPerTeamOnIce > 0 && (
                 <span className="text-xs text-destructive animate-pulse">0 JUGADORES</span>
@@ -470,77 +515,66 @@ export function MiniScoreboard() {
             <div className="relative w-full max-w-xs mx-auto my-1">
                 <div className="flex items-center justify-center">
                     {showHomeSearchPopover && (
-                        <Popover open={isHomeTeamSearchOpen} onOpenChange={setIsHomeTeamSearchOpen}>
-                            <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                        <Button variant="ghost" size="icon" className={cn("h-7 w-7 shrink-0", localHomeTeamName.trim() && "mr-1")} asChild>
+                             <Popover open={isHomeTeamSearchOpen} onOpenChange={setIsHomeTeamSearchOpen}>
+                                <PopoverTrigger asChild>
                                     <Search className="h-4 w-4 text-muted-foreground" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[200px] p-0" align="start">
-                                <Command>
-                                    <CommandInput placeholder="Buscar equipo..." value={homeTeamSearchTerm} onValueChange={setHomeTeamSearchTerm} />
-                                    <CommandList>
-                                        <CommandEmpty>No se encontraron equipos.</CommandEmpty>
-                                        <CommandGroup>
-                                            {filteredHomeTeams.map((team) => (
-                                                <CommandItem
-                                                    key={team.id}
-                                                    value={team.name}
-                                                    onSelect={() => handleSelectTeam('home', team)}
-                                                >
-                                                    <Check className={cn("mr-2 h-4 w-4", localHomeTeamName === team.name ? "opacity-100" : "opacity-0")} />
-                                                    {team.name}
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[240px] p-0" align="start">
+                                    <Command>
+                                        <CommandInput placeholder="Buscar equipo..." value={homeTeamSearchTerm} onValueChange={setHomeTeamSearchTerm} />
+                                        <CommandList>
+                                            <CommandEmpty>No se encontraron equipos.</CommandEmpty>
+                                            <CommandGroup>
+                                                {filteredHomeTeams.map((team) => (
+                                                    <CommandItem
+                                                        key={team.id}
+                                                        value={`${team.name}${team.subName ? ` - ${team.subName}` : ''}`}
+                                                        onSelect={() => handleSelectTeam('home', team)}
+                                                    >
+                                                        <Check className={cn("mr-2 h-4 w-4", localHomeTeamName === team.name && (localHomeTeamSubName || undefined) === (team.subName || undefined) ? "opacity-100" : "opacity-0")} />
+                                                        <span className="truncate">{team.name}{team.subName ? <span className="text-xs text-muted-foreground"> - {team.subName}</span> : ''}</span>
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </Button>
                     )}
                     <Input
                         id="homeTeamNameInput"
                         value={localHomeTeamName}
                         onChange={(e) => setLocalHomeTeamName(e.target.value)}
-                        onBlur={() => dispatch({ type: 'SET_HOME_TEAM_NAME', payload: localHomeTeamName.trim() || 'Local' })}
-                        onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                            dispatch({ type: 'SET_HOME_TEAM_NAME', payload: localHomeTeamName.trim() || 'Local' });
-                            (e.target as HTMLInputElement).blur();
-                        }
-                        }}
+                        onBlur={() => handleTeamNameInputBlur('home', localHomeTeamName)}
+                        onKeyDown={(e) => handleTeamNameInputKeyDown('home', localHomeTeamName, e)}
                         placeholder="Nombre Local"
                         className={cn(
                             "h-8 text-sm uppercase w-auto text-center",
-                            showHomeSearchPopover && "ml-1",
-                             state.enableTeamSelectionInMiniScoreboard && "mr-1" 
+                            state.enableTeamSelectionInMiniScoreboard && localHomeTeamName.trim() && "mr-1"
                         )}
                         aria-label="Nombre del equipo local"
                         autoComplete="off"
                     />
                     {state.enableTeamSelectionInMiniScoreboard && (
-                        <>
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-7 w-7 shrink-0" 
-                                onClick={() => setIsHomePlayersDialogOpen(true)}
-                                disabled={!matchedHomeTeamId}
-                                aria-label="Editar jugadores del equipo local"
-                            >
-                                <ClipboardList className={cn("h-4 w-4", matchedHomeTeamId ? "text-muted-foreground" : "text-muted-foreground/50 opacity-60")} />
-                            </Button>
-                            {matchedHomeTeamId && (
-                                <EditTeamPlayersDialog
-                                    isOpen={isHomePlayersDialogOpen}
-                                    onOpenChange={setIsHomePlayersDialogOpen}
-                                    teamId={matchedHomeTeamId}
-                                    teamName={localHomeTeamName}
-                                />
-                            )}
-                        </>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => setIsHomePlayersDialogOpen(true)}
+                            disabled={!matchedHomeTeamId}
+                            aria-label="Editar jugadores del equipo local"
+                        >
+                            <ClipboardList className={cn("h-4 w-4", matchedHomeTeamId ? "text-muted-foreground" : "text-muted-foreground/50 opacity-60")} />
+                        </Button>
                     )}
                 </div>
+                 {matchedHomeTeamId && localHomeTeamSubName && (
+                    <p className="text-xs text-muted-foreground text-center mt-0.5 truncate">
+                        ({localHomeTeamSubName})
+                    </p>
+                )}
             </div>
             <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0 ? 'Local' : state.homeTeamName.trim() || 'Local'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
@@ -564,6 +598,14 @@ export function MiniScoreboard() {
                 <Plus className="h-5 w-5" />
               </Button>
             </div>
+            {matchedHomeTeamId && isHomePlayersDialogOpen && (
+              <EditTeamPlayersDialog
+                isOpen={isHomePlayersDialogOpen}
+                onOpenChange={setIsHomePlayersDialogOpen}
+                teamId={matchedHomeTeamId}
+                teamName={localHomeTeamName}
+              />
+            )}
           </div>
 
           {/* Clock & Period Section */}
@@ -740,9 +782,9 @@ export function MiniScoreboard() {
 
           {/* Away Team Section */}
           <div className="flex-1 w-full sm:w-auto">
-            <div className="flex justify-center items-center gap-1 my-1 h-5">
+            <div className="flex justify-center items-center gap-1 mb-1 h-5 md:h-6 lg:h-7">
               {playersOnIceForAway > 0 && Array(playersOnIceForAway).fill(null).map((_, index) => (
-                <User key={`away-player-${index}`} className="h-5 w-5 text-primary-foreground/80" />
+                <User key={`away-player-${index}`} className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary-foreground/80" />
               ))}
               {playersOnIceForAway === 0 && state.playersPerTeamOnIce > 0 && (
                 <span className="text-xs text-destructive animate-pulse">0 JUGADORES</span>
@@ -751,77 +793,66 @@ export function MiniScoreboard() {
              <div className="relative w-full max-w-xs mx-auto my-1">
                 <div className="flex items-center justify-center">
                     {showAwaySearchPopover && (
-                        <Popover open={isAwayTeamSearchOpen} onOpenChange={setIsAwayTeamSearchOpen}>
-                            <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                        <Button variant="ghost" size="icon" className={cn("h-7 w-7 shrink-0", localAwayTeamName.trim() && "mr-1")} asChild>
+                            <Popover open={isAwayTeamSearchOpen} onOpenChange={setIsAwayTeamSearchOpen}>
+                                <PopoverTrigger asChild>
                                     <Search className="h-4 w-4 text-muted-foreground" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[200px] p-0" align="start">
-                                <Command>
-                                    <CommandInput placeholder="Buscar equipo..." value={awayTeamSearchTerm} onValueChange={setAwayTeamSearchTerm} />
-                                    <CommandList>
-                                        <CommandEmpty>No se encontraron equipos.</CommandEmpty>
-                                        <CommandGroup>
-                                            {filteredAwayTeams.map((team) => (
-                                                <CommandItem
-                                                    key={team.id}
-                                                    value={team.name}
-                                                    onSelect={() => handleSelectTeam('away', team)}
-                                                >
-                                                    <Check className={cn("mr-2 h-4 w-4", localAwayTeamName === team.name ? "opacity-100" : "opacity-0")} />
-                                                    {team.name}
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[240px] p-0" align="start">
+                                    <Command>
+                                        <CommandInput placeholder="Buscar equipo..." value={awayTeamSearchTerm} onValueChange={setAwayTeamSearchTerm} />
+                                        <CommandList>
+                                            <CommandEmpty>No se encontraron equipos.</CommandEmpty>
+                                            <CommandGroup>
+                                                {filteredAwayTeams.map((team) => (
+                                                    <CommandItem
+                                                        key={team.id}
+                                                        value={`${team.name}${team.subName ? ` - ${team.subName}` : ''}`}
+                                                        onSelect={() => handleSelectTeam('away', team)}
+                                                    >
+                                                        <Check className={cn("mr-2 h-4 w-4", localAwayTeamName === team.name && (localAwayTeamSubName || undefined) === (team.subName || undefined) ? "opacity-100" : "opacity-0")} />
+                                                        <span className="truncate">{team.name}{team.subName ? <span className="text-xs text-muted-foreground"> - {team.subName}</span> : ''}</span>
+                                                    </CommandItem>
+                                                ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                        </Button>
                     )}
                     <Input
                         id="awayTeamNameInput"
                         value={localAwayTeamName}
                         onChange={(e) => setLocalAwayTeamName(e.target.value)}
-                        onBlur={() => dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: localAwayTeamName.trim() || 'Visitante' })}
-                        onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                            dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: localAwayTeamName.trim() || 'Visitante' });
-                            (e.target as HTMLInputElement).blur();
-                        }
-                        }}
+                        onBlur={() => handleTeamNameInputBlur('away', localAwayTeamName)}
+                        onKeyDown={(e) => handleTeamNameInputKeyDown('away', localAwayTeamName, e)}
                         placeholder="Nombre Visitante"
                          className={cn(
                             "h-8 text-sm uppercase w-auto text-center",
-                            showAwaySearchPopover && "ml-1",
-                            state.enableTeamSelectionInMiniScoreboard && "mr-1"
+                            state.enableTeamSelectionInMiniScoreboard && localAwayTeamName.trim() && "mr-1"
                         )}
                         aria-label="Nombre del equipo visitante"
                         autoComplete="off"
                     />
-                    {state.enableTeamSelectionInMiniScoreboard && (
-                        <>
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-7 w-7 shrink-0" 
-                                onClick={() => setIsAwayPlayersDialogOpen(true)}
-                                disabled={!matchedAwayTeamId}
-                                aria-label="Editar jugadores del equipo visitante"
-                            >
-                                <ClipboardList className={cn("h-4 w-4", matchedAwayTeamId ? "text-muted-foreground" : "text-muted-foreground/50 opacity-60")} />
-                            </Button>
-                            {matchedAwayTeamId && (
-                                <EditTeamPlayersDialog
-                                    isOpen={isAwayPlayersDialogOpen}
-                                    onOpenChange={setIsAwayPlayersDialogOpen}
-                                    teamId={matchedAwayTeamId}
-                                    teamName={localAwayTeamName}
-                                />
-                            )}
-                        </>
+                     {state.enableTeamSelectionInMiniScoreboard && (
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => setIsAwayPlayersDialogOpen(true)}
+                            disabled={!matchedAwayTeamId}
+                            aria-label="Editar jugadores del equipo visitante"
+                        >
+                            <ClipboardList className={cn("h-4 w-4", matchedAwayTeamId ? "text-muted-foreground" : "text-muted-foreground/50 opacity-60")} />
+                        </Button>
                     )}
                 </div>
+                {matchedAwayTeamId && localAwayTeamSubName && (
+                    <p className="text-xs text-muted-foreground text-center mt-0.5 truncate">
+                        ({localAwayTeamSubName})
+                    </p>
+                )}
             </div>
             <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0 ? 'Visitante' : state.awayTeamName.trim() || 'Visitante'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
@@ -845,6 +876,14 @@ export function MiniScoreboard() {
                 <Plus className="h-5 w-5" />
               </Button>
             </div>
+             {matchedAwayTeamId && isAwayPlayersDialogOpen && (
+              <EditTeamPlayersDialog
+                isOpen={isAwayPlayersDialogOpen}
+                onOpenChange={setIsAwayPlayersDialogOpen}
+                teamId={matchedAwayTeamId}
+                teamName={localAwayTeamName}
+              />
+            )}
           </div>
         </CardContent>
       </Card>

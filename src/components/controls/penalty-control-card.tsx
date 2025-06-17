@@ -50,10 +50,15 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
 
 
   const penalties = team === 'home' ? state.homePenalties : state.awayPenalties;
+  const teamSubName = team === 'home' ? state.homeTeamSubName : state.awayTeamSubName;
 
   const matchedTeam = useMemo(() => {
-    return state.teams.find(t => t.name === teamName && t.category === state.selectedMatchCategory);
-  }, [state.teams, teamName, state.selectedMatchCategory]);
+    return state.teams.find(t =>
+        t.name === teamName &&
+        (t.subName || undefined) === (teamSubName || undefined) &&
+        t.category === state.selectedMatchCategory
+    );
+  }, [state.teams, teamName, teamSubName, state.selectedMatchCategory]);
   
   const teamHasPlayers = useMemo(() => {
       if (!state.enablePlayerSelectionForPenalties) return false; // Global setting check
@@ -306,7 +311,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
 
 
   return (
-    <ControlCardWrapper title={`Penalidades ${teamName}`}>
+    <ControlCardWrapper title={`Penalidades ${teamName}${teamSubName ? ` (${teamSubName})` : ''}`}>
       <form onSubmit={handleAddPenalty} className="space-y-4 mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
           <div className="sm:col-span-1">
@@ -428,3 +433,4 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     </ControlCardWrapper>
   );
 }
+

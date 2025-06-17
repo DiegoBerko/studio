@@ -102,7 +102,9 @@ interface GameState extends ConfigFields {
   homePenalties: Penalty[];
   awayPenalties: Penalty[];
   homeTeamName: string;
+  homeTeamSubName?: string;
   awayTeamName: string;
+  awayTeamSubName?: string;
   periodDisplayOverride: PeriodDisplayOverrideType;
   preTimeoutState: PreTimeoutState | null;
   clockStartTimeMs: number | null;
@@ -127,7 +129,9 @@ export type GameAction =
   | { type: 'REORDER_PENALTIES'; payload: { team: Team; startIndex: number; endIndex: number } }
   | { type: 'TICK' }
   | { type: 'SET_HOME_TEAM_NAME'; payload: string }
+  | { type: 'SET_HOME_TEAM_SUB_NAME'; payload?: string }
   | { type: 'SET_AWAY_TEAM_NAME'; payload: string }
+  | { type: 'SET_AWAY_TEAM_SUB_NAME'; payload?: string }
   | { type: 'START_BREAK' }
   | { type: 'START_PRE_OT_BREAK' }
   | { type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' }
@@ -184,7 +188,9 @@ const initialGlobalState: GameState = {
   homePenalties: [],
   awayPenalties: [],
   homeTeamName: 'Local',
+  homeTeamSubName: undefined,
   awayTeamName: 'Visitante',
+  awayTeamSubName: undefined,
   configName: INITIAL_CONFIG_NAME,
   defaultWarmUpDuration: INITIAL_WARM_UP_DURATION,
   defaultPeriodDuration: INITIAL_PERIOD_DURATION,
@@ -251,7 +257,7 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     maxConcurrentPenalties, playersPerTeamOnIce, playSoundAtPeriodEnd, customHornSoundDataUrl,
     enableTeamSelectionInMiniScoreboard, enablePlayerSelectionForPenalties,
     showAliasInPenaltyPlayerSelector, showAliasInControlsPenaltyList, showAliasInScoreboardPenalties,
-    homeScore, awayScore, homeTeamName, awayTeamName,
+    homeScore, awayScore, homeTeamName, homeTeamSubName, awayTeamName, awayTeamSubName,
     isClockRunning, currentTime, clockStartTimeMs, remainingTimeAtStartCs,
   } = currentState;
 
@@ -341,7 +347,7 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
   }
 
   const baseStateForTransition = {
-    homeScore, awayScore, homeTeamName, awayTeamName,
+    homeScore, awayScore, homeTeamName, homeTeamSubName, awayTeamName, awayTeamSubName,
     isClockRunning: currentState.isClockRunning,
     currentTime: currentState.currentTime,
     teams, homePenalties, awayPenalties,
@@ -454,6 +460,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         availableCategories: hydratedCategories, // Use robustly hydrated categories
         teams: (action.payload?.teams || initialGlobalState.teams).map(t => ({...t, subName: t.subName || undefined })), // Ensure teams is always an array and subName is correctly undefined
         playHornTrigger: initialGlobalState.playHornTrigger, // Reset playHornTrigger on hydration
+        homeTeamSubName: action.payload?.homeTeamSubName,
+        awayTeamSubName: action.payload?.awayTeamSubName,
       };
       
       // Ensure selectedMatchCategory is valid against the (potentially converted) hydratedCategories
@@ -867,8 +875,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_HOME_TEAM_NAME':
       newStateWithoutMeta = { ...state, homeTeamName: action.payload || 'Local' };
       break;
+    case 'SET_HOME_TEAM_SUB_NAME':
+      newStateWithoutMeta = { ...state, homeTeamSubName: action.payload };
+      break;
     case 'SET_AWAY_TEAM_NAME':
       newStateWithoutMeta = { ...state, awayTeamName: action.payload || 'Visitante' };
+      break;
+    case 'SET_AWAY_TEAM_SUB_NAME':
+      newStateWithoutMeta = { ...state, awayTeamSubName: action.payload };
       break;
     case 'START_BREAK': {
       const autoStart = state.autoStartBreaks && state.defaultBreakDuration > 0;
@@ -1204,7 +1218,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         homePenalties: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
         awayPenalties: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
         homeTeamName: initialsToKeepConfigAndTeams.homeTeamName,
+        homeTeamSubName: undefined,
         awayTeamName: initialsToKeepConfigAndTeams.awayTeamName,
+        awayTeamSubName: undefined,
         periodDisplayOverride: 'Warm-up',
         preTimeoutState: initialsToKeepConfigAndTeams.preTimeoutState,
         clockStartTimeMs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? Date.now() : null,

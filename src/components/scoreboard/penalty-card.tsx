@@ -35,13 +35,19 @@ const CagedUserIcon = ({ className }: { className?: string }) => (
 export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
   const { state } = useGameState();
 
+  const currentTeamSubName = state.homeTeamName === teamName ? state.homeTeamSubName : state.awayTeamSubName;
+
   const matchedPlayer = React.useMemo(() => {
-    const currentTeam = state.teams.find(t => t.name === teamName && t.category === state.selectedMatchCategory);
+    const currentTeam = state.teams.find(t =>
+        t.name === teamName &&
+        (t.subName || undefined) === (currentTeamSubName || undefined) &&
+        t.category === state.selectedMatchCategory
+    );
     if (currentTeam) {
-      return currentTeam.players.find(p => p.number === penalty.playerNumber);
+      return currentTeam.players.find(p => p.number === penalty.playerNumber || (penalty.playerNumber === "S/N" && !p.number));
     }
     return null;
-  }, [state.teams, teamName, penalty.playerNumber, state.selectedMatchCategory]);
+  }, [state.teams, teamName, currentTeamSubName, state.selectedMatchCategory, penalty.playerNumber]);
 
   const isWaiting = penalty._status === 'pending_player' || penalty._status === 'pending_concurrent';
   const cardClasses = cn(
@@ -78,7 +84,7 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
           <div className="flex items-center gap-2 md:gap-3">
             <CagedUserIcon className="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10 text-primary-foreground" />
             <span className="font-semibold text-3xl md:text-4xl lg:text-5xl xl:text-6xl">
-              {penalty.playerNumber}
+              {penalty.playerNumber || 'S/N'}
               {renderPlayerAlias()}
             </span>
           </div>
