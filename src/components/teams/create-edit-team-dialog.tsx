@@ -29,7 +29,8 @@ const SPECIFIC_DEFAULT_LOGOS: Record<string, string> = {
   'OVEJAS NEGRAS': '/logos/Logo-OvejasNegras.png',
   'FANTASY SKATE': '/logos/Logo-FantasySkate.png',
   'ACEMHH': '/logos/Logo-ACEMHH.png',
-  'CAHHL': '/logos/Logo-CAHHL.png', // Added CAHHL logo
+  'CAHHL': '/logos/Logo-CAHHL.png',
+  'WINTER': '/logos/Logo-Winter.png', // Added Winter logo
 };
 
 function getSpecificDefaultLogoUrl(teamName: string): string | null {
@@ -348,3 +349,4 @@ export function CreateEditTeamDialog({
     
 
     
+
