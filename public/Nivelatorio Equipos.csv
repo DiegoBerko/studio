@@ -1,4 +1,4 @@
-Fantasy Skate,A
+Fantasy Skate,,A
 ,Suez,Jugador
 ,Sedran,Jugador
 ,Almat,Jugador
@@ -12,7 +12,7 @@ Fantasy Skate,A
 ,Kim Stahl,Jugador
 ,Rudenko,Arquero
 	
-Fantasy Skate,B	
+Fantasy Skate,,B	
 ,Cervini,Jugador
 ,De Luca,Jugador
 ,Grenier,Jugador
@@ -27,7 +27,7 @@ Fantasy Skate,B
 ,Winsnes,Arquero
 ,Saenz,Arquero
 
-Fantasy Skate,C
+Fantasy Skate,C,C
 ,Soto,Jugador
 ,Amed,Jugador
 ,Hofmann,Jugador
@@ -41,7 +41,7 @@ Fantasy Skate,C
 ,Conde,Arquero
 ,Sosa,Arquero
 
-Fantasy Skate C1,C	
+Fantasy Skate,C1,C	
 ,Lavalle,Jugador
 ,Maier,Jugador
 ,Nudelman,Jugador
@@ -53,7 +53,7 @@ Fantasy Skate C1,C
 ,Mishin,Jugador
 ,Suez,Arquero
 
-Winter,B
+Winter,,B
 ,Thompson,Jugador  
 ,Distefano,Jugador  
 ,Solimano,Jugador  
@@ -72,7 +72,7 @@ Winter,B
 ,Pipman,Jugador
 ,Baña,Jugador
 
-Ovejas Negras,B
+Ovejas Negras,,B
 ,Martinez,Jugador  
 ,Trofimov,Jugador  
 ,Val,Jugador  
@@ -94,7 +94,7 @@ Ovejas Negras,B
 ,Martin,Arquero  
 ,Cufre,Arquero
 
-Ovejas Negras Corderos,C
+Ovejas Negras,Corderos,C
 ,Rost,Jugador
 ,Fondacaro,Jugador
 ,Abeid,Jugador
@@ -109,7 +109,7 @@ Ovejas Negras Corderos,C
 ,Fernandez,Arquero
 ,Silva,Arquero
 
-Ovejas Negras Carneros,C
+Ovejas Negras,Carneros,C
 ,Pangione,Jugador
 ,Loto,Jugador
 ,D'Elia,Jugador
@@ -124,7 +124,7 @@ Ovejas Negras Carneros,C
 ,Fernandez,Arquero
 ,Silva,Arquero
 
-Hazard,B
+Hazard,,B
 ,Russo,Arquero
 ,Murias,Arquero
 ,Astort,Jugador
@@ -142,7 +142,7 @@ Hazard,B
 ,Soler,Jugador
 ,Wytrzes,Jugador
 
-Hazard,C
+Hazard,,C
 ,Carlo,Arquero
 ,Pieresko,Arquero
 ,Bonvehi,Arquero
@@ -162,7 +162,7 @@ Hazard,C
 ,Sanchez,Jugador
 ,Ponce,Jugador
 
-ACEMHH,A
+ACEMHH,,A
 ,SAVCHUK,Jugador
 ,MONTES,Jugador
 ,RENZO,Jugador
@@ -177,7 +177,7 @@ ACEMHH,A
 ,CHEVALLIER,Arquero
 ,TUBIO,Arquero
 
-ACEMHH,B
+ACEMHH,,B
 ,PARODI,Arquero
 ,AGUIRRE,Jugador
 ,BERKOVICS,Jugador
@@ -191,7 +191,7 @@ ACEMHH,B
 ,B. BURGES-WEBB,Jugador
 ,BARCIA,Jugador
 
-CAHHL,A
+CAHHL,,A
 ,Copello,Arquero
 ,García,Arquero
 ,Grabenheimer,Jugador
@@ -209,7 +209,7 @@ CAHHL,A
 ,Giuliodoro,Jugador
 ,Boix Mansilla,Jugador
 
-CAHHL,B
+CAHHL,,B
 ,Gutierrez,Arquero
 ,Bystrowicz,Arquero
 ,Lombraña,Jugador
@@ -224,7 +224,7 @@ CAHHL,B
 ,Haiek,Jugador
 ,Covernton,Jugador
 
-CAHHL,C
+CAHHL,,C
 ,Ricciotti,Arquero
 ,Lombraña,Arquero
 ,Machado,Arquero
@@ -238,4 +238,3 @@ CAHHL,C
 ,NIEVAS,Jugador
 ,Guitelman,Jugador
 ,VILLAGRA,Jugador
-
