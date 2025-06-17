@@ -118,6 +118,9 @@ export default function ManageTeamPage() {
         )}
         <div className="flex-grow text-center sm:text-left">
           <h1 className="text-3xl sm:text-4xl font-bold text-primary-foreground">{team.name}</h1>
+          {team.subName && (
+            <p className="text-lg sm:text-xl text-muted-foreground -mt-1">{team.subName}</p>
+          )}
           {categoryName && (
             <Badge variant="outline" className="mt-1.5 mb-1 text-sm">
                 <ListFilter className="mr-1.5 h-3.5 w-3.5" /> {categoryName}
