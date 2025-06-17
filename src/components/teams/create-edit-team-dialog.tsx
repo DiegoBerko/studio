@@ -30,7 +30,7 @@ const SPECIFIC_DEFAULT_LOGOS: Record<string, string> = {
   'FANTASY SKATE': '/logos/Logo-FantasySkate.png',
   'ACEMHH': '/logos/Logo-ACEMHH.png',
   'CAHHL': '/logos/Logo-CAHHL.png',
-  'WINTER': '/logos/Logo-Winter.png', // Added Winter logo
+  'WINTER': '/logos/Logo-Winter.png',
 };
 
 function getSpecificDefaultLogoUrl(teamName: string): string | null {
@@ -63,6 +63,7 @@ export function CreateEditTeamDialog({
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
   const [teamName, setTeamName] = useState("");
+  const [teamSubName, setTeamSubName] = useState(""); // New state for subName
   const [teamCategory, setTeamCategory] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null); // Can be data URI or null
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -74,19 +75,21 @@ export function CreateEditTeamDialog({
     if (isOpen) {
       if (isEditing && teamToEdit) {
         setTeamName(teamToEdit.name);
+        setTeamSubName(teamToEdit.subName || ""); // Initialize subName
         setTeamCategory(teamToEdit.category || (availableCategories.length > 0 ? availableCategories[0].id : ""));
         if (teamToEdit.logoDataUrl && teamToEdit.logoDataUrl.startsWith('data:image')) {
             setLogoPreview(teamToEdit.logoDataUrl);
         } else {
-            setLogoPreview(null); 
+            setLogoPreview(null);
         }
       } else {
         setTeamName("");
+        setTeamSubName(""); // Reset subName for new team
         setTeamCategory(availableCategories.length > 0 ? availableCategories[0].id : "");
         setLogoPreview(null);
       }
       if (fileInputRef.current) {
-        fileInputRef.current.value = ""; 
+        fileInputRef.current.value = "";
       }
     }
   }, [isOpen, teamToEdit, isEditing, availableCategories]);
@@ -120,18 +123,20 @@ export function CreateEditTeamDialog({
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      setLogoPreview(e.target?.result as string); 
+      setLogoPreview(e.target?.result as string);
     };
     reader.readAsDataURL(file);
   };
 
   const handleClearLogo = () => {
-    setLogoPreview(null); 
+    setLogoPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSubmit = () => {
     const trimmedTeamName = teamName.trim();
+    const trimmedTeamSubName = teamSubName.trim(); // Get trimmed subName
+
     if (!trimmedTeamName) {
       toast({
         title: "Nombre Requerido",
@@ -188,8 +193,9 @@ export function CreateEditTeamDialog({
 
     const teamPayload = {
       name: trimmedTeamName,
+      subName: trimmedTeamSubName || undefined, // Set to undefined if empty
       category: teamCategory,
-      logoDataUrl: finalLogoDataUrl, 
+      logoDataUrl: finalLogoDataUrl,
     };
 
     if (isEditing && teamToEdit) {
@@ -259,6 +265,18 @@ export function CreateEditTeamDialog({
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="teamSubName" className="text-right">
+              Sub-Nombre
+            </Label>
+            <Input
+              id="teamSubName"
+              value={teamSubName}
+              onChange={(e) => setTeamSubName(e.target.value)}
+              className="col-span-3"
+              placeholder="Opcional (ej. Liga, Serie, Año)"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="teamCategory" className="text-right">
               Categoría
             </Label>
@@ -310,7 +328,7 @@ export function CreateEditTeamDialog({
                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                     <UploadCloud className="mr-2 h-4 w-4" /> Cargar Logo
                   </Button>
-                  { (logoPreview && logoPreview.startsWith('data:image')) && ( 
+                  { (logoPreview && logoPreview.startsWith('data:image')) && (
                     <Button type="button" variant="ghost" size="sm" onClick={handleClearLogo} className="text-destructive hover:text-destructive">
                       <XCircle className="mr-2 h-4 w-4" /> Quitar Logo Cargado
                     </Button>
@@ -349,4 +367,5 @@ export function CreateEditTeamDialog({
     
 
     
+
 

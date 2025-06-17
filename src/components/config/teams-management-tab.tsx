@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef } from "react";
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlusCircle, Search, Users, Info, Upload, Download, ListFilter, FileText, Trash2, X } from "lucide-react";
 import { TeamListItem } from "@/components/teams/team-list-item";
-import { CreateEditTeamDialog, getSpecificDefaultLogoUrlForCsv } from "@/components/teams/create-edit-team-dialog"; // Import new getSpecificDefaultLogoUrlForCsv
+import { CreateEditTeamDialog, getSpecificDefaultLogoUrlForCsv } from "@/components/teams/create-edit-team-dialog";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import type { TeamData, PlayerData, PlayerType } from "@/types";
@@ -62,7 +63,8 @@ export function TeamsManagementTab() {
       return teamsToFilter.sort((a, b) => a.name.localeCompare(b.name));
     }
     return teamsToFilter.filter((team) =>
-      team.name.toLowerCase().includes(searchTerm.toLowerCase())
+      team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (team.subName && team.subName.toLowerCase().includes(searchTerm.toLowerCase()))
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [state.teams, searchTerm, categoryFilter]);
 
@@ -91,7 +93,7 @@ export function TeamsManagementTab() {
         return;
     }
 
-    const jsonString = JSON.stringify(state.teams, null, 2);
+    const jsonString = JSON.stringify(state.teams, null, 2); // subName will be included if present
     const blob = new Blob([jsonString], { type: "application/json" });
     const href = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -127,7 +129,8 @@ export function TeamsManagementTab() {
         if (!Array.isArray(importedData) || !importedData.every(item =>
             item && typeof item.id === 'string' &&
             typeof item.name === 'string' &&
-            (typeof item.category === 'string' || item.category === undefined || item.category === null) && 
+            (typeof item.category === 'string' || item.category === undefined || item.category === null) &&
+            (typeof item.subName === 'string' || item.subName === undefined || item.subName === null) && // Check for subName
             Array.isArray(item.players))
            ) {
           throw new Error("Archivo de equipos no válido o formato incorrecto. Se esperaba un array de equipos.");
@@ -136,6 +139,7 @@ export function TeamsManagementTab() {
         const validatedTeams = importedData.map(team => ({
           id: team.id,
           name: team.name,
+          subName: team.subName || undefined, // Add subName
           logoDataUrl: team.logoDataUrl || getSpecificDefaultLogoUrlForCsv(team.name),
           category: team.category || (state.availableCategories.length > 0 ? state.availableCategories[0].id : ''),
           players: Array.isArray(team.players) ? team.players.map((player: any) => ({
@@ -197,7 +201,7 @@ export function TeamsManagementTab() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const importedTeams: TeamData[] = [];
-      let currentTeamData: { name: string; categoryId: string; players: PlayerData[] } | null = null;
+      let currentTeamData: { name: string; subName?: string; categoryId: string; players: PlayerData[] } | null = null;
       let playerNumbersInCurrentTeam: Set<string> = new Set();
       let lineCounter = 0;
 
@@ -214,6 +218,7 @@ export function TeamsManagementTab() {
               importedTeams.push({
                 id: crypto.randomUUID(),
                 name: currentTeamData.name,
+                subName: currentTeamData.subName,
                 category: currentTeamData.categoryId,
                 logoDataUrl: getSpecificDefaultLogoUrlForCsv(currentTeamData.name),
                 players: currentTeamData.players,
@@ -226,11 +231,38 @@ export function TeamsManagementTab() {
 
           if (!currentTeamData) {
             const teamDataParts = trimmedLine.split(',');
-            if (teamDataParts.length !== 2 || !teamDataParts[0]?.trim() || !teamDataParts[1]?.trim()) {
-              throw new Error(`Error en la línea ${lineCounter} del CSV (encabezado de equipo): Formato incorrecto. Esperado 'NombreEquipo,NombreCategoria'.`);
+            let teamNameCsv: string;
+            let subNameCsv: string | undefined = undefined;
+            let categoryNameCsv: string;
+
+            if (teamDataParts.length === 3) {
+                teamNameCsv = teamDataParts[0].trim();
+                subNameCsv = teamDataParts[1].trim() || undefined; // if empty string, make it undefined
+                categoryNameCsv = teamDataParts[2].trim();
+            } else if (teamDataParts.length === 2) { // Legacy format or subName is empty
+                teamNameCsv = teamDataParts[0].trim();
+                // Check if the second part looks like a known category name to distinguish
+                // between (Team, Category) and (Team, SubName_empty, Category)
+                const potentialCategory = state.availableCategories.find(
+                    (cat) => cat.name.toLowerCase() === teamDataParts[1].trim().toLowerCase()
+                );
+                if (potentialCategory) { // Likely (Team, Category)
+                    subNameCsv = undefined;
+                    categoryNameCsv = teamDataParts[1].trim();
+                } else { // Assume (Team, SubName_empty, Category_is_actually_subname) is an error or needs clearer CSV structure
+                      // For simplicity, if 2 parts, assume subName is empty and second part is category.
+                      // More robust would be to check if teamDataParts[1] is a valid category.
+                      // If user intended (Team, SubName, Category) but SubName is empty they must use (Team,,Category)
+                    subNameCsv = undefined;
+                    categoryNameCsv = teamDataParts[1].trim();
+                }
+            } else {
+                throw new Error(`Error en la línea ${lineCounter} del CSV (encabezado de equipo): Formato incorrecto. Se esperan 2 o 3 columnas: 'NombreEquipo,[SubNombreOpcional],NombreCategoria'.`);
             }
-            const teamNameCsv = teamDataParts[0].trim();
-            const categoryNameCsv = teamDataParts[1].trim();
+
+            if (!teamNameCsv || !categoryNameCsv) {
+                throw new Error(`Error en la línea ${lineCounter} del CSV (encabezado de equipo): Nombre de equipo y nombre de categoría son obligatorios.`);
+            }
 
             const category = state.availableCategories.find(
               (cat) => cat.name.toLowerCase() === categoryNameCsv.toLowerCase()
@@ -250,10 +282,10 @@ export function TeamsManagementTab() {
               throw new Error(`El equipo "${teamNameCsv}" en la categoría "${categoryNameCsv}" (línea ${lineCounter}) ya existe en la aplicación.`);
             }
 
-            currentTeamData = { name: teamNameCsv, categoryId: categoryId, players: [] };
+            currentTeamData = { name: teamNameCsv, subName: subNameCsv, categoryId: categoryId, players: [] };
             playerNumbersInCurrentTeam = new Set();
 
-          } else {
+          } else { // Player data line
             const playerDataParts = trimmedLine.split(',');
             if (playerDataParts.length !== 3) {
               throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): Se esperan 3 columnas (Número,Nombre,Rol).`);
@@ -266,7 +298,7 @@ export function TeamsManagementTab() {
               throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): Nombre y Rol son obligatorios.`);
             }
 
-            if (playerNumber && !/^\d*$/.test(playerNumber)) { 
+            if (playerNumber && !/^\d*$/.test(playerNumber)) {
               throw new Error(`Error en la línea ${lineCounter} del CSV (jugador): El número de jugador "${playerNumber}" debe ser numérico si se proporciona.`);
             }
             if (playerNumber && playerNumbersInCurrentTeam.has(playerNumber)) {
@@ -298,6 +330,7 @@ export function TeamsManagementTab() {
           importedTeams.push({
             id: crypto.randomUUID(),
             name: currentTeamData.name,
+            subName: currentTeamData.subName,
             category: currentTeamData.categoryId,
             logoDataUrl: getSpecificDefaultLogoUrlForCsv(currentTeamData.name),
             players: currentTeamData.players,
@@ -309,7 +342,7 @@ export function TeamsManagementTab() {
         }
 
         importedTeams.forEach(team => {
-            dispatch({ type: 'ADD_TEAM', payload: team });
+            dispatch({ type: 'ADD_TEAM', payload: team as TeamData }); // Cast to TeamData
         });
         
         toast({
@@ -374,7 +407,7 @@ export function TeamsManagementTab() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
                 type="search"
-                placeholder="Buscar equipo por nombre..."
+                placeholder="Buscar por nombre o sub-nombre..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 text-base"
@@ -408,9 +441,9 @@ export function TeamsManagementTab() {
       ) : filteredTeams.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTeams.map((team) => (
-            <TeamListItem 
-                key={team.id} 
-                team={team} 
+            <TeamListItem
+                key={team.id}
+                team={team}
                 isSelectionMode={isDeleteSelectionMode}
                 isSelected={selectedTeamIdsForDeletion.includes(team.id)}
                 onToggleSelection={handleToggleTeamSelectionForDeletion}
@@ -477,8 +510,11 @@ export function TeamsManagementTab() {
         {!isDeleteSelectionMode && (
           <>
             <p className="text-sm text-muted-foreground">
-              Exporta todos tus equipos a un archivo JSON, o importa equipos desde un archivo JSON o CSV.
-              Formato CSV: Una línea vacía entre cada equipo. Cada equipo: NombreEquipo,NombreCategoría en la primera línea, seguido de Número,Nombre,Rol (Jugador/Arquero) para cada jugador en líneas subsiguientes.
+              Exporta todos tus equipos a un archivo JSON, o importa equipos desde un archivo CSV. <br/>
+              Formato CSV: Una línea vacía entre cada equipo. Cada equipo: <br/>
+              <code>NombreEquipo,SubNombreOpcional,NombreCategoría</code> en la primera línea, <br/>
+              seguido de <code>Número,NombreJugador,Rol (Jugador/Arquero)</code> para cada jugador en líneas subsiguientes. <br/>
+              Si no hay SubNombre, usar: <code>NombreEquipo,,NombreCategoría</code> (doble coma) o <code>NombreEquipo,NombreCategoría</code> (2 columnas).
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <Button onClick={prepareExportTeams} variant="outline" className="flex-1" disabled={state.teams.length === 0}>
@@ -585,3 +621,4 @@ export function TeamsManagementTab() {
     </div>
   );
 }
+

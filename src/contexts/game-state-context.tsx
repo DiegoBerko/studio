@@ -165,8 +165,8 @@ export type GameAction =
   | { type: 'RESET_CONFIG_TO_DEFAULTS' }
   | { type: 'RESET_GAME_STATE' }
   // Team Actions
-  | { type: 'ADD_TEAM'; payload: TeamData } // Changed: payload is full TeamData
-  | { type: 'UPDATE_TEAM_DETAILS'; payload: { teamId: string; name: string; category: string; logoDataUrl?: string | null } }
+  | { type: 'ADD_TEAM'; payload: Omit<TeamData, 'players'> & { id: string; players: PlayerData[] } }
+  | { type: 'UPDATE_TEAM_DETAILS'; payload: { teamId: string; name: string; subName?: string; category: string; logoDataUrl?: string | null } }
   | { type: 'DELETE_TEAM'; payload: { teamId: string } }
   | { type: 'ADD_PLAYER_TO_TEAM'; payload: { teamId: string; player: Omit<PlayerData, 'id'> } }
   | { type: 'UPDATE_PLAYER_IN_TEAM'; payload: { teamId: string; playerId: string; updates: Partial<Pick<PlayerData, 'name' | 'number'>> } }
@@ -245,8 +245,8 @@ const handleAutoTransition = (currentState: GameState): Omit<GameState, '_lastAc
     awayPenalties,
     playHornTrigger,
     teams,
-    availableCategories, 
-    selectedMatchCategory, 
+    availableCategories,
+    selectedMatchCategory,
     configName, defaultWarmUpDuration, autoStartWarmUp, autoStartTimeouts, defaultTimeoutDuration,
     maxConcurrentPenalties, playersPerTeamOnIce, playSoundAtPeriodEnd, customHornSoundDataUrl,
     enableTeamSelectionInMiniScoreboard, enablePlayerSelectionForPenalties,
@@ -452,7 +452,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...initialGlobalState,
         ...hydratedBasePartial,
         availableCategories: hydratedCategories, // Use robustly hydrated categories
-        teams: action.payload?.teams || initialGlobalState.teams, // Ensure teams is always an array
+        teams: (action.payload?.teams || initialGlobalState.teams).map(t => ({...t, subName: t.subName || undefined })), // Ensure teams is always an array and subName is correctly undefined
         playHornTrigger: initialGlobalState.playHornTrigger, // Reset playHornTrigger on hydration
       };
       
@@ -1098,7 +1098,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       if (!enablePlayerSelection){
         showAliasInSelector = false;
         showAliasInControls = false;
-        showAliasInScoreboard = false; 
+        showAliasInScoreboard = false;
       }
 
       // Robust category handling from file
@@ -1214,7 +1214,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     case 'ADD_TEAM': {
-      const newTeamWithId: TeamData = { ...action.payload, id: action.payload.id || crypto.randomUUID() };
+      const newTeamWithId: TeamData = {
+        ...action.payload,
+        id: action.payload.id || crypto.randomUUID(),
+        subName: action.payload.subName || undefined,
+        players: action.payload.players || [],
+      };
       newStateWithoutMeta = {
         ...state,
         teams: [...state.teams, newTeamWithId],
@@ -1226,7 +1231,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         teams: state.teams.map(team =>
           team.id === action.payload.teamId
-            ? { ...team, name: action.payload.name, category: action.payload.category, logoDataUrl: action.payload.logoDataUrl }
+            ? {
+                ...team,
+                name: action.payload.name,
+                subName: action.payload.subName || undefined,
+                category: action.payload.category,
+                logoDataUrl: action.payload.logoDataUrl,
+              }
             : team
         ),
       };
@@ -1272,10 +1283,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
               console.warn(`Duplicate player number ${updates.number} for team ${team.name} during update`);
               return { // Return team with player unchanged regarding number if duplicate
                 ...team,
-                players: team.players.map(player => 
+                players: team.players.map(player =>
                     player.id === playerId ? { ...player, name: updates.name ?? player.name } : player
                 )
-              }; 
+              };
             }
             return {
               ...team,
@@ -1305,6 +1316,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'LOAD_TEAMS_FROM_FILE':
       const validTeams = action.payload.map(team => ({
         ...team,
+        subName: team.subName || undefined,
         category: team.category || (state.availableCategories[0]?.id || '')
       }));
       newStateWithoutMeta = { ...state, teams: validTeams };
@@ -1363,11 +1375,11 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     hasHydratedRef.current = true;
-  
+
     const loadInitialState = async () => {
       let finalPayloadForHydration: Partial<GameState> = {};
       let loadedFromLocalStorage = false;
-  
+
       try {
         const rawStoredState = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (rawStoredState) {
@@ -1383,12 +1395,12 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
         console.error("Error reading state from localStorage:", error);
       }
-  
+
       if (!loadedFromLocalStorage) {
         console.log("localStorage is empty or invalid. Attempting to load defaults from files...");
         let configFromFile: Partial<ConfigFields> | null = null;
         let teamsFromFile: TeamData[] | null = null;
-  
+
         try {
           const configRes = await fetch('/defaults/default-config.json');
           if (configRes.ok) {
@@ -1400,7 +1412,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         } catch (error) {
           console.error('Error fetching default-config.json:', error);
         }
-  
+
         try {
           const teamsRes = await fetch('/defaults/default-teams.json');
           if (teamsRes.ok) {
@@ -1414,12 +1426,12 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         }
         
         finalPayloadForHydration = { ...initialGlobalState }; // Start with system defaults
-  
+
         if (configFromFile) {
           finalPayloadForHydration = { ...finalPayloadForHydration, ...configFromFile };
         }
         if (teamsFromFile) {
-          finalPayloadForHydration.teams = teamsFromFile;
+          finalPayloadForHydration.teams = teamsFromFile.map(t => ({...t, subName: t.subName || undefined}));
         }
         // Ensure _lastUpdatedTimestamp is not set if loading from files/initial,
         // so it doesn't overwrite a potentially newer state from another tab after this initial load.
@@ -1430,9 +1442,9 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       dispatch({ type: 'HYDRATE_FROM_STORAGE', payload: finalPayloadForHydration });
       setIsLoading(false);
     };
-  
+
     loadInitialState();
-  
+
     if ('BroadcastChannel' in window) {
       if (!channelRef.current) {
         channelRef.current = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
@@ -1444,7 +1456,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         }
       };
       channelRef.current.addEventListener('message', handleMessage);
-  
+
       return () => {
         if (channelRef.current) {
           channelRef.current.removeEventListener('message', handleMessage);
@@ -1453,7 +1465,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
     } else {
       console.warn('BroadcastChannel API not available. Multi-tab sync will not work.');
     }
-  
+
   }, []);
   
   useEffect(() => { // Separate effect for BroadcastChannel cleanup
@@ -1597,3 +1609,4 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
   const category = availableCategories.find(cat => cat && typeof cat === 'object' && cat.id === categoryId);
   return category ? category.name : undefined;
 };
+

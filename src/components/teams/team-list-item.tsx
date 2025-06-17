@@ -61,10 +61,10 @@ export function TeamListItem({ team, isSelectionMode = false, isSelected = false
           {categoryName}
         </Badge>
       )}
-      <CardHeader className="flex-row items-center gap-4 pb-3 pt-3">
+      <CardHeader className="flex-row items-start gap-4 pb-3 pt-3">
         {team.logoDataUrl ? (
           <Image
-            src={team.logoDataUrl} // Puede ser una URL completa, ruta relativa a public, o data URI
+            src={team.logoDataUrl} 
             alt={`${team.name} logo`}
             width={48}
             height={48}
@@ -77,6 +77,11 @@ export function TeamListItem({ team, isSelectionMode = false, isSelected = false
           <CardTitle className="text-xl font-semibold text-primary-foreground truncate pr-4">
             {team.name}
           </CardTitle>
+          {team.subName && (
+            <p className="text-sm text-muted-foreground truncate pr-4 -mt-0.5" title={team.subName}>
+              {team.subName}
+            </p>
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex-grow pt-2 pb-4 flex flex-col justify-end">
@@ -100,3 +105,4 @@ export function TeamListItem({ team, isSelectionMode = false, isSelected = false
 }
 
     
+
