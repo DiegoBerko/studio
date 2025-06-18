@@ -17,11 +17,11 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
   const preTimeoutTimeCs = state.preTimeoutState?.time;
   const isPreTimeoutLastMinute = typeof preTimeoutTimeCs === 'number' && preTimeoutTimeCs < 6000 && preTimeoutTimeCs >= 0;
 
-  const getWinnerText = () => {
+  const getWinnerName = () => {
     if (state.homeScore > state.awayScore) {
-      return `Ganador ${state.homeTeamName || 'Local'}`;
+      return state.homeTeamName || 'Local';
     } else if (state.awayScore > state.homeScore) {
-      return `Ganador ${state.awayTeamName || 'Visitante'}`;
+      return state.awayTeamName || 'Visitante';
     } else {
       return "Empate";
     }
@@ -31,15 +31,18 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
     <div className={cn("text-center", className)}>
       {state.periodDisplayOverride === "End of Game" ? (
         <div className={cn(
-          "text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold font-headline text-accent tracking-tight py-4 md:py-6 lg:py-8", // Tamaño reducido
+          "font-bold font-headline text-accent tracking-tight py-4 md:py-6 lg:py-8 flex flex-col items-center justify-center",
           className
         )}>
-          {getWinnerText()}
+          <span className="text-xl md:text-3xl lg:text-4xl xl:text-5xl">Ganador</span>
+          <span className="text-3xl md:text-5xl lg:text-6xl xl:text-7xl mt-1 md:mt-2">
+            {getWinnerName()}
+          </span>
         </div>
       ) : (
         <div className={cn(
             "text-8xl md:text-[10rem] lg:text-[12rem] xl:text-[14rem] font-bold font-headline tabular-nums tracking-tighter",
-            isMainClockLastMinute ? "text-orange-500" : "text-accent" 
+            isMainClockLastMinute ? "text-orange-500" : "text-accent"
           )}>
           {formatTime(state.currentTime, { showTenths: isMainClockLastMinute, includeMinutesForTenths: false })}
         </div>
@@ -73,4 +76,3 @@ export function ClockDisplay({ className }: ClockDisplayProps) {
     </div>
   );
 }
-    
