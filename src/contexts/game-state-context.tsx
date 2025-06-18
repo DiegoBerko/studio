@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
-import type { Penalty, Team, TeamData, PlayerData, CategoryData } from '@/types';
+import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields } from '@/types';
 
 // --- Constantes para la sincronización local ---
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
@@ -51,6 +51,7 @@ const INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES = true;
 const INITIAL_AVAILABLE_CATEGORIES_RAW = ['A', 'B', 'C', 'Menores', 'Damas'];
 const INITIAL_AVAILABLE_CATEGORIES: CategoryData[] = INITIAL_AVAILABLE_CATEGORIES_RAW.map(name => ({ id: name, name: name }));
 const INITIAL_SELECTED_MATCH_CATEGORY = INITIAL_AVAILABLE_CATEGORIES[0]?.id || '';
+const INITIAL_IS_MONITOR_MODE_ENABLED = false;
 
 
 type PeriodDisplayOverrideType = "Warm-up" | "Break" | "Pre-OT Break" | "Time Out" | "End of Game" | null;
@@ -62,35 +63,6 @@ interface PreTimeoutState {
   override: PeriodDisplayOverrideType;
   clockStartTimeMs: number | null;
   remainingTimeAtStartCs: number | null; // Stored in centiseconds
-}
-
-export interface ConfigFields {
-  configName: string;
-  defaultWarmUpDuration: number; // Stored in centiseconds
-  defaultPeriodDuration: number; // Stored in centiseconds
-  defaultOTPeriodDuration: number; // Stored in centiseconds
-  defaultBreakDuration: number; // Stored in centiseconds
-  defaultPreOTBreakDuration: number; // Stored in centiseconds
-  defaultTimeoutDuration: number; // Stored in centiseconds
-  maxConcurrentPenalties: number;
-  autoStartWarmUp: boolean;
-  autoStartBreaks: boolean;
-  autoStartPreOTBreaks: boolean;
-  autoStartTimeouts: boolean;
-  numberOfRegularPeriods: number;
-  numberOfOvertimePeriods: number;
-  playersPerTeamOnIce: number;
-  playSoundAtPeriodEnd: boolean;
-  customHornSoundDataUrl: string | null;
-  // New team config fields
-  enableTeamSelectionInMiniScoreboard: boolean; // Master "Enable Team Usage" switch
-  enablePlayerSelectionForPenalties: boolean;
-  showAliasInPenaltyPlayerSelector: boolean;
-  showAliasInControlsPenaltyList: boolean;
-  showAliasInScoreboardPenalties: boolean;
-  // Category config fields
-  availableCategories: CategoryData[];
-  selectedMatchCategory: string;
 }
 
 interface GameState extends ConfigFields {
@@ -161,6 +133,7 @@ export type GameAction =
   | { type: 'SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES'; payload: boolean }
+  | { type: 'SET_MONITOR_MODE_ENABLED'; payload: boolean } // New action for Monitor Mode
   // Category Actions
   | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
   | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
@@ -215,6 +188,7 @@ const initialGlobalState: GameState = {
   showAliasInPenaltyPlayerSelector: INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR,
   showAliasInControlsPenaltyList: INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
   showAliasInScoreboardPenalties: INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
+  isMonitorModeEnabled: INITIAL_IS_MONITOR_MODE_ENABLED, // Initialize Monitor Mode
   // Category Defaults
   availableCategories: INITIAL_AVAILABLE_CATEGORIES,
   selectedMatchCategory: INITIAL_SELECTED_MATCH_CATEGORY,
@@ -418,6 +392,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         playHornTrigger: initialGlobalState.playHornTrigger, // Reset playHornTrigger on hydration
         homeTeamSubName: action.payload?.homeTeamSubName,
         awayTeamSubName: action.payload?.awayTeamSubName,
+        isMonitorModeEnabled: action.payload?.isMonitorModeEnabled ?? initialGlobalState.isMonitorModeEnabled,
       };
       
       // Ensure selectedMatchCategory is valid against the (potentially converted) hydratedCategories
@@ -1067,6 +1042,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES':
       newStateWithoutMeta = { ...state, showAliasInScoreboardPenalties: action.payload };
       break;
+    case 'SET_MONITOR_MODE_ENABLED':
+      newStateWithoutMeta = { ...state, isMonitorModeEnabled: action.payload };
+      break;
     case 'SET_AVAILABLE_CATEGORIES':
       newStateWithoutMeta = { ...state, availableCategories: action.payload };
       if (!action.payload.find(c => c.id === state.selectedMatchCategory) && action.payload.length > 0) {
@@ -1144,6 +1122,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInPenaltyPlayerSelector: showAliasInSelector,
         showAliasInControlsPenaltyList: showAliasInControls,
         showAliasInScoreboardPenalties: showAliasInScoreboard,
+        isMonitorModeEnabled: config.isMonitorModeEnabled ?? state.isMonitorModeEnabled,
         availableCategories: importedCategoriesFromFile,
         selectedMatchCategory: importedSelectedMatchCategory,
       };
@@ -1177,6 +1156,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInPenaltyPlayerSelector: INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR,
         showAliasInControlsPenaltyList: INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
         showAliasInScoreboardPenalties: INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
+        isMonitorModeEnabled: INITIAL_IS_MONITOR_MODE_ENABLED,
         availableCategories: INITIAL_AVAILABLE_CATEGORIES,
         selectedMatchCategory: INITIAL_SELECTED_MATCH_CATEGORY,
       };

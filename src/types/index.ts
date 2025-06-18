@@ -34,3 +34,31 @@ export interface CategoryData {
   name: string;
 }
 
+// Combined ConfigFields
+export interface ConfigFields {
+  configName: string;
+  defaultWarmUpDuration: number;
+  defaultPeriodDuration: number;
+  defaultOTPeriodDuration: number;
+  defaultBreakDuration: number;
+  defaultPreOTBreakDuration: number;
+  defaultTimeoutDuration: number;
+  maxConcurrentPenalties: number;
+  autoStartWarmUp: boolean;
+  autoStartBreaks: boolean;
+  autoStartPreOTBreaks: boolean;
+  autoStartTimeouts: boolean;
+  numberOfRegularPeriods: number;
+  numberOfOvertimePeriods: number;
+  playersPerTeamOnIce: number;
+  playSoundAtPeriodEnd: boolean;
+  customHornSoundDataUrl: string | null;
+  enableTeamSelectionInMiniScoreboard: boolean;
+  enablePlayerSelectionForPenalties: boolean;
+  showAliasInPenaltyPlayerSelector: boolean;
+  showAliasInControlsPenaltyList: boolean;
+  showAliasInScoreboardPenalties: boolean;
+  availableCategories: CategoryData[];
+  selectedMatchCategory: string;
+  isMonitorModeEnabled: boolean; // New field for Monitor Mode
+}

@@ -29,6 +29,7 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
   const [localShowAliasInSelector, setLocalShowAliasInSelector] = useState(state.showAliasInPenaltyPlayerSelector);
   const [localShowAliasInControlsList, setLocalShowAliasInControlsList] = useState(state.showAliasInControlsPenaltyList);
   const [localShowAliasInScoreboard, setLocalShowAliasInScoreboard] = useState(state.showAliasInScoreboardPenalties);
+  const [localIsMonitorModeEnabled, setLocalIsMonitorModeEnabled] = useState(state.isMonitorModeEnabled);
   const [isDirtyLocal, setIsDirtyLocal] = useState(false);
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
       setLocalShowAliasInSelector(state.showAliasInPenaltyPlayerSelector);
       setLocalShowAliasInControlsList(state.showAliasInControlsPenaltyList);
       setLocalShowAliasInScoreboard(state.showAliasInScoreboardPenalties);
+      setLocalIsMonitorModeEnabled(state.isMonitorModeEnabled);
     }
   }, [
     state.enableTeamSelectionInMiniScoreboard, 
@@ -49,6 +51,7 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
     state.showAliasInPenaltyPlayerSelector,
     state.showAliasInControlsPenaltyList,
     state.showAliasInScoreboardPenalties,
+    state.isMonitorModeEnabled,
     isDirtyLocal,
   ]);
 
@@ -81,6 +84,8 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
         dispatch({ type: "SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES", payload: false });
       }
       
+      dispatch({ type: "SET_MONITOR_MODE_ENABLED", payload: localIsMonitorModeEnabled });
+      
       setIsDirtyLocal(false);
       return true; 
     },
@@ -90,6 +95,7 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
       setLocalShowAliasInSelector(state.showAliasInPenaltyPlayerSelector);
       setLocalShowAliasInControlsList(state.showAliasInControlsPenaltyList);
       setLocalShowAliasInScoreboard(state.showAliasInScoreboardPenalties);
+      setLocalIsMonitorModeEnabled(state.isMonitorModeEnabled);
       setIsDirtyLocal(false);
     },
     getIsDirty: () => {
@@ -98,6 +104,7 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
       if (localShowAliasInSelector !== state.showAliasInPenaltyPlayerSelector) return true;
       if (localShowAliasInControlsList !== state.showAliasInControlsPenaltyList) return true;
       if (localShowAliasInScoreboard !== state.showAliasInScoreboardPenalties) return true;
+      if (localIsMonitorModeEnabled !== state.isMonitorModeEnabled) return true;
       return false;
     },
   }));
@@ -124,7 +131,7 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
   };
 
   return (
-    <ControlCardWrapper title="Configuración de Display (Alias y Selección)">
+    <ControlCardWrapper title="Configuración de Display (Alias, Selección y Monitor)">
       <div className="space-y-6">
         <div className="flex items-center justify-between p-4 border rounded-md bg-card shadow-sm">
           <Label htmlFor="enableTeamUsageSwitch" className="flex flex-col space-y-1">
@@ -209,9 +216,23 @@ export const TeamSettingsCard = forwardRef<TeamSettingsCardRef, TeamSettingsCard
                 </div>
             </div>
         </div>
+         <div className="flex items-center justify-between p-4 border rounded-md bg-card shadow-sm">
+          <Label htmlFor="monitorModeSwitch" className="flex flex-col space-y-1">
+            <span className="font-semibold text-base">Modo Monitor</span>
+            <span className="font-normal leading-snug text-muted-foreground text-xs">
+              Optimiza la visualización para monitores (ej. TV): mayor padding izquierdo, sin padding derecho, y oculta títulos de penalidades.
+            </span>
+          </Label>
+          <Switch
+            id="monitorModeSwitch"
+            checked={localIsMonitorModeEnabled}
+            onCheckedChange={(checked) => { setLocalIsMonitorModeEnabled(checked); markDirty(); }}
+          />
+        </div>
       </div>
     </ControlCardWrapper>
   );
 });
 
 TeamSettingsCard.displayName = "TeamSettingsCard";
+

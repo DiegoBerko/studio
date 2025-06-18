@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Undo2, Upload, Download, RotateCcw } from 'lucide-react';
-import { useGameState, type ConfigFields, type GameState } from '@/contexts/game-state-context'; // GameState for initialGlobalState
+import { useGameState, type ConfigFields } from '@/contexts/game-state-context';
 import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
@@ -212,6 +212,7 @@ export default function ConfigPage() {
       showAliasInPenaltyPlayerSelector: state.showAliasInPenaltyPlayerSelector,
       showAliasInControlsPenaltyList: state.showAliasInControlsPenaltyList,
       showAliasInScoreboardPenalties: state.showAliasInScoreboardPenalties,
+      isMonitorModeEnabled: state.isMonitorModeEnabled,
       availableCategories: state.availableCategories,
       selectedMatchCategory: state.selectedMatchCategory,
     };
@@ -283,6 +284,7 @@ export default function ConfigPage() {
           showAliasInPenaltyPlayerSelector: importedConfig.showAliasInPenaltyPlayerSelector ?? state.showAliasInPenaltyPlayerSelector,
           showAliasInControlsPenaltyList: importedConfig.showAliasInControlsPenaltyList ?? state.showAliasInControlsPenaltyList,
           showAliasInScoreboardPenalties: importedConfig.showAliasInScoreboardPenalties ?? state.showAliasInScoreboardPenalties,
+          isMonitorModeEnabled: importedConfig.isMonitorModeEnabled ?? state.isMonitorModeEnabled,
           availableCategories: importedConfig.availableCategories ?? state.availableCategories,
           selectedMatchCategory: importedConfig.selectedMatchCategory ?? state.selectedMatchCategory,
         };
@@ -469,7 +471,7 @@ export default function ConfigPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Restablecimiento</AlertDialogTitle>
               <AlertDialogDescription>
-                Esto restablecerá TODAS las configuraciones de esta página (nombre, duraciones, máximos, arranques automáticos, número de períodos, jugadores en cancha, sonido, configuraciones de equipo/alias y categorías) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer. ¿Estás seguro?
+                Esto restablecerá TODAS las configuraciones de esta página (nombre, duraciones, máximos, arranques automáticos, número de períodos, jugadores en cancha, sonido, configuraciones de equipo/alias, modo monitor y categorías) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer. ¿Estás seguro?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -484,3 +486,4 @@ export default function ConfigPage() {
     </div>
   );
 }
+
