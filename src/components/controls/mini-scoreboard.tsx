@@ -116,14 +116,14 @@ export function MiniScoreboard() {
     const isFirstGameAction = state.currentPeriod === 0 &&
                               state.periodDisplayOverride === 'Warm-up' &&
                               state.currentTime === state.defaultWarmUpDuration;
-    const hasDefaultTeamNames = state.homeTeamName.trim().toUpperCase() === 'LOCAL' ||
-                                state.awayTeamName.trim().toUpperCase() === 'VISITANTE';
+    const hasDefaultTeamNames = (state.homeTeamName.trim().toUpperCase() === 'LOCAL' || state.homeTeamName.trim() === '') ||
+                                (state.awayTeamName.trim().toUpperCase() === 'VISITANTE' || state.awayTeamName.trim() === '');
 
     if (!state.isClockRunning && isFirstGameAction && hasDefaultTeamNames && state.enableTeamSelectionInMiniScoreboard) {
       checkAndConfirm(
         true,
         "Nombres de Equipo por Defecto",
-        "Uno o ambos equipos aún tienen los nombres predeterminados ('Local', 'Visitante'). ¿Deseas iniciar la entrada en calor de todas formas o prefieres actualizar los nombres primero?",
+        "Uno o ambos equipos aún tienen los nombres predeterminados ('Local', 'Visitante') o están vacíos. ¿Deseas iniciar la entrada en calor de todas formas o prefieres actualizar los nombres primero?",
         () => dispatch({ type: 'TOGGLE_CLOCK' })
       );
     } else {
@@ -164,7 +164,7 @@ export function MiniScoreboard() {
           title: "Regreso al Último Período",
           description: `Se ha vuelto a ${getPeriodText(lastGamePeriod, state.numberOfRegularPeriods)}. El reloj está pausado.`,
         });
-      } else { // Only Warm-up was configured, or MAX_TOTAL_GAME_PERIODS is 0
+      } else { 
         dispatch({ type: 'SET_PERIOD', payload: 0 });
         toast({
           title: "Regreso a Entrada en Calor",
@@ -279,7 +279,7 @@ export function MiniScoreboard() {
             `El descanso no ha finalizado. ¿Estás seguro de que quieres iniciar ${getPeriodText(nextNumericPeriod, state.numberOfRegularPeriods)}?`,
             actionToConfirm
         );
-      } else { // Trying to advance beyond the last configured period from a break
+      } else { 
         const actionToConfirm = () => {
           dispatch({ type: 'MANUAL_END_GAME' });
           toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
@@ -294,7 +294,7 @@ export function MiniScoreboard() {
         );
       }
     } else if (state.periodDisplayOverride === null) { // Active game period
-      if (state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) { // Is it the last possible period (and there are periods)
+      if (state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) { 
         const actionToConfirm = () => {
           dispatch({ type: 'MANUAL_END_GAME' });
           toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
@@ -306,7 +306,7 @@ export function MiniScoreboard() {
           "El reloj del último período aún tiene tiempo. ¿Estás seguro de que quieres finalizar el partido ahora?",
           actionToConfirm
         );
-      } else if (MAX_TOTAL_GAME_PERIODS === 0 && state.currentPeriod === 0) { // Only warm-up, next action should be end game
+      } else if (MAX_TOTAL_GAME_PERIODS === 0 && state.currentPeriod === 0) { 
          const actionToConfirm = () => {
           dispatch({ type: 'MANUAL_END_GAME' });
           toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
@@ -318,7 +318,7 @@ export function MiniScoreboard() {
           "La entrada en calor aún tiene tiempo. ¿Estás seguro de que quieres finalizar el partido ahora?",
           actionToConfirm
         );
-      } else { // Not the last period, start a break
+      } else { 
         const actionToConfirm = () => {
           const isPreOT = state.currentPeriod >= state.numberOfRegularPeriods;
           const breakType = isPreOT ? "Pre-OT Break" : "Break";
@@ -359,7 +359,7 @@ export function MiniScoreboard() {
   }
 
 
-  const showNextActionButton = (state.currentTime <= 0 && !state.isClockRunning && state.periodDisplayOverride !== "End of Game") || (state.periodDisplayOverride === null && ((state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) || (MAX_TOTAL_GAME_PERIODS === 0 && state.currentPeriod === 0)));
+  const showNextActionButton = state.currentTime <= 0 && !state.isClockRunning && state.periodDisplayOverride !== "End of Game";
 
 
   let nextActionButtonText = "Siguiente";
@@ -369,11 +369,11 @@ export function MiniScoreboard() {
     if (MAX_TOTAL_GAME_PERIODS > 0) {
         nextActionButtonText = "Iniciar 1er Período";
     } else {
-        nextActionButtonText = "Finalizar Partido"; // Only warm-up exists
+        nextActionButtonText = "Finalizar Partido"; 
     }
-  } else if (state.periodDisplayOverride === null && state.currentPeriod < MAX_TOTAL_GAME_PERIODS && state.currentTime <= 0) {
+  } else if (state.periodDisplayOverride === null && state.currentTime <= 0 && state.currentPeriod < MAX_TOTAL_GAME_PERIODS) {
     nextActionButtonText = "Iniciar Descanso";
-  } else if (state.periodDisplayOverride === null && ((state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) || (MAX_TOTAL_GAME_PERIODS === 0 && state.currentPeriod === 0))) {
+  } else if (state.periodDisplayOverride === null && state.currentTime <= 0 && ((state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) || (MAX_TOTAL_GAME_PERIODS === 0 && state.currentPeriod === 0))) {
      nextActionButtonText = "Finalizar Partido";
   } else if ((state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") && state.currentTime <= 0) {
      if (state.currentPeriod + 1 <= MAX_TOTAL_GAME_PERIODS) {
@@ -584,7 +584,7 @@ export function MiniScoreboard() {
               )}
             </div>
              <div className="relative w-full max-w-xs mx-auto my-1">
-                <div className="flex items-center justify-center">
+                 <div className="flex items-center justify-center">
                     {showHomeSearchIcon && (
                         <Button variant="ghost" size="icon" className={cn("h-7 w-7 shrink-0")} asChild>
                              <Popover open={isHomeTeamSearchOpen} onOpenChange={setIsHomeTeamSearchOpen}>
