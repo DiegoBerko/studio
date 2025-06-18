@@ -1,0 +1,48 @@
+{
+  "configName": "Configuración Predeterminada",
+  "defaultWarmUpDuration": 30000,
+  "defaultPeriodDuration": 120000,
+  "defaultOTPeriodDuration": 30000,
+  "defaultBreakDuration": 12000,
+  "defaultPreOTBreakDuration": 6000,
+  "defaultTimeoutDuration": 3000,
+  "maxConcurrentPenalties": 1,
+  "autoStartWarmUp": false,
+  "autoStartBreaks": true,
+  "autoStartPreOTBreaks": true,
+  "autoStartTimeouts": true,
+  "numberOfRegularPeriods": 2,
+  "numberOfOvertimePeriods": 0,
+  "playersPerTeamOnIce": 3,
+  "playSoundAtPeriodEnd": true,
+  "customHornSoundDataUrl": null,
+  "enableTeamSelectionInMiniScoreboard": true,
+  "enablePlayerSelectionForPenalties": true,
+  "showAliasInPenaltyPlayerSelector": true,
+  "showAliasInControlsPenaltyList": true,
+  "showAliasInScoreboardPenalties": true,
+  "isMonitorModeEnabled": false,
+  "availableCategories": [
+    {
+      "id": "A",
+      "name": "A"
+    },
+    {
+      "id": "B",
+      "name": "B"
+    },
+    {
+      "id": "C",
+      "name": "C"
+    },
+    {
+      "id": "Menores",
+      "name": "Menores"
+    },
+    {
+      "id": "Damas",
+      "name": "Damas"
+    }
+  ],
+  "selectedMatchCategory": "C"
+}
