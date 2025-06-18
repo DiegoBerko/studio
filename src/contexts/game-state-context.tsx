@@ -312,19 +312,17 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
   let concurrentRunningCount = 0;
 
   for (const p of penalties) {
-    // Si la penalidad es 'pending_puck', mantenerla así y no procesarla para correr
     if (p._status === 'pending_puck') {
       newPenalties.push({ ...p });
       continue;
     }
 
-    let currentStatus: Penalty['_status'] = undefined;
+    // If a penalty's time is up, it should not be included in the new list.
     if (p.remainingTime <= 0) {
-      newPenalties.push({ ...p, _status: undefined }); // Ya no está activa
-      continue;
+      continue; // Skip this penalty, effectively removing it.
     }
 
-    // Solo considerar penalidades que no son 'pending_puck' para la lógica de slots
+    let currentStatus: Penalty['_status'] = undefined;
     if (p.playerNumber && activePlayerTickets.has(p.playerNumber)) {
       currentStatus = 'pending_player';
     } else if (concurrentRunningCount < maxConcurrent) {
@@ -351,11 +349,8 @@ const statusOrderValues: Record<NonNullable<Penalty['_status']>, number> = {
 const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
   const penaltiesToSort = [...penalties];
   return penaltiesToSort.sort((a, b) => {
-    const aStatusVal = a._status ? (statusOrderValues[a._status] ?? 5) : 5; // undefined (activas sin espera) al principio
-    const bStatusVal = b._status ? (statusOrderValues[b._status] ?? 5) : 5;
-
-    if (a._status === undefined && b._status !== undefined) return -1; // undefined (activas) antes que cualquier status
-    if (a._status !== undefined && b._status === undefined) return 1;
+    const aStatusVal = a._status ? (statusOrderValues[a._status] ?? 5) : 0; // Penalties without a status (e.g., just finished or newly added before puck) are treated as primary
+    const bStatusVal = b._status ? (statusOrderValues[b._status] ?? 5) : 0;
 
     if (aStatusVal !== bStatusVal) {
       return aStatusVal - bStatusVal;
@@ -1593,3 +1588,4 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
 
 
     
+
