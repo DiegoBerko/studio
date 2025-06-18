@@ -317,9 +317,8 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
       continue;
     }
 
-    // If a penalty's time is up, it should not be included in the new list.
     if (p.remainingTime <= 0) {
-      continue; // Skip this penalty, effectively removing it.
+      continue;
     }
 
     let currentStatus: Penalty['_status'] = undefined;
@@ -343,13 +342,13 @@ const statusOrderValues: Record<NonNullable<Penalty['_status']>, number> = {
   running: 1,
   pending_player: 2,
   pending_concurrent: 3,
-  pending_puck: 4, // Las 'pending_puck' se mostrarán al final
+  pending_puck: 4,
 };
 
 const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
   const penaltiesToSort = [...penalties];
   return penaltiesToSort.sort((a, b) => {
-    const aStatusVal = a._status ? (statusOrderValues[a._status] ?? 5) : 0; // Penalties without a status (e.g., just finished or newly added before puck) are treated as primary
+    const aStatusVal = a._status ? (statusOrderValues[a._status] ?? 5) : 0;
     const bStatusVal = b._status ? (statusOrderValues[b._status] ?? 5) : 0;
 
     if (aStatusVal !== bStatusVal) {
@@ -359,8 +358,16 @@ const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
   });
 };
 
-const cleanPenaltiesForStorage = (penalties?: Penalty[]): Omit<Penalty, '_status'>[] => {
-    return (penalties || []).map(({ _status, ...p }) => p);
+const cleanPenaltiesForStorage = (penalties?: Penalty[]): Penalty[] => {
+  if (!penalties) return [];
+  return penalties.map(p => {
+    if (p._status && p._status !== 'pending_puck') {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { _status, ...rest } = p;
+      return rest as Penalty; // Cast as Penalty, _status will be undefined
+    }
+    return p; // Keep penalty as is if _status is 'pending_puck' or undefined
+  });
 };
 
 
@@ -414,11 +421,15 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       hydratedBase.clockStartTimeMs = null;
       hydratedBase.remainingTimeAtStartCs = null;
 
-      let rawHomePenalties = cleanPenaltiesForStorage(action.payload?.homePenalties as Penalty[] | undefined);
-      let rawAwayPenalties = cleanPenaltiesForStorage(action.payload?.awayPenalties as Penalty[] | undefined);
+      const rawHomePenaltiesFromStorage = action.payload?.homePenalties || [];
+      const rawAwayPenaltiesFromStorage = action.payload?.awayPenalties || [];
 
-      hydratedBase.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(rawHomePenalties as Penalty[], hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties));
-      hydratedBase.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(rawAwayPenalties as Penalty[], hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties));
+      hydratedBase.homePenalties = sortPenaltiesByStatus(
+        updatePenaltyStatusesOnly(rawHomePenaltiesFromStorage as Penalty[], hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties)
+      );
+      hydratedBase.awayPenalties = sortPenaltiesByStatus(
+        updatePenaltyStatusesOnly(rawAwayPenaltiesFromStorage as Penalty[], hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties)
+      );
 
 
       let initialHydratedTimeCs: number;
@@ -1588,4 +1599,5 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
 
 
     
+
 
