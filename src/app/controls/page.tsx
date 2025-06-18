@@ -235,6 +235,10 @@ export default function ControlsPage() {
     <div className="w-full max-w-5xl mx-auto space-y-8">
       <MiniScoreboard />
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <TimeControlCard />
+      </div>
+
       {hasPendingPuckPenalties && (
         <div className="my-6 flex justify-center">
           <Button
@@ -249,9 +253,6 @@ export default function ControlsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <TimeControlCard />
-      </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <PenaltyControlCard team="home" teamName={state.homeTeamName} />
         <PenaltyControlCard team="away" teamName={state.awayTeamName} />
