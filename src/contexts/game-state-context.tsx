@@ -99,6 +99,7 @@ export type GameAction =
   | { type: 'REMOVE_PENALTY'; payload: { team: Team; penaltyId: string } }
   | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } }
   | { type: 'REORDER_PENALTIES'; payload: { team: Team; startIndex: number; endIndex: number } }
+  | { type: 'ACTIVATE_PENDING_PUCK_PENALTIES' } // New action for pending puck
   | { type: 'TICK' }
   | { type: 'SET_HOME_TEAM_NAME'; payload: string }
   | { type: 'SET_HOME_TEAM_SUB_NAME'; payload?: string }
@@ -311,17 +312,24 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
   let concurrentRunningCount = 0;
 
   for (const p of penalties) {
-    let currentStatus: Penalty['_status'] = undefined;
-    if (p.remainingTime <= 0) {
-      newPenalties.push({ ...p, _status: undefined });
+    // Si la penalidad es 'pending_puck', mantenerla así y no procesarla para correr
+    if (p._status === 'pending_puck') {
+      newPenalties.push({ ...p });
       continue;
     }
 
-    if (p.playerNumber && activePlayerTickets.has(p.playerNumber)) { // Check if playerNumber exists before adding to Set
+    let currentStatus: Penalty['_status'] = undefined;
+    if (p.remainingTime <= 0) {
+      newPenalties.push({ ...p, _status: undefined }); // Ya no está activa
+      continue;
+    }
+
+    // Solo considerar penalidades que no son 'pending_puck' para la lógica de slots
+    if (p.playerNumber && activePlayerTickets.has(p.playerNumber)) {
       currentStatus = 'pending_player';
     } else if (concurrentRunningCount < maxConcurrent) {
       currentStatus = 'running';
-      if (p.playerNumber) { // Check if playerNumber exists
+      if (p.playerNumber) {
           activePlayerTickets.add(p.playerNumber);
       }
       concurrentRunningCount++;
@@ -337,13 +345,17 @@ const statusOrderValues: Record<NonNullable<Penalty['_status']>, number> = {
   running: 1,
   pending_player: 2,
   pending_concurrent: 3,
+  pending_puck: 4, // Las 'pending_puck' se mostrarán al final
 };
 
 const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
   const penaltiesToSort = [...penalties];
   return penaltiesToSort.sort((a, b) => {
-    const aStatusVal = a._status ? (statusOrderValues[a._status] ?? 4) : 4;
-    const bStatusVal = b._status ? (statusOrderValues[b._status] ?? 4) : 4;
+    const aStatusVal = a._status ? (statusOrderValues[a._status] ?? 5) : 5; // undefined (activas sin espera) al principio
+    const bStatusVal = b._status ? (statusOrderValues[b._status] ?? 5) : 5;
+
+    if (a._status === undefined && b._status !== undefined) return -1; // undefined (activas) antes que cualquier status
+    if (a._status !== undefined && b._status === undefined) return 1;
 
     if (aStatusVal !== bStatusVal) {
       return aStatusVal - bStatusVal;
@@ -667,7 +679,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...action.payload.penalty,
         initialDuration: action.payload.penalty.initialDuration,
         remainingTime: action.payload.penalty.remainingTime,
-        id: (typeof window !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random().toString(36).slice(2))
+        id: (typeof window !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random().toString(36).slice(2)),
+        _status: 'pending_puck', // Nueva penalidad inicia como 'pending_puck'
       };
       let penalties = [...state[`${action.payload.team}Penalties`], newPenalty];
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
@@ -709,6 +722,21 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newStateWithoutMeta = { ...state, [`${team}Penalties`]: reorderedPenalties };
       break;
     }
+    case 'ACTIVATE_PENDING_PUCK_PENALTIES': {
+      const activate = (penalties: Penalty[]): Penalty[] =>
+        penalties.map(p => p._status === 'pending_puck' ? { ...p, _status: undefined } : p);
+
+      let homePenalties = activate(state.homePenalties);
+      let awayPenalties = activate(state.awayPenalties);
+
+      homePenalties = updatePenaltyStatusesOnly(homePenalties, state.maxConcurrentPenalties);
+      homePenalties = sortPenaltiesByStatus(homePenalties);
+      awayPenalties = updatePenaltyStatusesOnly(awayPenalties, state.maxConcurrentPenalties);
+      awayPenalties = sortPenaltiesByStatus(awayPenalties);
+
+      newStateWithoutMeta = { ...state, homePenalties, awayPenalties };
+      break;
+    }
     case 'TICK': {
       let newCalculatedTimeCs = state.currentTime;
       let homePenaltiesResult = state.homePenalties;
@@ -719,72 +747,45 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         const elapsedCs = Math.floor(elapsedMs / 10);
         newCalculatedTimeCs = Math.max(0, state.remainingTimeAtStartCs - elapsedCs);
 
+        // Penalties only tick if the main game clock is running (not during breaks/timeouts/warmup/end)
+        // and the game clock actually advanced a second.
         const gameClockWasTickingForPenalties =
-          state.isClockRunning &&
           state.periodDisplayOverride === null &&
-          state.currentPeriod > 0 &&
-          state.remainingTimeAtStartCs > 0;
+          state.currentPeriod > 0;
 
         if (gameClockWasTickingForPenalties) {
           const oldSecondBoundary = Math.floor(state.currentTime / CENTISECONDS_PER_SECOND);
           const newSecondBoundary = Math.floor(newCalculatedTimeCs / CENTISECONDS_PER_SECOND);
 
-          if (newSecondBoundary < oldSecondBoundary) {
-            const updatePenaltiesForOneSecondTick = (penalties: Penalty[], maxConcurrent: number): Penalty[] => {
-              const resultPenalties: Penalty[] = [];
-              const activePlayerTickets: Set<string> = new Set();
-              let concurrentRunningCount = 0;
-
-              for (const p of penalties) {
-                if (p.remainingTime <= 0) {
-                   if (p._status === 'running' && p.remainingTime <= 0) {
-                       resultPenalties.push({ ...p, remainingTime: 0, _status: undefined});
-                   } else if (p.remainingTime > 0) {
-                       resultPenalties.push({...p});
-                   }
-                  continue;
+          if (newSecondBoundary < oldSecondBoundary) { // A second has passed on the game clock
+            const decrementRunningPenalties = (penalties: Penalty[]): Penalty[] => {
+              return penalties.map(p => {
+                if (p._status === 'running' && p.remainingTime > 0) {
+                  return { ...p, remainingTime: Math.max(0, p.remainingTime - 1) };
                 }
-                let status: Penalty['_status'] = undefined;
-                let newRemainingTimeForPenaltySec = p.remainingTime;
-
-                if (p.playerNumber && activePlayerTickets.has(p.playerNumber)) {
-                  status = 'pending_player';
-                } else if (concurrentRunningCount < maxConcurrent) {
-                  status = 'running';
-                  newRemainingTimeForPenaltySec = Math.max(0, p.remainingTime - 1);
-                  if (newRemainingTimeForPenaltySec > 0 && p.playerNumber) {
-                      activePlayerTickets.add(p.playerNumber);
-                  }
-                  concurrentRunningCount++;
-                } else {
-                  status = 'pending_concurrent';
-                }
-                if (newRemainingTimeForPenaltySec > 0 || (status === 'running' && newRemainingTimeForPenaltySec === 0 && p.remainingTime > 0)) {
-                   resultPenalties.push({ ...p, remainingTime: newRemainingTimeForPenaltySec, _status: status });
-                } else if (p.remainingTime > 0) {
-                    resultPenalties.push({ ...p, _status: status});
-                }
-              }
-              return resultPenalties;
+                return p;
+              });
             };
-            homePenaltiesResult = updatePenaltiesForOneSecondTick(state.homePenalties, state.maxConcurrentPenalties);
-            awayPenaltiesResult = updatePenaltiesForOneSecondTick(state.awayPenalties, state.maxConcurrentPenalties);
+            homePenaltiesResult = decrementRunningPenalties(state.homePenalties);
+            awayPenaltiesResult = decrementRunningPenalties(state.awayPenalties);
           } else {
-            homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
-            awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
+            homePenaltiesResult = state.homePenalties;
+            awayPenaltiesResult = state.awayPenalties;
           }
-        } else if (state.isClockRunning) {
-            homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
-            awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
+        } else {
+          homePenaltiesResult = state.homePenalties;
+          awayPenaltiesResult = state.awayPenalties;
         }
       } else if (state.isClockRunning && state.currentTime <= 0) {
          newCalculatedTimeCs = 0;
-         homePenaltiesResult = updatePenaltyStatusesOnly(state.homePenalties, state.maxConcurrentPenalties);
-         awayPenaltiesResult = updatePenaltyStatusesOnly(state.awayPenalties, state.maxConcurrentPenalties);
+         homePenaltiesResult = state.homePenalties;
+         awayPenaltiesResult = state.awayPenalties;
       }
 
-
+      // Always recalculate statuses and sort, as penalties might have finished or new ones activated
+      homePenaltiesResult = updatePenaltyStatusesOnly(homePenaltiesResult, state.maxConcurrentPenalties);
       homePenaltiesResult = sortPenaltiesByStatus(homePenaltiesResult);
+      awayPenaltiesResult = updatePenaltyStatusesOnly(awayPenaltiesResult, state.maxConcurrentPenalties);
       awayPenaltiesResult = sortPenaltiesByStatus(awayPenaltiesResult);
 
 

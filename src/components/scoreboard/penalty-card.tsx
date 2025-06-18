@@ -35,7 +35,7 @@ const CagedUserIcon = ({ className }: { className?: string }) => (
 export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
   const { state } = useGameState();
 
-  const currentTeamSubName = state.homeTeamName === teamName ? state.homeTeamSubName : state.awayTeamSubName;
+  const currentTeamSubName = state.homeTeamName === teamName ? state.homeTeamSubName : state.awayTeamName;
 
   const matchedPlayer = React.useMemo(() => {
     const currentTeam = state.teams.find(t =>
@@ -49,10 +49,13 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
     return null;
   }, [state.teams, teamName, currentTeamSubName, state.selectedMatchCategory, penalty.playerNumber]);
 
-  const isWaiting = penalty._status === 'pending_player' || penalty._status === 'pending_concurrent';
+  const isWaitingSlot = penalty._status === 'pending_player' || penalty._status === 'pending_concurrent';
+  const isPendingPuck = penalty._status === 'pending_puck';
+
   const cardClasses = cn(
     "bg-muted/50 border-primary/30 transition-opacity",
-    isWaiting && "opacity-50" 
+    (isWaitingSlot || isPendingPuck) && "opacity-50", 
+    isPendingPuck && "border-yellow-500/40" 
   );
 
   const renderPlayerAlias = () => {
@@ -77,6 +80,13 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
     );
   };
 
+  const getStatusTextForScoreboard = () => {
+    if (isPendingPuck) return "Esperando Puck";
+    if (isWaitingSlot) return "Esperando";
+    return null;
+  }
+  const statusText = getStatusTextForScoreboard();
+
   return (
     <Card className={cardClasses}>
       <CardContent className="p-3 md:p-4">
@@ -97,9 +107,12 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
           <div className="text-sm md:text-base lg:text-lg xl:text-xl text-muted-foreground mt-1">
             ({formatTime(penalty.initialDuration * 100, { showTenths: false })} Min)
           </div>
-          {isWaiting && (
-            <div className="text-sm md:text-base lg:text-lg text-muted-foreground/80 mt-1 italic">
-              Esperando
+          {statusText && (
+            <div className={cn(
+                "text-sm md:text-base lg:text-lg mt-1 italic",
+                 isPendingPuck ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground/80"
+              )}>
+              {statusText}
             </div>
           )}
         </div>

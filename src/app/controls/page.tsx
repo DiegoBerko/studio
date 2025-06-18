@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { MiniScoreboard } from '@/components/controls/mini-scoreboard';
 import { TimeControlCard } from '@/components/controls/time-control-card';
 import { PenaltyControlCard } from '@/components/controls/penalty-control-card';
@@ -9,7 +9,7 @@ import { useGameState } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { RefreshCw, AlertTriangle, Router } from 'lucide-react';
+import { RefreshCw, AlertTriangle, PlayCircle } from 'lucide-react'; // Added PlayCircle
 import { useRouter } from 'next/navigation';
 
 const CONTROLS_LOCK_KEY = 'icevision-controls-lock-id';
@@ -36,8 +36,6 @@ export default function ControlsPage() {
 
   const checkLockStatus = useCallback(() => {
     if (!instanceId) {
-      // instanceId is not yet available, try again later or handle appropriately
-      // For now, we'll just return, assuming this will be re-triggered or is not critical yet
       return;
     }
     const lockIdFromStorage = localStorage.getItem(CONTROLS_LOCK_KEY);
@@ -60,7 +58,7 @@ export default function ControlsPage() {
 
 
   useEffect(() => {
-    if (!instanceId) return; // Wait for instanceId to be generated
+    if (!instanceId) return; 
     console.log(`ControlsPage Effect: Instance ${instanceId.slice(-6)} mounting/updating. Current state: ${pageDisplayState}`);
     
     setPageDisplayState('Checking'); 
@@ -193,6 +191,11 @@ export default function ControlsPage() {
     setShowResetConfirmation(false);
   };
 
+  const hasPendingPuckPenalties = useMemo(() => {
+    return state.homePenalties.some(p => p._status === 'pending_puck') ||
+           state.awayPenalties.some(p => p._status === 'pending_puck');
+  }, [state.homePenalties, state.awayPenalties]);
+
   if (pageDisplayState === 'Checking' || !instanceId) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-10rem)] text-center p-4">
@@ -231,6 +234,21 @@ export default function ControlsPage() {
   return (
     <div className="w-full max-w-5xl mx-auto space-y-8">
       <MiniScoreboard />
+
+      {hasPendingPuckPenalties && (
+        <div className="my-6 flex justify-center">
+          <Button
+            variant="destructive"
+            size="lg"
+            className="px-8 py-4 text-base font-semibold h-auto" 
+            onClick={() => dispatch({ type: 'ACTIVATE_PENDING_PUCK_PENALTIES' })}
+          >
+            <PlayCircle className="mr-2 h-5 w-5" /> 
+            ACTIVAR PENALIDADES (PUCK EN JUEGO)
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <TimeControlCard />
       </div>

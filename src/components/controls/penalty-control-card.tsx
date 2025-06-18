@@ -187,7 +187,8 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   };
 
   const getStatusText = (status?: Penalty['_status']) => {
-    if (status === 'pending_player' || status === 'pending_concurrent') return 'Esperando';
+    if (status === 'pending_player' || status === 'pending_concurrent') return 'Esperando Slot';
+    if (status === 'pending_puck') return 'Esperando Puck';
     return null;
   };
 
@@ -348,7 +349,8 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
             className="max-h-60 overflow-y-auto space-y-2 pr-2"
           >
             {penalties.map((p) => {
-              const isWaiting = p._status === 'pending_player' || p._status === 'pending_concurrent';
+              const isWaitingSlot = p._status === 'pending_player' || p._status === 'pending_concurrent';
+              const isPendingPuck = p._status === 'pending_puck';
               const statusText = getStatusText(p._status);
               
               const matchedPlayerForPenaltyDisplay = matchedTeam?.players.find(
@@ -370,7 +372,8 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                     "p-3 bg-muted/30 flex flex-col cursor-move transition-all",
                     draggedPenaltyId === p.id && "opacity-50 scale-95 shadow-lg",
                     dragOverPenaltyId === p.id && draggedPenaltyId !== p.id && "border-2 border-primary ring-2 ring-primary",
-                    isWaiting && "opacity-60 bg-muted/10"
+                    isWaitingSlot && "opacity-60 bg-muted/10",
+                    isPendingPuck && "opacity-40 bg-yellow-500/5 border-yellow-500/30" // Distintivo para pending_puck
                   )}
                 >
                   <div className="flex justify-between items-center w-full">
@@ -419,7 +422,10 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                     </div>
                   </div>
                   {statusText && (
-                    <div className="text-xs text-muted-foreground italic mt-1 flex items-center">
+                    <div className={cn(
+                        "text-xs italic mt-1 flex items-center",
+                        isPendingPuck ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"
+                    )}>
                       <Hourglass className="h-3 w-3 mr-1" />
                       {statusText}
                     </div>
