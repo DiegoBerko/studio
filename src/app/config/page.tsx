@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation'; // Import useSearchParams
+import { useSearchParams } from 'next/navigation';
 import { DurationSettingsCard, type DurationSettingsCardRef } from "@/components/config/duration-settings-card";
 import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/config/penalty-settings-card";
 import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card";
@@ -29,18 +29,16 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 
-// Helper to get initial state for ConfigPage's configName reset
-// (Simplified as full initialGlobalState is complex and not fully needed here)
 const initialConfigStateForReset = {
   configName: "Configuración Predeterminada",
 };
 
-const VALID_TAB_VALUES = ["gameFormat", "timings", "sound", "teamsAndDisplay"];
+const VALID_TAB_VALUES = ["formatAndTimings", "soundAndDisplay", "categoriesAndTeams"];
 
 export default function ConfigPage() {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
-  const searchParams = useSearchParams(); // Get search params
+  const searchParams = useSearchParams();
 
   const durationSettingsRef = useRef<DurationSettingsCardRef>(null);
   const penaltySettingsRef = useRef<PenaltySettingsCardRef>(null);
@@ -61,13 +59,11 @@ export default function ConfigPage() {
   const [currentExportFilename, setCurrentExportFilename] = useState('');
   const [isResetConfigDialogOpen, setIsResetConfigDialogOpen] = useState(false);
 
-  // Determine default tab based on URL parameter
   const urlTab = searchParams.get('tab');
-  const initialTab = urlTab && VALID_TAB_VALUES.includes(urlTab) ? urlTab : "gameFormat";
-  const [activeTab, setActiveTab] = useState(initialTab); // State to control active tab
+  const initialTab = urlTab && VALID_TAB_VALUES.includes(urlTab) ? urlTab : "formatAndTimings";
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   useEffect(() => {
-    // Sync local config name if global state changes and this component isn't dirty for configName
     if (!isConfigNameDirty) {
       setLocalConfigName(state.configName || '');
     }
@@ -235,7 +231,6 @@ export default function ConfigPage() {
     setIsExportDialogOpen(false);
   };
 
-
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -297,7 +292,6 @@ export default function ConfigPage() {
         setIsSoundDirty(false);
         setIsTeamSettingsDirty(false);
         setIsCategorySettingsDirty(false);
-        // Cards will re-sync due to global state change and their internal useEffects
 
         toast({
           title: "Configuración Importada",
@@ -332,7 +326,6 @@ export default function ConfigPage() {
     setIsSoundDirty(false);
     setIsTeamSettingsDirty(false);
     setIsCategorySettingsDirty(false);
-    // Cards will re-sync due to global state change
 
     toast({
       title: "Configuración Restablecida",
@@ -374,30 +367,33 @@ export default function ConfigPage() {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-          <TabsTrigger value="gameFormat">Formato Juego</TabsTrigger>
-          <TabsTrigger value="timings">Tiempos</TabsTrigger>
-          <TabsTrigger value="sound">Sonido</TabsTrigger>
-          <TabsTrigger value="teamsAndDisplay">Equipos y Display</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3">
+          <TabsTrigger value="formatAndTimings">Formato y Tiempos</TabsTrigger>
+          <TabsTrigger value="soundAndDisplay">Sonido y Display</TabsTrigger>
+          <TabsTrigger value="categoriesAndTeams">Categorías y Equipos</TabsTrigger>
         </TabsList>
-        <TabsContent value="gameFormat" className={tabContentClassName}>
+
+        <TabsContent value="formatAndTimings" className={tabContentClassName}>
           <div className="space-y-6">
             <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} />
+            <Separator />
+            <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
           </div>
         </TabsContent>
-        <TabsContent value="timings" className={tabContentClassName}>
-           <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
+
+        <TabsContent value="soundAndDisplay" className={tabContentClassName}>
+           <div className="space-y-6">
+            <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
+            <Separator />
+            <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty}/>
+           </div>
         </TabsContent>
-        <TabsContent value="sound" className={tabContentClassName}>
-           <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
-        </TabsContent>
-        <TabsContent value="teamsAndDisplay" className={tabContentClassName}>
+
+        <TabsContent value="categoriesAndTeams" className={tabContentClassName}>
           <div className="space-y-8">
             <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
             <Separator />
             <TeamsManagementTab />
-            <Separator />
-            <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty}/>
           </div>
         </TabsContent>
       </Tabs>
@@ -486,4 +482,3 @@ export default function ConfigPage() {
     </div>
   );
 }
-
