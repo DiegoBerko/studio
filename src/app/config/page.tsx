@@ -87,9 +87,14 @@ export default function ConfigPage() {
   const [editingProfileName, setEditingProfileName] = useState("");
   const [profileToDelete, setProfileToDelete] = useState<FormatAndTimingsProfile | null>(null);
 
+  const [isConfirmSwitchProfileDialogOpen, setIsConfirmSwitchProfileDialogOpen] = useState(false);
+  const [pendingProfileIdToSelect, setPendingProfileIdToSelect] = useState<string | null>(null);
+
+  const [isConfirmSwitchTabDialogOpen, setIsConfirmSwitchTabDialogOpen] = useState(false);
+  const [pendingTabSwitchData, setPendingTabSwitchData] = useState<{ newTabValue: string; discardAction: (() => void) | null; sectionName: string } | null>(null);
+
 
   useEffect(() => {
-    // Sync URL with activeTab state
     const currentUrlTab = searchParams.get('tab');
     if (activeTab !== currentUrlTab && VALID_TAB_VALUES.includes(activeTab)) {
       router.push(`/config?tab=${activeTab}`, { scroll: false });
@@ -286,9 +291,15 @@ export default function ConfigPage() {
 
         if (requiredFields.length > 0) {
             const dataToCheck = dispatchActionType === 'LOAD_FORMAT_AND_TIMINGS_PROFILES' ? importedConfig[0] : importedConfig;
-            const missingFields = requiredFields.filter(field => !(field in dataToCheck));
-            if (missingFields.length > 0) { 
-                throw new Error(`Archivo de configuración para ${sectionName} no válido. Faltan campos: ${missingFields.join(', ')}`);
+            if (dataToCheck) { // Ensure dataToCheck is not undefined (e.g. empty array)
+                const missingFields = requiredFields.filter(field => !(field in dataToCheck));
+                if (missingFields.length > 0) { 
+                    throw new Error(`Archivo de configuración para ${sectionName} no válido. Faltan campos: ${missingFields.join(', ')}`);
+                }
+            } else if (dispatchActionType === 'LOAD_FORMAT_AND_TIMINGS_PROFILES' && importedConfig.length === 0) {
+                // Allow empty array for profiles, but it won't have fields to check
+            } else {
+                 throw new Error(`Archivo de configuración para ${sectionName} no válido o vacío.`);
             }
         }
         
@@ -327,7 +338,7 @@ export default function ConfigPage() {
 
   const handleImportFormatAndTimings = (event: React.ChangeEvent<HTMLInputElement>) => {
     genericImportHandler(event, "Perfiles de Formato y Tiempos", 
-      ['name', 'defaultPeriodDuration'],  // Check for core fields in the first profile
+      ['name', 'defaultPeriodDuration'], 
       'LOAD_FORMAT_AND_TIMINGS_PROFILES',
       fileInputFormatAndTimingsRef
     );
@@ -373,19 +384,23 @@ export default function ConfigPage() {
 
   const handleSelectProfile = (profileId: string) => {
     if (isFormatAndTimingsSectionDirty) {
-        const confirmSwitch = window.confirm("Tiene cambios sin guardar en Formato y Tiempos. ¿Desea descartarlos y cambiar de perfil?");
-        if (!confirmSwitch) {
-            return;
-        }
-        // Discard changes for F&T before switching
+        setPendingProfileIdToSelect(profileId);
+        setIsConfirmSwitchProfileDialogOpen(true);
+    } else {
+        dispatch({ type: 'SELECT_FORMAT_AND_TIMINGS_PROFILE', payload: { profileId } });
+    }
+  };
+
+  const confirmSwitchProfile = () => {
+    if (pendingProfileIdToSelect) {
         if (durationSettingsRef.current) durationSettingsRef.current.handleDiscard();
         if (penaltySettingsRef.current) penaltySettingsRef.current.handleDiscard();
         setIsDurationDirty(false);
         setIsPenaltyDirty(false);
+        dispatch({ type: 'SELECT_FORMAT_AND_TIMINGS_PROFILE', payload: { profileId: pendingProfileIdToSelect } });
     }
-    dispatch({ type: 'SELECT_FORMAT_AND_TIMINGS_PROFILE', payload: { profileId } });
-    // setIsDurationDirty(false); // These are now handled by useEffect on selectedProfile.id change
-    // setIsPenaltyDirty(false);
+    setIsConfirmSwitchProfileDialogOpen(false);
+    setPendingProfileIdToSelect(null);
   };
   
   const handlePrepareEditProfileName = () => {
@@ -424,31 +439,41 @@ export default function ConfigPage() {
   };
 
   const handleTabChange = (newTabValue: string) => {
-    let canSwitch = true;
     let discardAction: (() => void) | null = null;
     let sectionName = "";
+    let isDirty = false;
 
     if (activeTab === "formatAndTimings" && isFormatAndTimingsSectionDirty) {
       sectionName = "Formato y Tiempos";
-      canSwitch = window.confirm(`Tiene cambios sin guardar en ${sectionName}. ¿Desea descartarlos y cambiar de pestaña?`);
-      if (canSwitch) discardAction = handleDiscardChanges_FormatAndTimings;
+      isDirty = true;
+      discardAction = handleDiscardChanges_FormatAndTimings;
     } else if (activeTab === "soundAndDisplay" && isSoundAndDisplaySectionDirty) {
       sectionName = "Sonido y Display";
-      canSwitch = window.confirm(`Tiene cambios sin guardar en ${sectionName}. ¿Desea descartarlos y cambiar de pestaña?`);
-      if (canSwitch) discardAction = handleDiscardChanges_SoundAndDisplay;
-    } else if (activeTab === "categoriesAndTeams" && isCategorySettingsDirty) { // Only check categories for this tab
+      isDirty = true;
+      discardAction = handleDiscardChanges_SoundAndDisplay;
+    } else if (activeTab === "categoriesAndTeams" && isCategorySettingsDirty) {
       sectionName = "Categorías";
-      canSwitch = window.confirm(`Tiene cambios sin guardar en ${sectionName}. ¿Desea descartarlos y cambiar de pestaña?`);
-      if (canSwitch) discardAction = handleDiscardChanges_Categories;
+      isDirty = true;
+      discardAction = handleDiscardChanges_Categories;
     }
 
-    if (canSwitch) {
-      if (discardAction) {
-        discardAction();
-      }
+    if (isDirty) {
+      setPendingTabSwitchData({ newTabValue, discardAction, sectionName });
+      setIsConfirmSwitchTabDialogOpen(true);
+    } else {
       setActiveTab(newTabValue);
-      // URL update is now handled by useEffect on activeTab change
     }
+  };
+
+  const confirmSwitchTab = () => {
+    if (pendingTabSwitchData) {
+      if (pendingTabSwitchData.discardAction) {
+        pendingTabSwitchData.discardAction();
+      }
+      setActiveTab(pendingTabSwitchData.newTabValue);
+    }
+    setIsConfirmSwitchTabDialogOpen(false);
+    setPendingTabSwitchData(null);
   };
 
   const tabContentClassName = "mt-6 p-0 sm:p-6 border-0 sm:border rounded-md sm:bg-card/30 sm:shadow-sm";
@@ -712,6 +737,45 @@ export default function ConfigPage() {
             </AlertDialogContent>
         </AlertDialog>
        )}
+
+      {isConfirmSwitchProfileDialogOpen && (
+        <AlertDialog open={isConfirmSwitchProfileDialogOpen} onOpenChange={setIsConfirmSwitchProfileDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Descartar Cambios</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tienes cambios sin guardar en la sección de Formato y Tiempos. ¿Deseas descartarlos y cambiar de perfil?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => { setIsConfirmSwitchProfileDialogOpen(false); setPendingProfileIdToSelect(null); }}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmSwitchProfile}>
+                Descartar y Cambiar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {isConfirmSwitchTabDialogOpen && pendingTabSwitchData && (
+        <AlertDialog open={isConfirmSwitchTabDialogOpen} onOpenChange={setIsConfirmSwitchTabDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Descartar Cambios</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tienes cambios sin guardar en la sección de {pendingTabSwitchData.sectionName}. ¿Deseas descartarlos y cambiar de pestaña?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => { setIsConfirmSwitchTabDialogOpen(false); setPendingTabSwitchData(null); }}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmSwitchTab}>
+                Descartar y Cambiar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
+
