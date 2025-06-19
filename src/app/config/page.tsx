@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Undo2, Upload, Download, RotateCcw, Plus, Edit3, Trash2, XCircle } from 'lucide-react';
-import { useGameState, type ConfigFields, type FormatAndTimingsProfile, type FormatAndTimingsProfileData, createDefaultFormatAndTimingsProfile } from '@/contexts/game-state-context';
+import { useGameState, type ConfigFields, type FormatAndTimingsProfile, type FormatAndTimingsProfileData, createDefaultFormatAndTimingsProfile, type CategoryData } from '@/contexts/game-state-context';
 import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
@@ -121,6 +121,19 @@ export default function ConfigPage() {
   const isSoundAndDisplaySectionDirty = isSoundDirty || isTeamSettingsDirty;
 
 
+  const downloadJsonFile = (data: object, filename: string) => {
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+  };
+
   const handleSaveChanges_FormatAndTimings = () => {
     let durationSaveSuccess = true;
     let penaltySaveSuccess = true;
@@ -133,7 +146,9 @@ export default function ConfigPage() {
       if (penaltySaveSuccess) setIsPenaltyDirty(false);
     }
     if (durationSaveSuccess && penaltySaveSuccess) {
-      toast({ title: "Formato y Tiempos Guardados", description: "Los cambios en Formato y Tiempos han sido guardados." });
+      toast({ title: "Formato y Tiempos Guardados", description: "Los cambios en Formato y Tiempos han sido guardados en la configuración activa." });
+      // Download .custom.json
+      downloadJsonFile(state.formatAndTimingsProfiles, 'format-timings.custom.json');
     } else {
       toast({ title: "Error al Guardar", description: "No se pudieron guardar todos los cambios en Formato y Tiempos.", variant: "destructive" });
     }
@@ -163,7 +178,18 @@ export default function ConfigPage() {
       if (teamSettingsSaveSuccess) setIsTeamSettingsDirty(false);
     }
     if (soundSaveSuccess && teamSettingsSaveSuccess) {
-      toast({ title: "Sonido y Display Guardados", description: "Los cambios en Sonido y Display han sido guardados." });
+      toast({ title: "Sonido y Display Guardados", description: "Los cambios en Sonido y Display han sido guardados en la configuración activa." });
+      const configToDownload: ExportableSoundAndDisplayConfig = {
+        playSoundAtPeriodEnd: state.playSoundAtPeriodEnd,
+        customHornSoundDataUrl: state.customHornSoundDataUrl,
+        enableTeamSelectionInMiniScoreboard: state.enableTeamSelectionInMiniScoreboard,
+        enablePlayerSelectionForPenalties: state.enablePlayerSelectionForPenalties,
+        showAliasInPenaltyPlayerSelector: state.showAliasInPenaltyPlayerSelector,
+        showAliasInControlsPenaltyList: state.showAliasInControlsPenaltyList,
+        showAliasInScoreboardPenalties: state.showAliasInScoreboardPenalties,
+        isMonitorModeEnabled: state.isMonitorModeEnabled,
+      };
+      downloadJsonFile(configToDownload, 'sound-display.custom.json');
     } else {
       toast({ title: "Error al Guardar", description: "No se pudieron guardar todos los cambios en Sonido y Display.", variant: "destructive" });
     }
@@ -185,7 +211,8 @@ export default function ConfigPage() {
     if (categorySettingsRef.current && isCategorySettingsDirty) {
       if (categorySettingsRef.current.handleSave()) {
         setIsCategorySettingsDirty(false);
-        toast({ title: "Categorías Guardadas", description: "Los cambios en Categorías han sido guardados." });
+        toast({ title: "Categorías Guardadas", description: "Los cambios en Categorías han sido guardados en la configuración activa." });
+        downloadJsonFile(state.availableCategories, 'categories.custom.json');
       } else {
         toast({ title: "Error al Guardar", description: "No se pudieron guardar los cambios en Categorías.", variant: "destructive" });
       }
@@ -291,7 +318,7 @@ export default function ConfigPage() {
 
         if (requiredFields.length > 0) {
             const dataToCheck = dispatchActionType === 'LOAD_FORMAT_AND_TIMINGS_PROFILES' ? importedConfig[0] : importedConfig;
-            if (dataToCheck) { // Ensure dataToCheck is not undefined (e.g. empty array)
+            if (dataToCheck) { 
                 const missingFields = requiredFields.filter(field => !(field in dataToCheck));
                 if (missingFields.length > 0) { 
                     throw new Error(`Archivo de configuración para ${sectionName} no válido. Faltan campos: ${missingFields.join(', ')}`);
