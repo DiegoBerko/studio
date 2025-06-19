@@ -1,0 +1,11 @@
+
+{
+  "playSoundAtPeriodEnd": true,
+  "customHornSoundDataUrl": null,
+  "enableTeamSelectionInMiniScoreboard": true,
+  "enablePlayerSelectionForPenalties": true,
+  "showAliasInPenaltyPlayerSelector": true,
+  "showAliasInControlsPenaltyList": true,
+  "showAliasInScoreboardPenalties": true,
+  "isMonitorModeEnabled": false
+}

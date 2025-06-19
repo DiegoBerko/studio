@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DurationSettingsCard, type DurationSettingsCardRef } from "@/components/config/duration-settings-card";
 import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/config/penalty-settings-card";
@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Undo2, Upload, Download, RotateCcw } from 'lucide-react';
-import { useGameState, type ConfigFields } from '@/contexts/game-state-context';
+import { Save, Undo2, Upload, Download, RotateCcw, FileJson } from 'lucide-react';
+import { useGameState, type ConfigFields, type CategoryData } from '@/contexts/game-state-context';
 import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
@@ -29,11 +29,29 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 
-const initialConfigStateForReset = {
-  configName: "Configuración Predeterminada",
-};
+const initialFormatAndTimingsConfigNameForReset = "Formato y Tiempos Predeterminado";
 
 const VALID_TAB_VALUES = ["formatAndTimings", "soundAndDisplay", "categoriesAndTeams"];
+
+type ExportableFormatAndTimingsConfig = Pick<ConfigFields,
+  | 'formatAndTimingsConfigName'
+  | 'defaultWarmUpDuration' | 'defaultPeriodDuration' | 'defaultOTPeriodDuration'
+  | 'defaultBreakDuration' | 'defaultPreOTBreakDuration' | 'defaultTimeoutDuration'
+  | 'maxConcurrentPenalties'
+  | 'autoStartWarmUp' | 'autoStartBreaks' | 'autoStartPreOTBreaks' | 'autoStartTimeouts'
+  | 'numberOfRegularPeriods' | 'numberOfOvertimePeriods'
+  | 'playersPerTeamOnIce'
+>;
+
+type ExportableSoundAndDisplayConfig = Pick<ConfigFields,
+  | 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl'
+  | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties'
+  | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties'
+  | 'isMonitorModeEnabled'
+>;
+
+type ExportableCategoriesConfig = Pick<ConfigFields, 'availableCategories' | 'selectedMatchCategory'>;
+
 
 export default function ConfigPage() {
   const { state, dispatch } = useGameState();
@@ -45,10 +63,15 @@ export default function ConfigPage() {
   const soundSettingsRef = useRef<SoundSettingsCardRef>(null);
   const teamSettingsRef = useRef<TeamSettingsCardRef>(null);
   const categorySettingsRef = useRef<CategorySettingsCardRef>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const fileInputRefFormatAndTimings = useRef<HTMLInputElement>(null);
+  const fileInputRefSoundAndDisplay = useRef<HTMLInputElement>(null);
+  const fileInputRefCategories = useRef<HTMLInputElement>(null);
 
-  const [localConfigName, setLocalConfigName] = useState(state.configName || '');
-  const [isConfigNameDirty, setIsConfigNameDirty] = useState(false);
+
+  const [localFormatAndTimingsConfigName, setLocalFormatAndTimingsConfigName] = useState(state.formatAndTimingsConfigName || '');
+  const [isFormatAndTimingsConfigNameDirty, setIsFormatAndTimingsConfigNameDirty] = useState(false);
+  
   const [isDurationDirty, setIsDurationDirty] = useState(false);
   const [isPenaltyDirty, setIsPenaltyDirty] = useState(false);
   const [isSoundDirty, setIsSoundDirty] = useState(false);
@@ -57,6 +80,8 @@ export default function ConfigPage() {
   
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [currentExportFilename, setCurrentExportFilename] = useState('');
+  const [currentExportAction, setCurrentExportAction] = useState<(() => void) | null>(null);
+
   const [isResetConfigDialogOpen, setIsResetConfigDialogOpen] = useState(false);
 
   const urlTab = searchParams.get('tab');
@@ -64,37 +89,37 @@ export default function ConfigPage() {
   const [activeTab, setActiveTab] = useState(initialTab);
 
   useEffect(() => {
-    if (!isConfigNameDirty) {
-      setLocalConfigName(state.configName || '');
+    if (!isFormatAndTimingsConfigNameDirty) {
+      setLocalFormatAndTimingsConfigName(state.formatAndTimingsConfigName || '');
     }
-  }, [state.configName, isConfigNameDirty]);
+  }, [state.formatAndTimingsConfigName, isFormatAndTimingsConfigNameDirty]);
 
-  const handleLocalConfigNameChange = (newName: string) => {
-    setLocalConfigName(newName);
-    setIsConfigNameDirty(newName !== (state.configName || ''));
+  const handleLocalFormatAndTimingsConfigNameChange = (newName: string) => {
+    setLocalFormatAndTimingsConfigName(newName);
+    setIsFormatAndTimingsConfigNameDirty(newName !== (state.formatAndTimingsConfigName || ''));
   };
 
-  const pageIsDirty = isConfigNameDirty || isDurationDirty || isPenaltyDirty || isSoundDirty || isTeamSettingsDirty || isCategorySettingsDirty;
+  const pageIsDirty = isFormatAndTimingsConfigNameDirty || isDurationDirty || isPenaltyDirty || isSoundDirty || isTeamSettingsDirty || isCategorySettingsDirty;
 
   const handleSaveAllConfig = () => {
-    let configNameSaveSuccess = true;
+    let formatAndTimingsNameSaveSuccess = true;
     let durationSaveSuccess = true;
     let penaltySaveSuccess = true;
     let soundSaveSuccess = true;
     let teamSettingsSaveSuccess = true;
     let categorySettingsSaveSuccess = true;
 
-    if (isConfigNameDirty) {
-      if (localConfigName.trim() === "") {
+    if (isFormatAndTimingsConfigNameDirty) {
+      if (localFormatAndTimingsConfigName.trim() === "") {
         toast({
-          title: "Nombre de Configuración Requerido",
-          description: "El nombre de la configuración no puede estar vacío.",
+          title: "Nombre de Configuración F&T Requerido",
+          description: "El nombre de la configuración de Formato y Tiempos no puede estar vacío.",
           variant: "destructive",
         });
-        configNameSaveSuccess = false;
+        formatAndTimingsNameSaveSuccess = false;
       } else {
-        dispatch({ type: 'SET_CONFIG_NAME', payload: localConfigName.trim() });
-        setIsConfigNameDirty(false); 
+        dispatch({ type: 'SET_FORMAT_AND_TIMINGS_CONFIG_NAME', payload: localFormatAndTimingsConfigName.trim() });
+        setIsFormatAndTimingsConfigNameDirty(false); 
       }
     }
 
@@ -119,13 +144,13 @@ export default function ConfigPage() {
       if (categorySettingsSaveSuccess) setIsCategorySettingsDirty(false);
     }
 
-    if (configNameSaveSuccess && durationSaveSuccess && penaltySaveSuccess && soundSaveSuccess && teamSettingsSaveSuccess && categorySettingsSaveSuccess) {
+    if (formatAndTimingsNameSaveSuccess && durationSaveSuccess && penaltySaveSuccess && soundSaveSuccess && teamSettingsSaveSuccess && categorySettingsSaveSuccess) {
       toast({
         title: "Configuración Guardada",
         description: "Todos los cambios de configuración han sido guardados exitosamente.",
       });
-    } else if (!configNameSaveSuccess) {
-      // Toast already shown for config name
+    } else if (!formatAndTimingsNameSaveSuccess) {
+      // Toast already shown
     } else {
       toast({
         title: "Error al Guardar Configuración",
@@ -136,9 +161,9 @@ export default function ConfigPage() {
   };
 
   const handleDiscardAllConfig = () => {
-    if (isConfigNameDirty) {
-      setLocalConfigName(state.configName || '');
-      setIsConfigNameDirty(false);
+    if (isFormatAndTimingsConfigNameDirty) {
+      setLocalFormatAndTimingsConfigName(state.formatAndTimingsConfigName || '');
+      setIsFormatAndTimingsConfigNameDirty(false);
     }
     if (durationSettingsRef.current && isDurationDirty) {
       durationSettingsRef.current.handleDiscard();
@@ -166,13 +191,9 @@ export default function ConfigPage() {
     });
   };
 
-  const prepareExportConfig = () => {
-    const suggestedFilename = `icevision_config_${state.configName.trim().toLowerCase().replace(/\s+/g, '_') || 'default'}.json`;
-    setCurrentExportFilename(suggestedFilename);
-    setIsExportDialogOpen(true);
-  };
+  const performExportActionWithDialog = (filename: string) => {
+    if (!currentExportAction) return;
 
-  const performExport = (filename: string) => {
     if (!filename.trim().endsWith('.json')) {
         filename = filename.trim() + '.json';
     }
@@ -184,9 +205,39 @@ export default function ConfigPage() {
         });
         return;
     }
+    localStorage.setItem('lastExportFilename', filename.trim()); // Save for next time
+    currentExportAction(); // This will use the validated currentExportFilename
+    setIsExportDialogOpen(false);
+    setCurrentExportAction(null);
+  };
 
-    const configToExport: ConfigFields = {
-      configName: state.configName,
+  const exportSection = (sectionName: string, configData: object, suggestedBaseName: string) => {
+    const lastFilename = localStorage.getItem('lastExportFilename');
+    const suggestedFilename = lastFilename || `${suggestedBaseName}_config.json`;
+    setCurrentExportFilename(suggestedFilename);
+
+    setCurrentExportAction(() => () => { // This inner function is what performExportActionWithDialog calls
+        const jsonString = JSON.stringify(configData, null, 2);
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const href = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = currentExportFilename.trim(); // Use the (potentially edited) filename from dialog
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(href);
+        toast({
+            title: `${sectionName} Exportado`,
+            description: `Archivo ${currentExportFilename.trim()} descargado.`,
+        });
+    });
+    setIsExportDialogOpen(true);
+  };
+
+  const handleExportFormatAndTimings = () => {
+    const configToExport: ExportableFormatAndTimingsConfig = {
+      formatAndTimingsConfigName: state.formatAndTimingsConfigName,
       defaultWarmUpDuration: state.defaultWarmUpDuration,
       defaultPeriodDuration: state.defaultPeriodDuration,
       defaultOTPeriodDuration: state.defaultOTPeriodDuration,
@@ -197,10 +248,15 @@ export default function ConfigPage() {
       autoStartWarmUp: state.autoStartWarmUp,
       autoStartBreaks: state.autoStartBreaks,
       autoStartPreOTBreaks: state.autoStartPreOTBreaks,
-      autoStartTimeouts: state.autoStartTimeouts,
       numberOfRegularPeriods: state.numberOfRegularPeriods,
       numberOfOvertimePeriods: state.numberOfOvertimePeriods,
       playersPerTeamOnIce: state.playersPerTeamOnIce,
+    };
+    exportSection("Configuración de Formato y Tiempos", configToExport, "icevision_formato_tiempos");
+  };
+
+  const handleExportSoundAndDisplay = () => {
+    const configToExport: ExportableSoundAndDisplayConfig = {
       playSoundAtPeriodEnd: state.playSoundAtPeriodEnd,
       customHornSoundDataUrl: state.customHornSoundDataUrl,
       enableTeamSelectionInMiniScoreboard: state.enableTeamSelectionInMiniScoreboard,
@@ -209,33 +265,28 @@ export default function ConfigPage() {
       showAliasInControlsPenaltyList: state.showAliasInControlsPenaltyList,
       showAliasInScoreboardPenalties: state.showAliasInScoreboardPenalties,
       isMonitorModeEnabled: state.isMonitorModeEnabled,
+    };
+    exportSection("Configuración de Sonido y Display", configToExport, "icevision_sonido_display");
+  };
+  
+  const handleExportCategories = () => {
+    const configToExport: ExportableCategoriesConfig = {
       availableCategories: state.availableCategories,
       selectedMatchCategory: state.selectedMatchCategory,
     };
-    const jsonString = JSON.stringify(configToExport, null, 2);
-    const blob = new Blob([jsonString], { type: "application/json" });
-    const href = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-
-    link.href = href;
-    link.download = filename.trim();
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(href);
-
-    toast({
-      title: "Configuración Exportada",
-      description: `Archivo ${filename.trim()} descargado.`,
-    });
-    setIsExportDialogOpen(false);
+    exportSection("Configuración de Categorías", configToExport, "icevision_categorias");
   };
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  
+  const genericImportHandler = (
+    event: React.ChangeEvent<HTMLInputElement>,
+    sectionName: string,
+    requiredFields: string[],
+    dispatchActionType: 
+        | 'LOAD_FORMAT_AND_TIMINGS_CONFIG' 
+        | 'LOAD_SOUND_AND_DISPLAY_CONFIG' 
+        | 'LOAD_CATEGORIES_CONFIG',
+    fileInputRef: React.RefObject<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -246,62 +297,46 @@ export default function ConfigPage() {
         if (typeof text !== 'string') throw new Error("Error al leer el archivo.");
         const importedConfig = JSON.parse(text) as Partial<ConfigFields>;
 
-        if (!importedConfig.configName &&
-            importedConfig.defaultPeriodDuration === undefined &&
-            importedConfig.playersPerTeamOnIce === undefined &&
-            importedConfig.playSoundAtPeriodEnd === undefined &&
-            importedConfig.enablePlayerSelectionForPenalties === undefined &&
-            importedConfig.availableCategories === undefined
-           ) {
-          throw new Error("Archivo de configuración no válido o formato incorrecto.");
+        const missingFields = requiredFields.filter(field => !(field in importedConfig));
+        if (missingFields.length > 0 && requiredFields.length > 0) { // Check if any required fields are actually expected
+          throw new Error(`Archivo de configuración para ${sectionName} no válido. Faltan campos: ${missingFields.join(', ')}`);
+        }
+        
+        // Type assertion for payload
+        let payload: any;
+        if (dispatchActionType === 'LOAD_CATEGORIES_CONFIG') {
+            payload = {
+                availableCategories: importedConfig.availableCategories,
+                selectedMatchCategory: importedConfig.selectedMatchCategory,
+            } as Pick<ConfigFields, 'availableCategories' | 'selectedMatchCategory'>;
+        } else {
+            payload = importedConfig;
         }
 
-        const newConfigFromFile: Partial<ConfigFields> = {
-          configName: importedConfig.configName ?? state.configName,
-          defaultWarmUpDuration: importedConfig.defaultWarmUpDuration ?? state.defaultWarmUpDuration,
-          defaultPeriodDuration: importedConfig.defaultPeriodDuration ?? state.defaultPeriodDuration,
-          defaultOTPeriodDuration: importedConfig.defaultOTPeriodDuration ?? state.defaultOTPeriodDuration,
-          defaultBreakDuration: importedConfig.defaultBreakDuration ?? state.defaultBreakDuration,
-          defaultPreOTBreakDuration: importedConfig.defaultPreOTBreakDuration ?? state.defaultPreOTBreakDuration,
-          defaultTimeoutDuration: importedConfig.defaultTimeoutDuration ?? state.defaultTimeoutDuration,
-          maxConcurrentPenalties: importedConfig.maxConcurrentPenalties ?? state.maxConcurrentPenalties,
-          autoStartWarmUp: importedConfig.autoStartWarmUp ?? state.autoStartWarmUp,
-          autoStartBreaks: importedConfig.autoStartBreaks ?? state.autoStartBreaks,
-          autoStartPreOTBreaks: importedConfig.autoStartPreOTBreaks ?? state.autoStartPreOTBreaks,
-          autoStartTimeouts: importedConfig.autoStartTimeouts ?? state.autoStartTimeouts,
-          numberOfRegularPeriods: importedConfig.numberOfRegularPeriods ?? state.numberOfRegularPeriods,
-          numberOfOvertimePeriods: importedConfig.numberOfOvertimePeriods ?? state.numberOfOvertimePeriods,
-          playersPerTeamOnIce: importedConfig.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
-          playSoundAtPeriodEnd: importedConfig.playSoundAtPeriodEnd ?? state.playSoundAtPeriodEnd,
-          customHornSoundDataUrl: importedConfig.customHornSoundDataUrl === undefined ? state.customHornSoundDataUrl : importedConfig.customHornSoundDataUrl,
-          enableTeamSelectionInMiniScoreboard: importedConfig.enableTeamSelectionInMiniScoreboard ?? state.enableTeamSelectionInMiniScoreboard,
-          enablePlayerSelectionForPenalties: importedConfig.enablePlayerSelectionForPenalties ?? state.enablePlayerSelectionForPenalties,
-          showAliasInPenaltyPlayerSelector: importedConfig.showAliasInPenaltyPlayerSelector ?? state.showAliasInPenaltyPlayerSelector,
-          showAliasInControlsPenaltyList: importedConfig.showAliasInControlsPenaltyList ?? state.showAliasInControlsPenaltyList,
-          showAliasInScoreboardPenalties: importedConfig.showAliasInScoreboardPenalties ?? state.showAliasInScoreboardPenalties,
-          isMonitorModeEnabled: importedConfig.isMonitorModeEnabled ?? state.isMonitorModeEnabled,
-          availableCategories: importedConfig.availableCategories ?? state.availableCategories,
-          selectedMatchCategory: importedConfig.selectedMatchCategory ?? state.selectedMatchCategory,
-        };
 
-        dispatch({ type: 'LOAD_CONFIG_FROM_FILE', payload: newConfigFromFile });
-        setLocalConfigName(newConfigFromFile.configName || '');
-        setIsConfigNameDirty(false);
-        setIsDurationDirty(false);
-        setIsPenaltyDirty(false);
-        setIsSoundDirty(false);
-        setIsTeamSettingsDirty(false);
-        setIsCategorySettingsDirty(false);
+        dispatch({ type: dispatchActionType, payload });
+        
+        // Reset relevant dirty flags after successful import
+        if (dispatchActionType === 'LOAD_FORMAT_AND_TIMINGS_CONFIG') {
+            setIsFormatAndTimingsConfigNameDirty(false);
+            setIsDurationDirty(false);
+            setIsPenaltyDirty(false);
+        } else if (dispatchActionType === 'LOAD_SOUND_AND_DISPLAY_CONFIG') {
+            setIsSoundDirty(false);
+            setIsTeamSettingsDirty(false);
+        } else if (dispatchActionType === 'LOAD_CATEGORIES_CONFIG') {
+            setIsCategorySettingsDirty(false);
+        }
 
         toast({
-          title: "Configuración Importada",
-          description: `Configuración "${newConfigFromFile.configName || ''}" cargada exitosamente.`,
+          title: `${sectionName} Importado`,
+          description: `Configuración de ${sectionName.toLowerCase()} cargada exitosamente.`,
         });
       } catch (error) {
-        console.error("Error importing config:", error);
+        console.error(`Error importing ${sectionName}:`, error);
         toast({
-          title: "Error al Importar",
-          description: (error as Error).message || "No se pudo procesar el archivo de configuración.",
+          title: `Error al Importar ${sectionName}`,
+          description: (error as Error).message || `No se pudo procesar el archivo de ${sectionName.toLowerCase()}.`,
           variant: "destructive",
         });
       } finally {
@@ -313,14 +348,39 @@ export default function ConfigPage() {
     reader.readAsText(file);
   };
 
+  const handleImportFormatAndTimings = (event: React.ChangeEvent<HTMLInputElement>) => {
+    genericImportHandler(event, "Formato y Tiempos", 
+      ['formatAndTimingsConfigName', 'defaultPeriodDuration'], // Sample required fields
+      'LOAD_FORMAT_AND_TIMINGS_CONFIG',
+      fileInputRefFormatAndTimings
+    );
+  };
+
+  const handleImportSoundAndDisplay = (event: React.ChangeEvent<HTMLInputElement>) => {
+    genericImportHandler(event, "Sonido y Display",
+      ['playSoundAtPeriodEnd', 'isMonitorModeEnabled'], // Sample required fields
+      'LOAD_SOUND_AND_DISPLAY_CONFIG',
+      fileInputRefSoundAndDisplay
+    );
+  };
+  
+  const handleImportCategories = (event: React.ChangeEvent<HTMLInputElement>) => {
+    genericImportHandler(event, "Categorías",
+      ['availableCategories'], // Sample required field
+      'LOAD_CATEGORIES_CONFIG',
+      fileInputRefCategories
+    );
+  };
+
+
   const handlePrepareResetConfig = () => {
     setIsResetConfigDialogOpen(true);
   };
 
   const performConfigReset = () => {
     dispatch({ type: 'RESET_CONFIG_TO_DEFAULTS' });
-    setLocalConfigName(initialConfigStateForReset.configName);
-    setIsConfigNameDirty(false);
+    setLocalFormatAndTimingsConfigName(initialFormatAndTimingsConfigNameForReset); // Reset specific name
+    setIsFormatAndTimingsConfigNameDirty(false);
     setIsDurationDirty(false);
     setIsPenaltyDirty(false);
     setIsSoundDirty(false);
@@ -334,7 +394,9 @@ export default function ConfigPage() {
     setIsResetConfigDialogOpen(false);
   };
 
-  const tabContentClassName = "mt-6 p-6 border rounded-md bg-card/30 shadow-sm";
+  const tabContentClassName = "mt-6 p-0 sm:p-6 border-0 sm:border rounded-md sm:bg-card/30 sm:shadow-sm";
+  const sectionCardClassName = "mb-8 p-6 border rounded-md bg-card shadow-sm";
+
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-8">
@@ -343,41 +405,56 @@ export default function ConfigPage() {
         {pageIsDirty && (
           <div className="flex gap-2">
             <Button onClick={handleSaveAllConfig} size="sm">
-              <Save className="mr-2 h-4 w-4" /> Guardar Config.
+              <Save className="mr-2 h-4 w-4" /> Guardar Cambios
             </Button>
             <Button onClick={handleDiscardAllConfig} variant="outline" size="sm">
-              <Undo2 className="mr-2 h-4 w-4" /> Descartar Config.
+              <Undo2 className="mr-2 h-4 w-4" /> Descartar Cambios
             </Button>
           </div>
         )}
       </div>
-
-      <div className="space-y-4 p-6 border rounded-md bg-card">
-        <Label htmlFor="configName" className="text-lg font-medium">Nombre de la Configuración</Label>
-        <Input
-          id="configName"
-          value={localConfigName}
-          onChange={(e) => handleLocalConfigNameChange(e.target.value)}
-          placeholder="ej. Formato 4vs4 Juvenil"
-          className="text-base"
-        />
-        <p className="text-xs text-muted-foreground">
-          Este nombre se usará para identificar la configuración al exportarla.
-        </p>
-      </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3">
-          <TabsTrigger value="formatAndTimings">Formato y Tiempos</TabsTrigger>
-          <TabsTrigger value="soundAndDisplay">Sonido y Display</TabsTrigger>
-          <TabsTrigger value="categoriesAndTeams">Categorías y Equipos</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 h-auto sm:h-10">
+          <TabsTrigger value="formatAndTimings" className="py-2 sm:py-1.5">Formato y Tiempos</TabsTrigger>
+          <TabsTrigger value="soundAndDisplay" className="py-2 sm:py-1.5">Sonido y Display</TabsTrigger>
+          <TabsTrigger value="categoriesAndTeams" className="py-2 sm:py-1.5">Categorías y Equipos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="formatAndTimings" className={tabContentClassName}>
           <div className="space-y-6">
+             <div className={sectionCardClassName}>
+                <Label htmlFor="formatAndTimingsConfigName" className="text-lg font-medium">Nombre de Config. (Formato y Tiempos)</Label>
+                <Input
+                id="formatAndTimingsConfigName"
+                value={localFormatAndTimingsConfigName}
+                onChange={(e) => handleLocalFormatAndTimingsConfigNameChange(e.target.value)}
+                placeholder="ej. Torneo Apertura 2024"
+                className="text-base mt-2"
+                />
+                <p className="text-xs text-muted-foreground mt-1.5">
+                Este nombre se usará para identificar esta sección de configuración al exportarla.
+                </p>
+            </div>
             <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} />
             <Separator />
             <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} />
+            <Separator />
+             <div className="space-y-3 pt-4">
+                <h3 className="text-lg font-semibold text-primary-foreground">Exportar/Importar Configuración de Formato y Tiempos</h3>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <Button onClick={handleExportFormatAndTimings} variant="outline" className="flex-1">
+                        <Download className="mr-2 h-4 w-4" /> Exportar (JSON)
+                    </Button>
+                    <Button onClick={() => fileInputRefFormatAndTimings.current?.click()} variant="outline" className="flex-1">
+                        <Upload className="mr-2 h-4 w-4" /> Importar (JSON)
+                    </Button>
+                    <input
+                        type="file" ref={fileInputRefFormatAndTimings} onChange={handleImportFormatAndTimings}
+                        accept=".json" className="hidden"
+                    />
+                </div>
+            </div>
           </div>
         </TabsContent>
 
@@ -386,12 +463,47 @@ export default function ConfigPage() {
             <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
             <Separator />
             <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty}/>
+            <Separator />
+            <div className="space-y-3 pt-4">
+                <h3 className="text-lg font-semibold text-primary-foreground">Exportar/Importar Configuración de Sonido y Display</h3>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <Button onClick={handleExportSoundAndDisplay} variant="outline" className="flex-1">
+                        <Download className="mr-2 h-4 w-4" /> Exportar (JSON)
+                    </Button>
+                    <Button onClick={() => fileInputRefSoundAndDisplay.current?.click()} variant="outline" className="flex-1">
+                        <Upload className="mr-2 h-4 w-4" /> Importar (JSON)
+                    </Button>
+                     <input
+                        type="file" ref={fileInputRefSoundAndDisplay} onChange={handleImportSoundAndDisplay}
+                        accept=".json" className="hidden"
+                    />
+                </div>
+            </div>
            </div>
         </TabsContent>
 
         <TabsContent value="categoriesAndTeams" className={tabContentClassName}>
           <div className="space-y-8">
             <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
+             <Separator />
+            <div className="space-y-3 pt-0"> {/* Adjusted pt-0 as CategorySettingsCard has its own padding */}
+                <h3 className="text-lg font-semibold text-primary-foreground">Exportar/Importar Configuración de Categorías</h3>
+                 <p className="text-sm text-muted-foreground">
+                    Guarda o carga la lista de categorías disponibles y la categoría seleccionada por defecto para los partidos.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <Button onClick={handleExportCategories} variant="outline" className="flex-1">
+                        <Download className="mr-2 h-4 w-4" /> Exportar Categorías (JSON)
+                    </Button>
+                    <Button onClick={() => fileInputRefCategories.current?.click()} variant="outline" className="flex-1">
+                        <Upload className="mr-2 h-4 w-4" /> Importar Categorías (JSON)
+                    </Button>
+                     <input
+                        type="file" ref={fileInputRefCategories} onChange={handleImportCategories}
+                        accept=".json" className="hidden"
+                    />
+                </div>
+            </div>
             <Separator />
             <TeamsManagementTab />
           </div>
@@ -401,10 +513,10 @@ export default function ConfigPage() {
       {pageIsDirty && (
         <div className="mt-8 flex justify-end gap-2">
           <Button onClick={handleSaveAllConfig}>
-            <Save className="mr-2 h-4 w-4" /> Guardar Configuración
+            <Save className="mr-2 h-4 w-4" /> Guardar Cambios Pendientes
           </Button>
           <Button onClick={handleDiscardAllConfig} variant="outline">
-            <Undo2 className="mr-2 h-4 w-4" /> Descartar Configuración
+            <Undo2 className="mr-2 h-4 w-4" /> Descartar Cambios Pendientes
           </Button>
         </div>
       )}
@@ -412,32 +524,25 @@ export default function ConfigPage() {
       <Separator className="my-10" />
 
       <div className="space-y-6 p-6 border rounded-md bg-card">
-        <h2 className="text-xl font-semibold text-primary-foreground">Acciones de Configuración</h2>
+        <h2 className="text-xl font-semibold text-primary-foreground">Restablecer Todas las Configuraciones</h2>
         <p className="text-sm text-muted-foreground">
-          Guarda tu configuración general actual en un archivo, carga una configuración previamente guardada, o restablece todas las configuraciones a sus valores predeterminados de fábrica.
+          Restablece todas las configuraciones de todas las secciones (Formato y Tiempos, Sonido y Display, y Categorías) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer.
+          La lista de Equipos y Jugadores NO será afectada.
         </p>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Button onClick={prepareExportConfig} variant="outline" className="flex-1">
-            <Download className="mr-2 h-4 w-4" /> Exportar Configuración
-          </Button>
-          <Button onClick={handleImportClick} variant="outline" className="flex-1">
-            <Upload className="mr-2 h-4 w-4" /> Importar Configuración
-          </Button>
+        <div className="flex justify-start">
           <Button onClick={handlePrepareResetConfig} variant="destructive" >
-            <RotateCcw className="mr-2 h-4 w-4" /> Restablecer
+            <RotateCcw className="mr-2 h-4 w-4" /> Restablecer Todas las Configuraciones
           </Button>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".json"
-            className="hidden"
-          />
         </div>
       </div>
 
       {isExportDialogOpen && (
-        <AlertDialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+        <AlertDialog open={isExportDialogOpen} onOpenChange={(open) => {
+            if (!open) {
+                setCurrentExportAction(null); // Clear action when dialog closes
+            }
+            setIsExportDialogOpen(open);
+        }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Nombre del Archivo de Exportación</AlertDialogTitle>
@@ -452,8 +557,8 @@ export default function ConfigPage() {
               className="my-4"
             />
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setIsExportDialogOpen(false)}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={() => performExport(currentExportFilename)}>
+              <AlertDialogCancel onClick={() => { setIsExportDialogOpen(false); setCurrentExportAction(null); }}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => performExportActionWithDialog(currentExportFilename)}>
                 Exportar
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -465,15 +570,15 @@ export default function ConfigPage() {
         <AlertDialog open={isResetConfigDialogOpen} onOpenChange={setIsResetConfigDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar Restablecimiento</AlertDialogTitle>
+              <AlertDialogTitle>Confirmar Restablecimiento Total</AlertDialogTitle>
               <AlertDialogDescription>
-                Esto restablecerá TODAS las configuraciones de esta página (nombre, duraciones, máximos, arranques automáticos, número de períodos, jugadores en cancha, sonido, configuraciones de equipo/alias, modo monitor y categorías) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer. ¿Estás seguro?
+                Esto restablecerá TODAS las configuraciones de esta página (Formato y Tiempos, Sonido y Display, y lista de Categorías) a sus valores predeterminados de fábrica. La lista de Equipos y sus jugadores NO se verá afectada. Esta acción no se puede deshacer. ¿Estás seguro?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setIsResetConfigDialogOpen(false)}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={performConfigReset}>
-                Restablecer
+              <AlertDialogAction onClick={performConfigReset} className="bg-destructive hover:bg-destructive/90">
+                Confirmar Restablecimiento
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

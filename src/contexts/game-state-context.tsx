@@ -22,7 +22,7 @@ if (typeof window !== 'undefined') {
 
 
 // Duraciones por defecto iniciales, se guardarán en centésimas de segundo
-const INITIAL_CONFIG_NAME = "Configuración Predeterminada";
+const INITIAL_FORMAT_AND_TIMINGS_CONFIG_NAME = "Formato y Tiempos Predeterminado";
 const INITIAL_WARM_UP_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND;
 const INITIAL_PERIOD_DURATION = 20 * 60 * CENTISECONDS_PER_SECOND;
 const INITIAL_OT_PERIOD_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND;
@@ -111,7 +111,7 @@ export type GameAction =
   | { type: 'START_TIMEOUT' }
   | { type: 'END_TIMEOUT' }
   | { type: 'MANUAL_END_GAME' } // New action
-  | { type: 'SET_CONFIG_NAME'; payload: string }
+  | { type: 'SET_FORMAT_AND_TIMINGS_CONFIG_NAME'; payload: string } // New action for specific config name
   | { type: 'SET_DEFAULT_WARM_UP_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_PERIOD_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_OT_PERIOD_DURATION'; payload: number }
@@ -138,7 +138,10 @@ export type GameAction =
   // Category Actions
   | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
   | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
-  | { type: 'LOAD_CONFIG_FROM_FILE'; payload: Partial<ConfigFields> }
+  // Modular Import/Export Actions
+  | { type: 'LOAD_FORMAT_AND_TIMINGS_CONFIG'; payload: Partial<ConfigFields> }
+  | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<ConfigFields> }
+  | { type: 'LOAD_CATEGORIES_CONFIG'; payload: Pick<ConfigFields, 'availableCategories' | 'selectedMatchCategory'> }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
   | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState }
   | { type: 'RESET_CONFIG_TO_DEFAULTS' }
@@ -166,7 +169,7 @@ const initialGlobalState: GameState = {
   homeTeamSubName: undefined,
   awayTeamName: 'Visitante',
   awayTeamSubName: undefined,
-  configName: INITIAL_CONFIG_NAME,
+  formatAndTimingsConfigName: INITIAL_FORMAT_AND_TIMINGS_CONFIG_NAME,
   defaultWarmUpDuration: INITIAL_WARM_UP_DURATION,
   defaultPeriodDuration: INITIAL_PERIOD_DURATION,
   defaultOTPeriodDuration: INITIAL_OT_PERIOD_DURATION,
@@ -316,10 +319,10 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
       newPenalties.push({ ...p });
       continue;
     }
-
-    if (p.remainingTime <= 0) {
-      continue;
+    if (p.remainingTime <= 0) { // Ensure finished penalties are filtered out here
+        continue;
     }
+
 
     let currentStatus: Penalty['_status'] = undefined;
     if (p.playerNumber && activePlayerTickets.has(p.playerNumber)) {
@@ -364,9 +367,9 @@ const cleanPenaltiesForStorage = (penalties?: Penalty[]): Penalty[] => {
     if (p._status && p._status !== 'pending_puck') {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { _status, ...rest } = p;
-      return rest as Penalty; // Cast as Penalty, _status will be undefined
+      return rest as Penalty; 
     }
-    return p; // Keep penalty as is if _status is 'pending_puck' or undefined
+    return p; 
   });
 };
 
@@ -401,6 +404,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const hydratedBase: GameState = {
         ...initialGlobalState,
         ...hydratedBasePartial,
+        formatAndTimingsConfigName: action.payload?.formatAndTimingsConfigName ?? initialGlobalState.formatAndTimingsConfigName,
         availableCategories: hydratedCategories, // Use robustly hydrated categories
         teams: (action.payload?.teams || initialGlobalState.teams).map(t => ({...t, subName: t.subName || undefined })), // Ensure teams is always an array and subName is correctly undefined
         playHornTrigger: initialGlobalState.playHornTrigger, // Reset playHornTrigger on hydration
@@ -961,8 +965,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
       newPlayHornTrigger = state.playHornTrigger + 1;
       break;
-    case 'SET_CONFIG_NAME':
-      newStateWithoutMeta = { ...state, configName: action.payload || initialGlobalState.configName };
+    case 'SET_FORMAT_AND_TIMINGS_CONFIG_NAME':
+      newStateWithoutMeta = { ...state, formatAndTimingsConfigName: action.payload || initialGlobalState.formatAndTimingsConfigName };
       break;
     case 'SET_DEFAULT_WARM_UP_DURATION':
       newStateWithoutMeta = { ...state, defaultWarmUpDuration: Math.max(60 * CENTISECONDS_PER_SECOND, action.payload) };
@@ -1063,85 +1067,98 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_SELECTED_MATCH_CATEGORY':
       newStateWithoutMeta = { ...state, selectedMatchCategory: action.payload };
       break;
-    case 'LOAD_CONFIG_FROM_FILE': {
-      const config = action.payload;
-      let enableTeamUsage = config.enableTeamSelectionInMiniScoreboard ?? state.enableTeamSelectionInMiniScoreboard;
-      let enablePlayerSelection = config.enablePlayerSelectionForPenalties ?? state.enablePlayerSelectionForPenalties;
-      let showAliasInSelector = config.showAliasInPenaltyPlayerSelector ?? state.showAliasInPenaltyPlayerSelector;
-      let showAliasInControls = config.showAliasInControlsPenaltyList ?? state.showAliasInControlsPenaltyList;
-      let showAliasInScoreboard = config.showAliasInScoreboardPenalties ?? state.showAliasInScoreboardPenalties;
+    case 'LOAD_FORMAT_AND_TIMINGS_CONFIG': {
+        const config = action.payload;
+        newStateWithoutMeta = {
+            ...state,
+            formatAndTimingsConfigName: config.formatAndTimingsConfigName ?? state.formatAndTimingsConfigName,
+            defaultWarmUpDuration: config.defaultWarmUpDuration ?? state.defaultWarmUpDuration,
+            defaultPeriodDuration: config.defaultPeriodDuration ?? state.defaultPeriodDuration,
+            defaultOTPeriodDuration: config.defaultOTPeriodDuration ?? state.defaultOTPeriodDuration,
+            defaultBreakDuration: config.defaultBreakDuration ?? state.defaultBreakDuration,
+            defaultPreOTBreakDuration: config.defaultPreOTBreakDuration ?? state.defaultPreOTBreakDuration,
+            defaultTimeoutDuration: config.defaultTimeoutDuration ?? state.defaultTimeoutDuration,
+            maxConcurrentPenalties: config.maxConcurrentPenalties ?? state.maxConcurrentPenalties,
+            autoStartWarmUp: config.autoStartWarmUp ?? state.autoStartWarmUp,
+            autoStartBreaks: config.autoStartBreaks ?? state.autoStartBreaks,
+            autoStartPreOTBreaks: config.autoStartPreOTBreaks ?? state.autoStartPreOTBreaks,
+            autoStartTimeouts: config.autoStartTimeouts ?? state.autoStartTimeouts,
+            numberOfRegularPeriods: config.numberOfRegularPeriods ?? state.numberOfRegularPeriods,
+            numberOfOvertimePeriods: config.numberOfOvertimePeriods ?? state.numberOfOvertimePeriods,
+            playersPerTeamOnIce: config.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
+        };
+        const newMaxPen = newStateWithoutMeta.maxConcurrentPenalties;
+        newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, newMaxPen));
+        newStateWithoutMeta.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.awayPenalties, newMaxPen));
+        break;
+    }
+    case 'LOAD_SOUND_AND_DISPLAY_CONFIG': {
+        const config = action.payload;
+        let enableTeamUsage = config.enableTeamSelectionInMiniScoreboard ?? state.enableTeamSelectionInMiniScoreboard;
+        let enablePlayerSelection = config.enablePlayerSelectionForPenalties ?? state.enablePlayerSelectionForPenalties;
+        let showAliasInSelector = config.showAliasInPenaltyPlayerSelector ?? state.showAliasInPenaltyPlayerSelector;
+        let showAliasInControls = config.showAliasInControlsPenaltyList ?? state.showAliasInControlsPenaltyList;
+        let showAliasInScoreboard = config.showAliasInScoreboardPenalties ?? state.showAliasInScoreboardPenalties;
 
-      if (!enableTeamUsage) {
-        enablePlayerSelection = false;
-        showAliasInSelector = false;
-        showAliasInControls = false;
-        showAliasInScoreboard = false;
-      }
-      if (!enablePlayerSelection){
-        showAliasInSelector = false;
-        showAliasInControls = false;
-        showAliasInScoreboard = false;
-      }
-
-      // Robust category handling from file
-      let importedCategoriesFromFile: CategoryData[];
-      const fileCategories = config.availableCategories;
-      if (Array.isArray(fileCategories) && fileCategories.length > 0) {
-        if (typeof fileCategories[0] === 'string') {
-          importedCategoriesFromFile = (fileCategories as string[]).map(name => ({ id: name, name: name }));
-        } else if (typeof fileCategories[0] === 'object' && fileCategories[0] !== null && 'id' in fileCategories[0] && 'name' in fileCategories[0]) {
-          importedCategoriesFromFile = fileCategories as CategoryData[];
-        } else {
-          importedCategoriesFromFile = state.availableCategories; // Fallback to current state's if format is unknown
+        if (!enableTeamUsage) {
+            enablePlayerSelection = false;
+            showAliasInSelector = false;
+            showAliasInControls = false;
+            showAliasInScoreboard = false;
         }
-      } else {
-        importedCategoriesFromFile = state.availableCategories; // Fallback if not in file or empty
-      }
+        if (!enablePlayerSelection){
+            showAliasInSelector = false;
+            showAliasInControls = false;
+            showAliasInScoreboard = false;
+        }
+        newStateWithoutMeta = {
+            ...state,
+            playSoundAtPeriodEnd: config.playSoundAtPeriodEnd ?? state.playSoundAtPeriodEnd,
+            customHornSoundDataUrl: config.customHornSoundDataUrl === undefined ? state.customHornSoundDataUrl : config.customHornSoundDataUrl,
+            enableTeamSelectionInMiniScoreboard: enableTeamUsage,
+            enablePlayerSelectionForPenalties: enablePlayerSelection,
+            showAliasInPenaltyPlayerSelector: showAliasInSelector,
+            showAliasInControlsPenaltyList: showAliasInControls,
+            showAliasInScoreboardPenalties: showAliasInScoreboard,
+            isMonitorModeEnabled: config.isMonitorModeEnabled ?? state.isMonitorModeEnabled,
+        };
+        break;
+    }
+    case 'LOAD_CATEGORIES_CONFIG': {
+        const config = action.payload;
+        let importedCategoriesFromFile: CategoryData[];
+        const fileCategories = config.availableCategories;
 
-      let importedSelectedMatchCategory = config.selectedMatchCategory ?? state.selectedMatchCategory;
-      if (!importedCategoriesFromFile.find(c => c.id === importedSelectedMatchCategory) && importedCategoriesFromFile.length > 0) {
-        importedSelectedMatchCategory = importedCategoriesFromFile[0].id;
-      } else if (importedCategoriesFromFile.length === 0) {
-        importedSelectedMatchCategory = '';
-      }
+        if (Array.isArray(fileCategories) && fileCategories.length > 0) {
+            if (typeof fileCategories[0] === 'string') {
+                importedCategoriesFromFile = (fileCategories as string[]).map(name => ({ id: name, name: name }));
+            } else if (typeof fileCategories[0] === 'object' && fileCategories[0] !== null && 'id' in fileCategories[0] && 'name' in fileCategories[0]) {
+                importedCategoriesFromFile = fileCategories as CategoryData[];
+            } else {
+                importedCategoriesFromFile = state.availableCategories;
+            }
+        } else {
+            importedCategoriesFromFile = state.availableCategories;
+        }
 
-      newStateWithoutMeta = {
-        ...state,
-        configName: config.configName ?? state.configName,
-        defaultWarmUpDuration: config.defaultWarmUpDuration ?? state.defaultWarmUpDuration,
-        defaultPeriodDuration: config.defaultPeriodDuration ?? state.defaultPeriodDuration,
-        defaultOTPeriodDuration: config.defaultOTPeriodDuration ?? state.defaultOTPeriodDuration,
-        defaultBreakDuration: config.defaultBreakDuration ?? state.defaultBreakDuration,
-        defaultPreOTBreakDuration: config.defaultPreOTBreakDuration ?? state.defaultPreOTBreakDuration,
-        defaultTimeoutDuration: config.defaultTimeoutDuration ?? state.defaultTimeoutDuration,
-        maxConcurrentPenalties: config.maxConcurrentPenalties ?? state.maxConcurrentPenalties,
-        autoStartWarmUp: config.autoStartWarmUp ?? state.autoStartWarmUp,
-        autoStartBreaks: config.autoStartBreaks ?? state.autoStartBreaks,
-        autoStartPreOTBreaks: config.autoStartPreOTBreaks ?? state.autoStartPreOTBreaks,
-        autoStartTimeouts: config.autoStartTimeouts ?? state.autoStartTimeouts,
-        numberOfRegularPeriods: config.numberOfRegularPeriods ?? state.numberOfRegularPeriods,
-        numberOfOvertimePeriods: config.numberOfOvertimePeriods ?? state.numberOfOvertimePeriods,
-        playersPerTeamOnIce: config.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
-        playSoundAtPeriodEnd: config.playSoundAtPeriodEnd ?? state.playSoundAtPeriodEnd,
-        customHornSoundDataUrl: config.customHornSoundDataUrl === undefined ? state.customHornSoundDataUrl : config.customHornSoundDataUrl,
-        enableTeamSelectionInMiniScoreboard: enableTeamUsage,
-        enablePlayerSelectionForPenalties: enablePlayerSelection,
-        showAliasInPenaltyPlayerSelector: showAliasInSelector,
-        showAliasInControlsPenaltyList: showAliasInControls,
-        showAliasInScoreboardPenalties: showAliasInScoreboard,
-        isMonitorModeEnabled: config.isMonitorModeEnabled ?? state.isMonitorModeEnabled,
-        availableCategories: importedCategoriesFromFile,
-        selectedMatchCategory: importedSelectedMatchCategory,
-      };
-      const newMaxPen = newStateWithoutMeta.maxConcurrentPenalties;
-      newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, newMaxPen));
-      newStateWithoutMeta.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.awayPenalties, newMaxPen));
-      break;
+        let importedSelectedMatchCategory = config.selectedMatchCategory ?? state.selectedMatchCategory;
+        if (!importedCategoriesFromFile.find(c => c.id === importedSelectedMatchCategory) && importedCategoriesFromFile.length > 0) {
+            importedSelectedMatchCategory = importedCategoriesFromFile[0].id;
+        } else if (importedCategoriesFromFile.length === 0) {
+            importedSelectedMatchCategory = '';
+        }
+
+        newStateWithoutMeta = {
+            ...state,
+            availableCategories: importedCategoriesFromFile,
+            selectedMatchCategory: importedSelectedMatchCategory,
+        };
+        break;
     }
     case 'RESET_CONFIG_TO_DEFAULTS': {
       newStateWithoutMeta = {
         ...state,
-        configName: INITIAL_CONFIG_NAME,
+        formatAndTimingsConfigName: INITIAL_FORMAT_AND_TIMINGS_CONFIG_NAME,
         defaultWarmUpDuration: INITIAL_WARM_UP_DURATION,
         defaultPeriodDuration: INITIAL_PERIOD_DURATION,
         defaultOTPeriodDuration: INITIAL_OT_PERIOD_DURATION,
@@ -1370,7 +1387,8 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         const rawStoredState = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (rawStoredState) {
           const parsedState = JSON.parse(rawStoredState) as Partial<GameState>;
-          if (parsedState && typeof parsedState.configName === 'string' && parsedState._lastUpdatedTimestamp) { // Check for a meaningful field
+           // Check for a meaningful field, e.g., formatAndTimingsConfigName
+          if (parsedState && typeof parsedState.formatAndTimingsConfigName === 'string' && parsedState._lastUpdatedTimestamp) {
             finalPayloadForHydration = { ...parsedState };
             loadedFromLocalStorage = true;
             console.log("Loaded state from localStorage.");
@@ -1387,17 +1405,48 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         let configFromFile: Partial<ConfigFields> | null = null;
         let teamsFromFile: TeamData[] | null = null;
 
+        // Attempt to load format-and-timings config
         try {
-          const configRes = await fetch('/defaults/default-config.json');
-          if (configRes.ok) {
-            configFromFile = await configRes.json();
-            console.log("Loaded default config from file.");
+          const ftRes = await fetch('/defaults/default-format-timings.json');
+          if (ftRes.ok) {
+            const ftConfig = await ftRes.json();
+            if (ftConfig) configFromFile = { ...(configFromFile || {}), ...ftConfig };
+            console.log("Loaded default format-timings config from file.");
           } else {
-            console.warn(`Default config file '/defaults/default-config.json' not found (status: ${configRes.status}) or failed to load. Using system defaults for config.`);
+             console.warn(`Default format-timings file '/defaults/default-format-timings.json' not found (status: ${ftRes.status}) or failed to load.`);
           }
         } catch (error) {
-          console.error('Error fetching default-config.json:', error);
+            console.error('Error fetching default-format-timings.json:', error);
         }
+
+        // Attempt to load sound-and-display config
+        try {
+          const sdRes = await fetch('/defaults/default-sound-display.json');
+          if (sdRes.ok) {
+            const sdConfig = await sdRes.json();
+            if (sdConfig) configFromFile = { ...(configFromFile || {}), ...sdConfig };
+            console.log("Loaded default sound-display config from file.");
+          } else {
+            console.warn(`Default sound-display file '/defaults/default-sound-display.json' not found (status: ${sdRes.status}) or failed to load.`);
+          }
+        } catch (error) {
+             console.error('Error fetching default-sound-display.json:', error);
+        }
+        
+        // Attempt to load categories config
+        try {
+          const catRes = await fetch('/defaults/default-categories.json');
+          if (catRes.ok) {
+            const catConfig = await catRes.json() as Pick<ConfigFields, 'availableCategories' | 'selectedMatchCategory'>;
+            if (catConfig) configFromFile = { ...(configFromFile || {}), ...catConfig };
+            console.log("Loaded default categories config from file.");
+          } else {
+             console.warn(`Default categories file '/defaults/default-categories.json' not found (status: ${catRes.status}) or failed to load.`);
+          }
+        } catch (error) {
+            console.error('Error fetching default-categories.json:', error);
+        }
+
 
         try {
           const teamsRes = await fetch('/defaults/default-teams.json');
@@ -1419,9 +1468,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         if (teamsFromFile) {
           finalPayloadForHydration.teams = teamsFromFile.map(t => ({...t, subName: t.subName || undefined}));
         }
-        // Ensure _lastUpdatedTimestamp is not set if loading from files/initial,
-        // so it doesn't overwrite a potentially newer state from another tab after this initial load.
-        // The HYDRATE_FROM_STORAGE reducer will handle this.
         delete finalPayloadForHydration._lastUpdatedTimestamp;
       }
       
@@ -1596,8 +1642,3 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
   const category = availableCategories.find(cat => cat && typeof cat === 'object' && cat.id === categoryId);
   return category ? category.name : undefined;
 };
-
-
-    
-
-

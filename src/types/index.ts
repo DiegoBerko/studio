@@ -36,7 +36,7 @@ export interface CategoryData {
 
 // Combined ConfigFields
 export interface ConfigFields {
-  configName: string;
+  formatAndTimingsConfigName: string; // Specific config name for this section
   defaultWarmUpDuration: number;
   defaultPeriodDuration: number;
   defaultOTPeriodDuration: number;
@@ -62,4 +62,3 @@ export interface ConfigFields {
   selectedMatchCategory: string;
   isMonitorModeEnabled: boolean; // New field for Monitor Mode
 }
-
