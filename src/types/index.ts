@@ -34,9 +34,8 @@ export interface CategoryData {
   name: string;
 }
 
-// Combined ConfigFields
-export interface ConfigFields {
-  formatAndTimingsConfigName: string; // Specific config name for this section
+// Data fields for a single Format & Timings Profile
+export interface FormatAndTimingsProfileData {
   defaultWarmUpDuration: number;
   defaultPeriodDuration: number;
   defaultOTPeriodDuration: number;
@@ -51,6 +50,20 @@ export interface ConfigFields {
   numberOfRegularPeriods: number;
   numberOfOvertimePeriods: number;
   playersPerTeamOnIce: number;
+}
+
+// Full Format & Timings Profile structure (including id and name)
+export interface FormatAndTimingsProfile extends FormatAndTimingsProfileData {
+  id: string;
+  name: string;
+}
+
+
+// Combined ConfigFields - Represents the *active/effective* settings from the selected profile
+export interface ConfigFields extends FormatAndTimingsProfileData {
+  // formatAndTimingsConfigName: string; // This will be part of FormatAndTimingsProfile instead
+  
+  // Sound & Display settings
   playSoundAtPeriodEnd: boolean;
   customHornSoundDataUrl: string | null;
   enableTeamSelectionInMiniScoreboard: boolean;
@@ -58,7 +71,9 @@ export interface ConfigFields {
   showAliasInPenaltyPlayerSelector: boolean;
   showAliasInControlsPenaltyList: boolean;
   showAliasInScoreboardPenalties: boolean;
+  isMonitorModeEnabled: boolean;
+
+  // Categories settings
   availableCategories: CategoryData[];
   selectedMatchCategory: string;
-  isMonitorModeEnabled: boolean; // New field for Monitor Mode
 }

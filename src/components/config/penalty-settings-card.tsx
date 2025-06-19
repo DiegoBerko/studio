@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
-import { useGameState } from "@/contexts/game-state-context";
+import { useGameState, type FormatAndTimingsProfileData } from "@/contexts/game-state-context";
 import { ControlCardWrapper } from "@/components/controls/control-card-wrapper";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -11,30 +11,36 @@ export interface PenaltySettingsCardRef {
   handleSave: () => boolean;
   handleDiscard: () => void;
   getIsDirty: () => boolean;
+  setValues: (values: Pick<FormatAndTimingsProfileData, 'maxConcurrentPenalties' | 'playersPerTeamOnIce'>) => void;
 }
 
 interface PenaltySettingsCardProps {
   onDirtyChange: (isDirty: boolean) => void;
+  initialValues: Pick<FormatAndTimingsProfileData, 'maxConcurrentPenalties' | 'playersPerTeamOnIce'>;
 }
 
 export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySettingsCardProps>((props, ref) => {
-  const { state, dispatch } = useGameState();
-  const { onDirtyChange } = props;
+  const { dispatch } = useGameState();
+  const { onDirtyChange, initialValues } = props;
   
-  const [localMaxPenaltiesInput, setLocalMaxPenaltiesInput] = useState(String(state.maxConcurrentPenalties));
-  const [localPlayersPerTeamInput, setLocalPlayersPerTeamInput] = useState(String(state.playersPerTeamOnIce));
+  const [localMaxPenaltiesInput, setLocalMaxPenaltiesInput] = useState(String(initialValues.maxConcurrentPenalties));
+  const [localPlayersPerTeamInput, setLocalPlayersPerTeamInput] = useState(String(initialValues.playersPerTeamOnIce));
   const [isDirtyLocal, setIsDirtyLocal] = useState(false);
+
+  const setValuesFromProfile = (values: Pick<FormatAndTimingsProfileData, 'maxConcurrentPenalties' | 'playersPerTeamOnIce'>) => {
+    setLocalMaxPenaltiesInput(String(values.maxConcurrentPenalties));
+    setLocalPlayersPerTeamInput(String(values.playersPerTeamOnIce));
+    setIsDirtyLocal(false);
+  };
+
+  useEffect(() => {
+    setValuesFromProfile(initialValues);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValues]);
 
   useEffect(() => {
     onDirtyChange(isDirtyLocal);
   }, [isDirtyLocal, onDirtyChange]);
-
-  useEffect(() => {
-    if (!isDirtyLocal) {
-        setLocalMaxPenaltiesInput(String(state.maxConcurrentPenalties));
-        setLocalPlayersPerTeamInput(String(state.playersPerTeamOnIce));
-    }
-  }, [state.maxConcurrentPenalties, state.playersPerTeamOnIce, isDirtyLocal]);
 
   const markDirty = () => setIsDirtyLocal(true);
 
@@ -54,11 +60,10 @@ export const PenaltySettingsCard = forwardRef<PenaltySettingsCardRef, PenaltySet
       return true;
     },
     handleDiscard: () => {
-      setLocalMaxPenaltiesInput(String(state.maxConcurrentPenalties));
-      setLocalPlayersPerTeamInput(String(state.playersPerTeamOnIce));
-      setIsDirtyLocal(false);
+      setValuesFromProfile(initialValues);
     },
     getIsDirty: () => isDirtyLocal,
+    setValues: setValuesFromProfile,
   }));
 
   return (

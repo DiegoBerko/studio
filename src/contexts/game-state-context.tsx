@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
-import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields } from '@/types';
+import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData } from '@/types';
 
 // --- Constantes para la sincronización local ---
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
@@ -22,7 +22,7 @@ if (typeof window !== 'undefined') {
 
 
 // Duraciones por defecto iniciales, se guardarán en centésimas de segundo
-const INITIAL_FORMAT_AND_TIMINGS_CONFIG_NAME = "Formato y Tiempos Predeterminado";
+const INITIAL_PROFILE_NAME = "Predeterminado"; // Used for the first default profile
 const INITIAL_WARM_UP_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND;
 const INITIAL_PERIOD_DURATION = 20 * 60 * CENTISECONDS_PER_SECOND;
 const INITIAL_OT_PERIOD_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND;
@@ -37,21 +37,41 @@ const INITIAL_AUTO_START_TIMEOUTS = true;
 const INITIAL_NUMBER_OF_REGULAR_PERIODS = 2;
 const INITIAL_NUMBER_OF_OVERTIME_PERIODS = 0;
 const INITIAL_PLAYERS_PER_TEAM_ON_ICE = 5;
+
+// Sound & Display Defaults
 const INITIAL_PLAY_SOUND_AT_PERIOD_END = true;
 const INITIAL_CUSTOM_HORN_SOUND_DATA_URL = null;
-
-// New Team and Alias Config Defaults
-const INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD = true; // This will be "Enable Team Usage"
+const INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD = true;
 const INITIAL_ENABLE_PLAYER_SELECTION_FOR_PENALTIES = true;
 const INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR = true;
 const INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST = true;
 const INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES = true;
+const INITIAL_IS_MONITOR_MODE_ENABLED = false;
 
 // Category Defaults
 const INITIAL_AVAILABLE_CATEGORIES_RAW = ['A', 'B', 'C', 'Menores', 'Damas'];
 const INITIAL_AVAILABLE_CATEGORIES: CategoryData[] = INITIAL_AVAILABLE_CATEGORIES_RAW.map(name => ({ id: name, name: name }));
 const INITIAL_SELECTED_MATCH_CATEGORY = INITIAL_AVAILABLE_CATEGORIES[0]?.id || '';
-const INITIAL_IS_MONITOR_MODE_ENABLED = false;
+
+
+const createDefaultFormatAndTimingsProfile = (id?: string, name?: string): FormatAndTimingsProfile => ({
+  id: id || crypto.randomUUID(),
+  name: name || INITIAL_PROFILE_NAME,
+  defaultWarmUpDuration: INITIAL_WARM_UP_DURATION,
+  defaultPeriodDuration: INITIAL_PERIOD_DURATION,
+  defaultOTPeriodDuration: INITIAL_OT_PERIOD_DURATION,
+  defaultBreakDuration: INITIAL_BREAK_DURATION,
+  defaultPreOTBreakDuration: INITIAL_PRE_OT_BREAK_DURATION,
+  defaultTimeoutDuration: INITIAL_TIMEOUT_DURATION,
+  maxConcurrentPenalties: INITIAL_MAX_CONCURRENT_PENALTIES,
+  autoStartWarmUp: INITIAL_AUTO_START_WARM_UP,
+  autoStartBreaks: INITIAL_AUTO_START_BREAKS,
+  autoStartPreOTBreaks: INITIAL_AUTO_START_PRE_OT_BREAKS,
+  autoStartTimeouts: INITIAL_AUTO_START_TIMEOUTS,
+  numberOfRegularPeriods: INITIAL_NUMBER_OF_REGULAR_PERIODS,
+  numberOfOvertimePeriods: INITIAL_NUMBER_OF_OVERTIME_PERIODS,
+  playersPerTeamOnIce: INITIAL_PLAYERS_PER_TEAM_ON_ICE,
+});
 
 
 type PeriodDisplayOverrideType = "Warm-up" | "Break" | "Pre-OT Break" | "Time Out" | "End of Game" | null;
@@ -82,7 +102,9 @@ interface GameState extends ConfigFields {
   clockStartTimeMs: number | null;
   remainingTimeAtStartCs: number | null; // in centiseconds
   playHornTrigger: number; // Increments to trigger sound effect
-  teams: TeamData[]; // New state for teams
+  teams: TeamData[];
+  formatAndTimingsProfiles: FormatAndTimingsProfile[];
+  selectedFormatAndTimingsProfileId: string | null;
   _lastActionOriginator?: string;
   _lastUpdatedTimestamp?: number;
 }
@@ -99,7 +121,7 @@ export type GameAction =
   | { type: 'REMOVE_PENALTY'; payload: { team: Team; penaltyId: string } }
   | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } }
   | { type: 'REORDER_PENALTIES'; payload: { team: Team; startIndex: number; endIndex: number } }
-  | { type: 'ACTIVATE_PENDING_PUCK_PENALTIES' } // New action for pending puck
+  | { type: 'ACTIVATE_PENDING_PUCK_PENALTIES' }
   | { type: 'TICK' }
   | { type: 'SET_HOME_TEAM_NAME'; payload: string }
   | { type: 'SET_HOME_TEAM_SUB_NAME'; payload?: string }
@@ -110,8 +132,15 @@ export type GameAction =
   | { type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' }
   | { type: 'START_TIMEOUT' }
   | { type: 'END_TIMEOUT' }
-  | { type: 'MANUAL_END_GAME' } // New action
-  | { type: 'SET_FORMAT_AND_TIMINGS_CONFIG_NAME'; payload: string }
+  | { type: 'MANUAL_END_GAME' }
+  // Format & Timings Profile Actions
+  | { type: 'ADD_FORMAT_AND_TIMINGS_PROFILE'; payload: { name: string; profileData?: Partial<FormatAndTimingsProfileData> } }
+  | { type: 'UPDATE_FORMAT_AND_TIMINGS_PROFILE_DATA'; payload: { profileId: string; updates: Partial<FormatAndTimingsProfileData> } }
+  | { type: 'UPDATE_FORMAT_AND_TIMINGS_PROFILE_NAME'; payload: { profileId: string; newName: string } }
+  | { type: 'DELETE_FORMAT_AND_TIMINGS_PROFILE'; payload: { profileId: string } }
+  | { type: 'SELECT_FORMAT_AND_TIMINGS_PROFILE'; payload: { profileId: string | null } }
+  | { type: 'LOAD_FORMAT_AND_TIMINGS_PROFILES'; payload: FormatAndTimingsProfile[] } // Replaces LOAD_FORMAT_AND_TIMINGS_CONFIG
+  // Actions for individual fields (will now also update selected profile)
   | { type: 'SET_DEFAULT_WARM_UP_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_PERIOD_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_OT_PERIOD_DURATION'; payload: number }
@@ -126,25 +155,23 @@ export type GameAction =
   | { type: 'SET_AUTO_START_BREAKS_VALUE'; payload: boolean }
   | { type: 'SET_AUTO_START_PRE_OT_BREAKS_VALUE'; payload: boolean }
   | { type: 'SET_AUTO_START_TIMEOUTS_VALUE'; payload: boolean }
+  // Sound & Display Actions
   | { type: 'SET_PLAY_SOUND_AT_PERIOD_END'; payload: boolean }
   | { type: 'SET_CUSTOM_HORN_SOUND_DATA_URL'; payload: string | null }
-  // New Team Config Actions
-  | { type: 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD'; payload: boolean } // Master "Enable Team Usage"
+  | { type: 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD'; payload: boolean }
   | { type: 'SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES'; payload: boolean }
-  | { type: 'SET_MONITOR_MODE_ENABLED'; payload: boolean } // New action for Monitor Mode
+  | { type: 'SET_MONITOR_MODE_ENABLED'; payload: boolean }
+  | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<ConfigFields> }
   // Category Actions
   | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
   | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
-  // Modular Import/Export Actions
-  | { type: 'LOAD_FORMAT_AND_TIMINGS_CONFIG'; payload: Partial<ConfigFields> }
-  | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<ConfigFields> }
-  | { type: 'LOAD_CATEGORIES_CONFIG'; payload: Pick<ConfigFields, 'availableCategories' | 'selectedMatchCategory'> }
+  // General State Actions
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
   | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState }
-  | { type: 'RESET_CONFIG_TO_DEFAULTS' }
+  | { type: 'RESET_CONFIG_TO_DEFAULTS' } // Will now reset current profile to defaults, and other sections
   | { type: 'RESET_GAME_STATE' }
   // Team Actions
   | { type: 'ADD_TEAM'; payload: Omit<TeamData, 'players'> & { id: string; players: PlayerData[] } }
@@ -156,11 +183,13 @@ export type GameAction =
   | { type: 'LOAD_TEAMS_FROM_FILE'; payload: TeamData[] };
 
 
+const defaultInitialProfile = createDefaultFormatAndTimingsProfile();
+
 const initialGlobalState: GameState = {
   homeScore: 0,
   awayScore: 0,
   currentPeriod: 0,
-  currentTime: INITIAL_WARM_UP_DURATION,
+  currentTime: defaultInitialProfile.defaultWarmUpDuration,
   isClockRunning: false,
   periodDisplayOverride: 'Warm-up',
   homePenalties: [],
@@ -169,38 +198,42 @@ const initialGlobalState: GameState = {
   homeTeamSubName: undefined,
   awayTeamName: 'Visitante',
   awayTeamSubName: undefined,
-  formatAndTimingsConfigName: INITIAL_FORMAT_AND_TIMINGS_CONFIG_NAME,
-  defaultWarmUpDuration: INITIAL_WARM_UP_DURATION,
-  defaultPeriodDuration: INITIAL_PERIOD_DURATION,
-  defaultOTPeriodDuration: INITIAL_OT_PERIOD_DURATION,
-  defaultBreakDuration: INITIAL_BREAK_DURATION,
-  defaultPreOTBreakDuration: INITIAL_PRE_OT_BREAK_DURATION,
-  defaultTimeoutDuration: INITIAL_TIMEOUT_DURATION,
-  maxConcurrentPenalties: INITIAL_MAX_CONCURRENT_PENALTIES,
-  autoStartWarmUp: INITIAL_AUTO_START_WARM_UP,
-  autoStartBreaks: INITIAL_AUTO_START_BREAKS,
-  autoStartPreOTBreaks: INITIAL_AUTO_START_PRE_OT_BREAKS,
-  autoStartTimeouts: INITIAL_AUTO_START_TIMEOUTS,
-  numberOfRegularPeriods: INITIAL_NUMBER_OF_REGULAR_PERIODS,
-  numberOfOvertimePeriods: INITIAL_NUMBER_OF_OVERTIME_PERIODS,
-  playersPerTeamOnIce: INITIAL_PLAYERS_PER_TEAM_ON_ICE,
+  // Format & Timings - reflects selected profile
+  defaultWarmUpDuration: defaultInitialProfile.defaultWarmUpDuration,
+  defaultPeriodDuration: defaultInitialProfile.defaultPeriodDuration,
+  defaultOTPeriodDuration: defaultInitialProfile.defaultOTPeriodDuration,
+  defaultBreakDuration: defaultInitialProfile.defaultBreakDuration,
+  defaultPreOTBreakDuration: defaultInitialProfile.defaultPreOTBreakDuration,
+  defaultTimeoutDuration: defaultInitialProfile.defaultTimeoutDuration,
+  maxConcurrentPenalties: defaultInitialProfile.maxConcurrentPenalties,
+  autoStartWarmUp: defaultInitialProfile.autoStartWarmUp,
+  autoStartBreaks: defaultInitialProfile.autoStartBreaks,
+  autoStartPreOTBreaks: defaultInitialProfile.autoStartPreOTBreaks,
+  autoStartTimeouts: defaultInitialProfile.autoStartTimeouts,
+  numberOfRegularPeriods: defaultInitialProfile.numberOfRegularPeriods,
+  numberOfOvertimePeriods: defaultInitialProfile.numberOfOvertimePeriods,
+  playersPerTeamOnIce: defaultInitialProfile.playersPerTeamOnIce,
+  // Format & Timings Profiles
+  formatAndTimingsProfiles: [defaultInitialProfile],
+  selectedFormatAndTimingsProfileId: defaultInitialProfile.id,
+  // Sound & Display
   playSoundAtPeriodEnd: INITIAL_PLAY_SOUND_AT_PERIOD_END,
   customHornSoundDataUrl: INITIAL_CUSTOM_HORN_SOUND_DATA_URL,
-  // New Team Config Defaults
   enableTeamSelectionInMiniScoreboard: INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD,
   enablePlayerSelectionForPenalties: INITIAL_ENABLE_PLAYER_SELECTION_FOR_PENALTIES,
   showAliasInPenaltyPlayerSelector: INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR,
   showAliasInControlsPenaltyList: INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
   showAliasInScoreboardPenalties: INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
-  isMonitorModeEnabled: INITIAL_IS_MONITOR_MODE_ENABLED, // Initialize Monitor Mode
-  // Category Defaults
+  isMonitorModeEnabled: INITIAL_IS_MONITOR_MODE_ENABLED,
+  // Categories
   availableCategories: INITIAL_AVAILABLE_CATEGORIES,
   selectedMatchCategory: INITIAL_SELECTED_MATCH_CATEGORY,
+  // Game Runtime State
   preTimeoutState: null,
   clockStartTimeMs: null,
   remainingTimeAtStartCs: null,
   playHornTrigger: 0,
-  teams: [], // Initialize teams as empty array
+  teams: [],
   _lastActionOriginator: undefined,
   _lastUpdatedTimestamp: undefined,
 };
@@ -364,7 +397,7 @@ const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
 const cleanPenaltiesForStorage = (penalties?: Penalty[]): Penalty[] => {
   if (!penalties) return [];
   return penalties.map(p => {
-    if (p._status && p._status !== 'pending_puck') { // Preserve 'pending_puck' status
+    if (p._status && p._status !== 'pending_puck') { 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { _status, ...rest } = p;
       return rest as Penalty; 
@@ -374,18 +407,55 @@ const cleanPenaltiesForStorage = (penalties?: Penalty[]): Penalty[] => {
 };
 
 
+const applyProfileToState = (state: GameState, profileId: string | null): GameState => {
+  const profileToApply = state.formatAndTimingsProfiles.find(p => p.id === profileId) || state.formatAndTimingsProfiles[0] || createDefaultFormatAndTimingsProfile();
+  if (!profileToApply) return state; // Should not happen if profiles always exist
+
+  return {
+    ...state,
+    selectedFormatAndTimingsProfileId: profileToApply.id,
+    defaultWarmUpDuration: profileToApply.defaultWarmUpDuration,
+    defaultPeriodDuration: profileToApply.defaultPeriodDuration,
+    defaultOTPeriodDuration: profileToApply.defaultOTPeriodDuration,
+    defaultBreakDuration: profileToApply.defaultBreakDuration,
+    defaultPreOTBreakDuration: profileToApply.defaultPreOTBreakDuration,
+    defaultTimeoutDuration: profileToApply.defaultTimeoutDuration,
+    maxConcurrentPenalties: profileToApply.maxConcurrentPenalties,
+    autoStartWarmUp: profileToApply.autoStartWarmUp,
+    autoStartBreaks: profileToApply.autoStartBreaks,
+    autoStartPreOTBreaks: profileToApply.autoStartPreOTBreaks,
+    autoStartTimeouts: profileToApply.autoStartTimeouts,
+    numberOfRegularPeriods: profileToApply.numberOfRegularPeriods,
+    numberOfOvertimePeriods: profileToApply.numberOfOvertimePeriods,
+    playersPerTeamOnIce: profileToApply.playersPerTeamOnIce,
+  };
+};
+
+
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   let newStateWithoutMeta: Omit<GameState, '_lastActionOriginator' | '_lastUpdatedTimestamp' | 'playHornTrigger'>;
   let newPlayHornTrigger = state.playHornTrigger;
   let newTimestamp = Date.now();
+  let tempState = { ...state }; // For multi-step operations before final state assignment
 
   switch (action.type) {
     case 'HYDRATE_FROM_STORAGE': {
       const hydratedBasePartial: Partial<GameState> = {
         ...(action.payload ?? {}),
       };
+      
+      let hydratedProfiles = action.payload?.formatAndTimingsProfiles;
+      if (!hydratedProfiles || hydratedProfiles.length === 0) {
+        hydratedProfiles = [createDefaultFormatAndTimingsProfile()];
+      }
+      
+      let hydratedSelectedProfileId = action.payload?.selectedFormatAndTimingsProfileId;
+      if (!hydratedSelectedProfileId || !hydratedProfiles.find(p => p.id === hydratedSelectedProfileId)) {
+        hydratedSelectedProfileId = hydratedProfiles[0].id;
+      }
 
-      // Robust handling for availableCategories
+      const selectedProfileValues = hydratedProfiles.find(p => p.id === hydratedSelectedProfileId) || hydratedProfiles[0];
+
       let hydratedCategories: CategoryData[];
       const storedCategories = action.payload?.availableCategories;
 
@@ -402,9 +472,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
       
       const hydratedBase: GameState = {
-        ...initialGlobalState,
-        ...hydratedBasePartial,
-        formatAndTimingsConfigName: action.payload?.formatAndTimingsConfigName ?? initialGlobalState.formatAndTimingsConfigName,
+        ...initialGlobalState, // Start with system defaults for non-profile/non-core fields
+        ...selectedProfileValues, // Apply selected profile's F&T settings
+        ...hydratedBasePartial, // Override with anything explicitly in payload
+        formatAndTimingsProfiles: hydratedProfiles,
+        selectedFormatAndTimingsProfileId: hydratedSelectedProfileId,
         availableCategories: hydratedCategories, 
         teams: (action.payload?.teams || initialGlobalState.teams).map(t => ({...t, subName: t.subName || undefined })), 
         playHornTrigger: initialGlobalState.playHornTrigger, 
@@ -413,13 +485,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         isMonitorModeEnabled: action.payload?.isMonitorModeEnabled ?? initialGlobalState.isMonitorModeEnabled,
       };
       
-      
       if (!hydratedBase.availableCategories.find(c => c.id === hydratedBase.selectedMatchCategory) && hydratedBase.availableCategories.length > 0) {
         hydratedBase.selectedMatchCategory = hydratedBase.availableCategories[0].id;
       } else if (hydratedBase.availableCategories.length === 0) {
         hydratedBase.selectedMatchCategory = ''; 
       }
-
 
       hydratedBase.isClockRunning = false;
       hydratedBase.clockStartTimeMs = null;
@@ -429,44 +499,36 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const rawAwayPenaltiesFromStorage = action.payload?.awayPenalties || [];
 
       hydratedBase.homePenalties = sortPenaltiesByStatus(
-        updatePenaltyStatusesOnly(rawHomePenaltiesFromStorage as Penalty[], hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties)
+        updatePenaltyStatusesOnly(rawHomePenaltiesFromStorage as Penalty[], hydratedBase.maxConcurrentPenalties)
       );
       hydratedBase.awayPenalties = sortPenaltiesByStatus(
-        updatePenaltyStatusesOnly(rawAwayPenaltiesFromStorage as Penalty[], hydratedBase.maxConcurrentPenalties ?? initialGlobalState.maxConcurrentPenalties)
+        updatePenaltyStatusesOnly(rawAwayPenaltiesFromStorage as Penalty[], hydratedBase.maxConcurrentPenalties)
       );
-
 
       let initialHydratedTimeCs: number;
       const hydratedPeriod = hydratedBase.currentPeriod ?? initialGlobalState.currentPeriod;
-      const hydratedWarmUpDurationCs = hydratedBase.defaultWarmUpDuration ?? initialGlobalState.defaultWarmUpDuration;
-      const hydratedPeriodDurationCs = hydratedBase.defaultPeriodDuration ?? initialGlobalState.defaultPeriodDuration;
-      const hydratedOTPeriodDurationCs = hydratedBase.defaultOTPeriodDuration ?? initialGlobalState.defaultOTPeriodDuration;
-      const hydratedBreakDurationCs = hydratedBase.defaultBreakDuration ?? initialGlobalState.defaultBreakDuration;
-      const hydratedPreOTBreakDurationCs = hydratedBase.defaultPreOTBreakDuration ?? initialGlobalState.defaultPreOTBreakDuration;
-      const hydratedTimeoutDurationCs = hydratedBase.defaultTimeoutDuration ?? initialGlobalState.defaultTimeoutDuration;
-      const hydratedNumberOfRegularPeriods = hydratedBase.numberOfRegularPeriods ?? initialGlobalState.numberOfRegularPeriods;
-
+      
       if (hydratedBase.periodDisplayOverride === 'Warm-up' || (hydratedPeriod === 0 && hydratedBase.periodDisplayOverride === null) ) {
-        initialHydratedTimeCs = hydratedWarmUpDurationCs;
+        initialHydratedTimeCs = hydratedBase.defaultWarmUpDuration;
         hydratedBase.periodDisplayOverride = 'Warm-up';
         hydratedBase.currentPeriod = 0;
       } else if (hydratedBase.periodDisplayOverride === 'Break') {
-        initialHydratedTimeCs = hydratedBreakDurationCs;
+        initialHydratedTimeCs = hydratedBase.defaultBreakDuration;
       } else if (hydratedBase.periodDisplayOverride === 'Pre-OT Break') {
-         initialHydratedTimeCs = hydratedPreOTBreakDurationCs;
+         initialHydratedTimeCs = hydratedBase.defaultPreOTBreakDuration;
       } else if (hydratedBase.periodDisplayOverride === 'Time Out') {
          if (hydratedBase.preTimeoutState) {
-            initialHydratedTimeCs = hydratedTimeoutDurationCs;
+            initialHydratedTimeCs = hydratedBase.defaultTimeoutDuration;
          } else {
-            initialHydratedTimeCs = hydratedTimeoutDurationCs;
+            initialHydratedTimeCs = hydratedBase.defaultTimeoutDuration;
          }
       } else if (hydratedBase.periodDisplayOverride === 'End of Game') {
         initialHydratedTimeCs = 0; 
-      } else if (hydratedPeriod > hydratedNumberOfRegularPeriods) {
-        initialHydratedTimeCs = hydratedOTPeriodDurationCs;
+      } else if (hydratedPeriod > hydratedBase.numberOfRegularPeriods) {
+        initialHydratedTimeCs = hydratedBase.defaultOTPeriodDuration;
         hydratedBase.periodDisplayOverride = null;
       } else {
-        initialHydratedTimeCs = hydratedPeriodDurationCs;
+        initialHydratedTimeCs = hydratedBase.defaultPeriodDuration;
         hydratedBase.periodDisplayOverride = null;
       }
 
@@ -485,20 +547,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         hydratedBase.currentTime = 0;
       }
 
-
-      hydratedBase.enableTeamSelectionInMiniScoreboard = action.payload?.enableTeamSelectionInMiniScoreboard ?? initialGlobalState.enableTeamSelectionInMiniScoreboard;
-      hydratedBase.enablePlayerSelectionForPenalties = action.payload?.enablePlayerSelectionForPenalties ?? initialGlobalState.enablePlayerSelectionForPenalties;
-      hydratedBase.showAliasInPenaltyPlayerSelector = action.payload?.showAliasInPenaltyPlayerSelector ?? initialGlobalState.showAliasInPenaltyPlayerSelector;
-      hydratedBase.showAliasInControlsPenaltyList = action.payload?.showAliasInControlsPenaltyList ?? initialGlobalState.showAliasInControlsPenaltyList;
-      hydratedBase.showAliasInScoreboardPenalties = action.payload?.showAliasInScoreboardPenalties ?? initialGlobalState.showAliasInScoreboardPenalties;
-
       if (!hydratedBase.enableTeamSelectionInMiniScoreboard) {
         hydratedBase.enablePlayerSelectionForPenalties = false;
         hydratedBase.showAliasInPenaltyPlayerSelector = false;
         hydratedBase.showAliasInControlsPenaltyList = false;
         hydratedBase.showAliasInScoreboardPenalties = false;
       }
-
 
       const { _lastActionOriginator, _lastUpdatedTimestamp, playHornTrigger: hydratedHornTrigger, ...restOfHydrated } = hydratedBase;
       newStateWithoutMeta = restOfHydrated;
@@ -964,57 +1018,269 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
       newPlayHornTrigger = state.playHornTrigger + 1;
       break;
-    case 'SET_FORMAT_AND_TIMINGS_CONFIG_NAME':
-      newStateWithoutMeta = { ...state, formatAndTimingsConfigName: action.payload || initialGlobalState.formatAndTimingsConfigName };
-      break;
-    case 'SET_DEFAULT_WARM_UP_DURATION':
-      newStateWithoutMeta = { ...state, defaultWarmUpDuration: Math.max(60 * CENTISECONDS_PER_SECOND, action.payload) };
-      break;
-    case 'SET_DEFAULT_PERIOD_DURATION':
-      newStateWithoutMeta = { ...state, defaultPeriodDuration: Math.max(60 * CENTISECONDS_PER_SECOND, action.payload) };
-      break;
-    case 'SET_DEFAULT_OT_PERIOD_DURATION':
-      newStateWithoutMeta = { ...state, defaultOTPeriodDuration: Math.max(60 * CENTISECONDS_PER_SECOND, action.payload) };
-      break;
-    case 'SET_DEFAULT_BREAK_DURATION':
-      newStateWithoutMeta = { ...state, defaultBreakDuration: Math.max(1 * CENTISECONDS_PER_SECOND, action.payload) };
-      break;
-    case 'SET_DEFAULT_PRE_OT_BREAK_DURATION':
-      newStateWithoutMeta = { ...state, defaultPreOTBreakDuration: Math.max(1 * CENTISECONDS_PER_SECOND, action.payload) };
-      break;
-    case 'SET_DEFAULT_TIMEOUT_DURATION':
-      newStateWithoutMeta = { ...state, defaultTimeoutDuration: Math.max(1 * CENTISECONDS_PER_SECOND, action.payload) };
-      break;
-    case 'SET_MAX_CONCURRENT_PENALTIES': {
-      const newMax = Math.max(1, action.payload);
-      let homePenalties = updatePenaltyStatusesOnly(state.homePenalties, newMax);
-      homePenalties = sortPenaltiesByStatus(homePenalties);
-      let awayPenalties = updatePenaltyStatusesOnly(state.awayPenalties, newMax);
-      awayPenalties = sortPenaltiesByStatus(awayPenalties);
-      newStateWithoutMeta = { ...state, maxConcurrentPenalties: newMax, homePenalties, awayPenalties };
+    // Format & Timings Profile Actions
+    case 'ADD_FORMAT_AND_TIMINGS_PROFILE': {
+      const newProfile = createDefaultFormatAndTimingsProfile(crypto.randomUUID(), action.payload.name);
+      if (action.payload.profileData) {
+        Object.assign(newProfile, action.payload.profileData);
+      }
+      const newProfiles = [...state.formatAndTimingsProfiles, newProfile];
+      tempState = { ...state, formatAndTimingsProfiles: newProfiles };
+      newStateWithoutMeta = applyProfileToState(tempState, newProfile.id);
       break;
     }
-    case 'SET_NUMBER_OF_REGULAR_PERIODS':
-      newStateWithoutMeta = { ...state, numberOfRegularPeriods: Math.max(1, action.payload) };
+    case 'UPDATE_FORMAT_AND_TIMINGS_PROFILE_DATA': {
+      const { profileId, updates } = action.payload;
+      const newProfiles = state.formatAndTimingsProfiles.map(p =>
+        p.id === profileId ? { ...p, ...updates } : p
+      );
+      tempState = { ...state, formatAndTimingsProfiles: newProfiles };
+      if (state.selectedFormatAndTimingsProfileId === profileId) {
+        newStateWithoutMeta = applyProfileToState(tempState, profileId);
+      } else {
+        newStateWithoutMeta = tempState;
+      }
       break;
-    case 'SET_NUMBER_OF_OVERTIME_PERIODS':
-      newStateWithoutMeta = { ...state, numberOfOvertimePeriods: Math.max(0, action.payload) };
+    }
+    case 'UPDATE_FORMAT_AND_TIMINGS_PROFILE_NAME': {
+      const { profileId, newName } = action.payload;
+      newStateWithoutMeta = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, name: newName } : p
+        ),
+      };
       break;
-    case 'SET_PLAYERS_PER_TEAM_ON_ICE':
-      newStateWithoutMeta = { ...state, playersPerTeamOnIce: Math.max(1, action.payload) };
+    }
+    case 'DELETE_FORMAT_AND_TIMINGS_PROFILE': {
+      let newProfiles = state.formatAndTimingsProfiles.filter(p => p.id !== action.payload.profileId);
+      let newSelectedId = state.selectedFormatAndTimingsProfileId;
+
+      if (newProfiles.length === 0) {
+        const defaultProfile = createDefaultFormatAndTimingsProfile();
+        newProfiles = [defaultProfile];
+        newSelectedId = defaultProfile.id;
+      } else if (state.selectedFormatAndTimingsProfileId === action.payload.profileId) {
+        newSelectedId = newProfiles[0].id;
+      }
+      tempState = { ...state, formatAndTimingsProfiles: newProfiles, selectedFormatAndTimingsProfileId: newSelectedId };
+      newStateWithoutMeta = applyProfileToState(tempState, newSelectedId);
       break;
-    case 'SET_AUTO_START_WARM_UP_VALUE':
-      newStateWithoutMeta = { ...state, autoStartWarmUp: action.payload };
+    }
+    case 'SELECT_FORMAT_AND_TIMINGS_PROFILE': {
+      newStateWithoutMeta = applyProfileToState(state, action.payload.profileId);
+      if (state.currentPeriod === 0 && state.periodDisplayOverride === 'Warm-up') {
+        newStateWithoutMeta.currentTime = newStateWithoutMeta.defaultWarmUpDuration;
+      } else if (state.periodDisplayOverride === null) {
+          if (state.currentPeriod > state.numberOfRegularPeriods) {
+              newStateWithoutMeta.currentTime = newStateWithoutMeta.defaultOTPeriodDuration;
+          } else {
+              newStateWithoutMeta.currentTime = newStateWithoutMeta.defaultPeriodDuration;
+          }
+      }
+       newStateWithoutMeta.isClockRunning = false;
+       newStateWithoutMeta.clockStartTimeMs = null;
+       newStateWithoutMeta.remainingTimeAtStartCs = null;
       break;
-    case 'SET_AUTO_START_BREAKS_VALUE':
-      newStateWithoutMeta = { ...state, autoStartBreaks: action.payload };
+    }
+    case 'LOAD_FORMAT_AND_TIMINGS_PROFILES': {
+      let profilesToLoad = action.payload;
+      if (!profilesToLoad || profilesToLoad.length === 0) {
+        profilesToLoad = [createDefaultFormatAndTimingsProfile()];
+      }
+      const newSelectedId = profilesToLoad[0].id;
+      tempState = { ...state, formatAndTimingsProfiles: profilesToLoad, selectedFormatAndTimingsProfileId: newSelectedId };
+      newStateWithoutMeta = applyProfileToState(tempState, newSelectedId);
       break;
-    case 'SET_AUTO_START_PRE_OT_BREAKS_VALUE':
-      newStateWithoutMeta = { ...state, autoStartPreOTBreaks: action.payload };
+    }
+    // Field-specific setters now update the selected profile and root state
+    // Example for one field, others follow the same pattern
+    case 'SET_DEFAULT_PERIOD_DURATION': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      const newValue = Math.max(60 * CENTISECONDS_PER_SECOND, action.payload);
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, defaultPeriodDuration: newValue } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, defaultPeriodDuration: newValue };
       break;
-    case 'SET_AUTO_START_TIMEOUTS_VALUE':
-      newStateWithoutMeta = { ...state, autoStartTimeouts: action.payload };
+    }
+    // Add similar cases for all other FormatAndTimingsProfileData fields
+    case 'SET_DEFAULT_WARM_UP_DURATION': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      const newValue = Math.max(60 * CENTISECONDS_PER_SECOND, action.payload);
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, defaultWarmUpDuration: newValue } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, defaultWarmUpDuration: newValue };
       break;
+    }
+     case 'SET_DEFAULT_OT_PERIOD_DURATION': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      const newValue = Math.max(60 * CENTISECONDS_PER_SECOND, action.payload);
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, defaultOTPeriodDuration: newValue } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, defaultOTPeriodDuration: newValue };
+      break;
+    }
+    case 'SET_DEFAULT_BREAK_DURATION': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      const newValue = Math.max(1 * CENTISECONDS_PER_SECOND, action.payload);
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, defaultBreakDuration: newValue } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, defaultBreakDuration: newValue };
+      break;
+    }
+    case 'SET_DEFAULT_PRE_OT_BREAK_DURATION': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      const newValue = Math.max(1 * CENTISECONDS_PER_SECOND, action.payload);
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, defaultPreOTBreakDuration: newValue } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, defaultPreOTBreakDuration: newValue };
+      break;
+    }
+    case 'SET_DEFAULT_TIMEOUT_DURATION': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      const newValue = Math.max(1 * CENTISECONDS_PER_SECOND, action.payload);
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, defaultTimeoutDuration: newValue } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, defaultTimeoutDuration: newValue };
+      break;
+    }
+    case 'SET_MAX_CONCURRENT_PENALTIES': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      const newValue = Math.max(1, action.payload);
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, maxConcurrentPenalties: newValue } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, maxConcurrentPenalties: newValue };
+      let homePenalties = updatePenaltyStatusesOnly(state.homePenalties, newValue);
+      homePenalties = sortPenaltiesByStatus(homePenalties);
+      let awayPenalties = updatePenaltyStatusesOnly(state.awayPenalties, newValue);
+      awayPenalties = sortPenaltiesByStatus(awayPenalties);
+      newStateWithoutMeta.homePenalties = homePenalties;
+      newStateWithoutMeta.awayPenalties = awayPenalties;
+      break;
+    }
+    case 'SET_NUMBER_OF_REGULAR_PERIODS': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      const newValue = Math.max(1, action.payload);
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, numberOfRegularPeriods: newValue } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, numberOfRegularPeriods: newValue };
+      break;
+    }
+    case 'SET_NUMBER_OF_OVERTIME_PERIODS': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      const newValue = Math.max(0, action.payload);
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, numberOfOvertimePeriods: newValue } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, numberOfOvertimePeriods: newValue };
+      break;
+    }
+    case 'SET_PLAYERS_PER_TEAM_ON_ICE': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      const newValue = Math.max(1, action.payload);
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, playersPerTeamOnIce: newValue } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, playersPerTeamOnIce: newValue };
+      break;
+    }
+    case 'SET_AUTO_START_WARM_UP_VALUE': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, autoStartWarmUp: action.payload } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, autoStartWarmUp: action.payload };
+      break;
+    }
+    case 'SET_AUTO_START_BREAKS_VALUE': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, autoStartBreaks: action.payload } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, autoStartBreaks: action.payload };
+      break;
+    }
+    case 'SET_AUTO_START_PRE_OT_BREAKS_VALUE': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+      tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, autoStartPreOTBreaks: action.payload } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, autoStartPreOTBreaks: action.payload };
+      break;
+    }
+    case 'SET_AUTO_START_TIMEOUTS_VALUE': {
+      const profileId = state.selectedFormatAndTimingsProfileId;
+      if (!profileId) { newStateWithoutMeta = state; break; }
+       tempState = {
+        ...state,
+        formatAndTimingsProfiles: state.formatAndTimingsProfiles.map(p =>
+          p.id === profileId ? { ...p, autoStartTimeouts: action.payload } : p
+        ),
+      };
+      newStateWithoutMeta = { ...tempState, autoStartTimeouts: action.payload };
+      break;
+    }
+    // Sound & Display Actions
     case 'SET_PLAY_SOUND_AT_PERIOD_END':
       newStateWithoutMeta = { ...state, playSoundAtPeriodEnd: action.payload };
       break;
@@ -1055,42 +1321,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_MONITOR_MODE_ENABLED':
       newStateWithoutMeta = { ...state, isMonitorModeEnabled: action.payload };
       break;
-    case 'SET_AVAILABLE_CATEGORIES':
-      newStateWithoutMeta = { ...state, availableCategories: action.payload };
-      if (!action.payload.find(c => c.id === state.selectedMatchCategory) && action.payload.length > 0) {
-        newStateWithoutMeta.selectedMatchCategory = action.payload[0].id;
-      } else if (action.payload.length === 0) {
-        newStateWithoutMeta.selectedMatchCategory = '';
-      }
-      break;
-    case 'SET_SELECTED_MATCH_CATEGORY':
-      newStateWithoutMeta = { ...state, selectedMatchCategory: action.payload };
-      break;
-    case 'LOAD_FORMAT_AND_TIMINGS_CONFIG': {
-        const config = action.payload;
-        newStateWithoutMeta = {
-            ...state,
-            formatAndTimingsConfigName: config.formatAndTimingsConfigName ?? state.formatAndTimingsConfigName,
-            defaultWarmUpDuration: config.defaultWarmUpDuration ?? state.defaultWarmUpDuration,
-            defaultPeriodDuration: config.defaultPeriodDuration ?? state.defaultPeriodDuration,
-            defaultOTPeriodDuration: config.defaultOTPeriodDuration ?? state.defaultOTPeriodDuration,
-            defaultBreakDuration: config.defaultBreakDuration ?? state.defaultBreakDuration,
-            defaultPreOTBreakDuration: config.defaultPreOTBreakDuration ?? state.defaultPreOTBreakDuration,
-            defaultTimeoutDuration: config.defaultTimeoutDuration ?? state.defaultTimeoutDuration,
-            maxConcurrentPenalties: config.maxConcurrentPenalties ?? state.maxConcurrentPenalties,
-            autoStartWarmUp: config.autoStartWarmUp ?? state.autoStartWarmUp,
-            autoStartBreaks: config.autoStartBreaks ?? state.autoStartBreaks,
-            autoStartPreOTBreaks: config.autoStartPreOTBreaks ?? state.autoStartPreOTBreaks,
-            autoStartTimeouts: config.autoStartTimeouts ?? state.autoStartTimeouts,
-            numberOfRegularPeriods: config.numberOfRegularPeriods ?? state.numberOfRegularPeriods,
-            numberOfOvertimePeriods: config.numberOfOvertimePeriods ?? state.numberOfOvertimePeriods,
-            playersPerTeamOnIce: config.playersPerTeamOnIce ?? state.playersPerTeamOnIce,
-        };
-        const newMaxPen = newStateWithoutMeta.maxConcurrentPenalties;
-        newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, newMaxPen));
-        newStateWithoutMeta.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.awayPenalties, newMaxPen));
-        break;
-    }
     case 'LOAD_SOUND_AND_DISPLAY_CONFIG': {
         const config = action.payload;
         let enableTeamUsage = config.enableTeamSelectionInMiniScoreboard ?? state.enableTeamSelectionInMiniScoreboard;
@@ -1123,55 +1353,44 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         };
         break;
     }
-    case 'LOAD_CATEGORIES_CONFIG': {
-        const config = action.payload;
-        let importedCategoriesFromFile: CategoryData[];
-        const fileCategories = config.availableCategories;
-
-        if (Array.isArray(fileCategories) && fileCategories.length > 0) {
-            if (typeof fileCategories[0] === 'string') {
-                importedCategoriesFromFile = (fileCategories as string[]).map(name => ({ id: name, name: name }));
-            } else if (typeof fileCategories[0] === 'object' && fileCategories[0] !== null && 'id' in fileCategories[0] && 'name' in fileCategories[0]) {
-                importedCategoriesFromFile = fileCategories as CategoryData[];
-            } else {
-                importedCategoriesFromFile = state.availableCategories;
-            }
-        } else {
-            importedCategoriesFromFile = state.availableCategories;
-        }
-
-        let importedSelectedMatchCategory = config.selectedMatchCategory ?? state.selectedMatchCategory;
-        if (!importedCategoriesFromFile.find(c => c.id === importedSelectedMatchCategory) && importedCategoriesFromFile.length > 0) {
-            importedSelectedMatchCategory = importedCategoriesFromFile[0].id;
-        } else if (importedCategoriesFromFile.length === 0) {
-            importedSelectedMatchCategory = '';
-        }
-
-        newStateWithoutMeta = {
-            ...state,
-            availableCategories: importedCategoriesFromFile,
-            selectedMatchCategory: importedSelectedMatchCategory,
-        };
-        break;
-    }
+    case 'SET_AVAILABLE_CATEGORIES':
+      newStateWithoutMeta = { ...state, availableCategories: action.payload };
+      if (!action.payload.find(c => c.id === state.selectedMatchCategory) && action.payload.length > 0) {
+        newStateWithoutMeta.selectedMatchCategory = action.payload[0].id;
+      } else if (action.payload.length === 0) {
+        newStateWithoutMeta.selectedMatchCategory = '';
+      }
+      break;
+    case 'SET_SELECTED_MATCH_CATEGORY':
+      newStateWithoutMeta = { ...state, selectedMatchCategory: action.payload };
+      break;
     case 'RESET_CONFIG_TO_DEFAULTS': {
-      newStateWithoutMeta = {
+      const defaultProfileData = createDefaultFormatAndTimingsProfile();
+      let updatedProfiles = state.formatAndTimingsProfiles;
+      let selectedProfileId = state.selectedFormatAndTimingsProfileId;
+
+      if (selectedProfileId) {
+        updatedProfiles = state.formatAndTimingsProfiles.map(p =>
+          p.id === selectedProfileId ? { ...defaultProfileData, id: p.id, name: p.name } : p
+        );
+      } else if (state.formatAndTimingsProfiles.length > 0) {
+         selectedProfileId = state.formatAndTimingsProfiles[0].id;
+         updatedProfiles = state.formatAndTimingsProfiles.map(p =>
+            p.id === selectedProfileId ? { ...defaultProfileData, id: p.id, name: p.name } : p
+         );
+      } else {
+        const newDefaultProfile = createDefaultFormatAndTimingsProfile();
+        updatedProfiles = [newDefaultProfile];
+        selectedProfileId = newDefaultProfile.id;
+      }
+      
+      tempState = {
         ...state,
-        formatAndTimingsConfigName: INITIAL_FORMAT_AND_TIMINGS_CONFIG_NAME,
-        defaultWarmUpDuration: INITIAL_WARM_UP_DURATION,
-        defaultPeriodDuration: INITIAL_PERIOD_DURATION,
-        defaultOTPeriodDuration: INITIAL_OT_PERIOD_DURATION,
-        defaultBreakDuration: INITIAL_BREAK_DURATION,
-        defaultPreOTBreakDuration: INITIAL_PRE_OT_BREAK_DURATION,
-        defaultTimeoutDuration: INITIAL_TIMEOUT_DURATION,
-        maxConcurrentPenalties: INITIAL_MAX_CONCURRENT_PENALTIES,
-        autoStartWarmUp: INITIAL_AUTO_START_WARM_UP,
-        autoStartBreaks: INITIAL_AUTO_START_BREAKS,
-        autoStartPreOTBreaks: INITIAL_AUTO_START_PRE_OT_BREAKS,
-        autoStartTimeouts: INITIAL_AUTO_START_TIMEOUTS,
-        numberOfRegularPeriods: INITIAL_NUMBER_OF_REGULAR_PERIODS,
-        numberOfOvertimePeriods: INITIAL_NUMBER_OF_OVERTIME_PERIODS,
-        playersPerTeamOnIce: INITIAL_PLAYERS_PER_TEAM_ON_ICE,
+        // Reset F&T section to selected profile's (now default) values
+        ... (updatedProfiles.find(p => p.id === selectedProfileId) || defaultProfileData),
+        formatAndTimingsProfiles: updatedProfiles,
+        selectedFormatAndTimingsProfileId: selectedProfileId,
+        // Reset Sound & Display section
         playSoundAtPeriodEnd: INITIAL_PLAY_SOUND_AT_PERIOD_END,
         customHornSoundDataUrl: INITIAL_CUSTOM_HORN_SOUND_DATA_URL,
         enableTeamSelectionInMiniScoreboard: INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD,
@@ -1180,35 +1399,40 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInControlsPenaltyList: INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
         showAliasInScoreboardPenalties: INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
         isMonitorModeEnabled: INITIAL_IS_MONITOR_MODE_ENABLED,
+        // Reset Categories section
         availableCategories: INITIAL_AVAILABLE_CATEGORIES,
         selectedMatchCategory: INITIAL_SELECTED_MATCH_CATEGORY,
       };
-      const initialMaxPen = INITIAL_MAX_CONCURRENT_PENALTIES;
-      newStateWithoutMeta.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, initialMaxPen));
-      newStateWithoutMeta.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.awayPenalties, initialMaxPen));
+      const newMaxPen = tempState.maxConcurrentPenalties;
+      tempState.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, newMaxPen));
+      tempState.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.awayPenalties, newMaxPen));
+      newStateWithoutMeta = tempState;
       break;
     }
     case 'RESET_GAME_STATE': {
       const { _lastActionOriginator, _lastUpdatedTimestamp, playHornTrigger: initialHornTrigger, teams: currentTeams, ...initialsToKeepConfigAndTeams } = initialGlobalState;
 
-      const initialWarmUpDurationCs = state.defaultWarmUpDuration ?? initialsToKeepConfigAndTeams.defaultWarmUpDuration;
-      const autoStartWarmUp = state.autoStartWarmUp ?? initialsToKeepConfigAndTeams.autoStartWarmUp;
+      const activeProfileId = state.selectedFormatAndTimingsProfileId;
+      const activeProfile = state.formatAndTimingsProfiles.find(p => p.id === activeProfileId) || state.formatAndTimingsProfiles[0] || defaultInitialProfile;
+      
+      const initialWarmUpDurationCs = activeProfile.defaultWarmUpDuration;
+      const autoStartWarmUp = activeProfile.autoStartWarmUp;
 
       newStateWithoutMeta = {
         ...state, 
-        homeScore: initialsToKeepConfigAndTeams.homeScore,
-        awayScore: initialsToKeepConfigAndTeams.awayScore,
+        homeScore: 0,
+        awayScore: 0,
         currentPeriod: 0,
         currentTime: initialWarmUpDurationCs,
         isClockRunning: autoStartWarmUp && initialWarmUpDurationCs > 0,
         homePenalties: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
         awayPenalties: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
-        homeTeamName: initialsToKeepConfigAndTeams.homeTeamName,
+        homeTeamName: 'Local',
         homeTeamSubName: undefined,
-        awayTeamName: initialsToKeepConfigAndTeams.awayTeamName,
+        awayTeamName: 'Visitante',
         awayTeamSubName: undefined,
         periodDisplayOverride: 'Warm-up',
-        preTimeoutState: initialsToKeepConfigAndTeams.preTimeoutState,
+        preTimeoutState: null,
         clockStartTimeMs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? Date.now() : null,
         remainingTimeAtStartCs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? initialWarmUpDurationCs : null,
       };
@@ -1324,6 +1548,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newStateWithoutMeta = { ...state, teams: validTeams };
       break;
     default:
+      // Ensure newStateWithoutMeta is always assigned by falling back to current state
+      // This handles unlisted actions or if a specific field setter wasn't matched above
+      const exhaustiveCheck: never = action; // Should cause a type error if a case is missed
       newStateWithoutMeta = state;
       newTimestamp = state._lastUpdatedTimestamp || Date.now();
       newPlayHornTrigger = state.playHornTrigger;
@@ -1386,8 +1613,8 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         const rawStoredState = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (rawStoredState) {
           const parsedState = JSON.parse(rawStoredState) as Partial<GameState>;
-           // Check for a meaningful field, e.g., formatAndTimingsConfigName
-          if (parsedState && typeof parsedState.formatAndTimingsConfigName === 'string' && parsedState._lastUpdatedTimestamp) {
+           // Check for a meaningful field
+          if (parsedState && parsedState.formatAndTimingsProfiles && parsedState.formatAndTimingsProfiles.length > 0 && parsedState._lastUpdatedTimestamp) {
             finalPayloadForHydration = { ...parsedState };
             loadedFromLocalStorage = true;
             console.log("Loaded state from localStorage.");
@@ -1401,16 +1628,20 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
 
       if (!loadedFromLocalStorage) {
         console.log("localStorage is empty or invalid. Attempting to load defaults from files...");
-        let configFromFile: Partial<ConfigFields> | null = null;
+        let formatTimingsProfilesFromFile: FormatAndTimingsProfile[] | null = null;
+        let soundDisplayConfigFromFile: Partial<ConfigFields> | null = null;
         let teamsFromFile: TeamData[] | null = null;
 
-        // Attempt to load format-and-timings config
         try {
           const ftRes = await fetch('/defaults/default-format-timings.json');
           if (ftRes.ok) {
-            const ftConfig = await ftRes.json();
-            if (ftConfig) configFromFile = { ...(configFromFile || {}), ...ftConfig };
-            console.log("Loaded default format-timings config from file.");
+            const ftProfiles = await ftRes.json();
+            if (Array.isArray(ftProfiles) && ftProfiles.length > 0) {
+                 formatTimingsProfilesFromFile = ftProfiles;
+                 console.log("Loaded default format-timings profiles from file.");
+            } else {
+                console.warn("Default format-timings.json is not a valid array or is empty.");
+            }
           } else {
              console.warn(`Default format-timings file '/defaults/default-format-timings.json' not found (status: ${ftRes.status}) or failed to load.`);
           }
@@ -1418,12 +1649,11 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
             console.error('Error fetching default-format-timings.json:', error);
         }
 
-        // Attempt to load sound-and-display config
         try {
           const sdRes = await fetch('/defaults/default-sound-display.json');
           if (sdRes.ok) {
             const sdConfig = await sdRes.json();
-            if (sdConfig) configFromFile = { ...(configFromFile || {}), ...sdConfig };
+            if (sdConfig) soundDisplayConfigFromFile = sdConfig;
             console.log("Loaded default sound-display config from file.");
           } else {
             console.warn(`Default sound-display file '/defaults/default-sound-display.json' not found (status: ${sdRes.status}) or failed to load.`);
@@ -1432,10 +1662,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
              console.error('Error fetching default-sound-display.json:', error);
         }
         
-        // Categories are now taken from initialGlobalState if not in localStorage
-        // No attempt to load /defaults/default-categories.json
-
-
         try {
           const teamsRes = await fetch('/defaults/default-teams.json');
           if (teamsRes.ok) {
@@ -1448,15 +1674,22 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
           console.error('Error fetching default-teams.json:', error);
         }
         
-        finalPayloadForHydration = { ...initialGlobalState }; // Start with system defaults
+        finalPayloadForHydration = { ...initialGlobalState }; 
 
-        if (configFromFile) {
-          finalPayloadForHydration = { ...finalPayloadForHydration, ...configFromFile };
+        if (formatTimingsProfilesFromFile) {
+            finalPayloadForHydration.formatAndTimingsProfiles = formatTimingsProfilesFromFile;
+            finalPayloadForHydration.selectedFormatAndTimingsProfileId = formatTimingsProfilesFromFile[0].id;
+            // Apply the first profile's data to root state
+            const firstProfile = formatTimingsProfilesFromFile[0];
+            Object.assign(finalPayloadForHydration, firstProfile);
+        }
+        if (soundDisplayConfigFromFile) {
+          finalPayloadForHydration = { ...finalPayloadForHydration, ...soundDisplayConfigFromFile };
         }
         if (teamsFromFile) {
           finalPayloadForHydration.teams = teamsFromFile.map(t => ({...t, subName: t.subName || undefined}));
         }
-        // Ensure categories are from initialGlobalState if not already set by localStorage earlier
+        
         if (!finalPayloadForHydration.availableCategories || finalPayloadForHydration.availableCategories.length === 0) {
             finalPayloadForHydration.availableCategories = initialGlobalState.availableCategories;
             finalPayloadForHydration.selectedMatchCategory = initialGlobalState.selectedMatchCategory;
@@ -1494,7 +1727,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
 
   }, []);
   
-  useEffect(() => { // Separate effect for BroadcastChannel cleanup
+  useEffect(() => { 
     return () => {
       if (channelRef.current) {
         channelRef.current.close();
@@ -1637,3 +1870,4 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
   return category ? category.name : undefined;
 };
 
+export { createDefaultFormatAndTimingsProfile };

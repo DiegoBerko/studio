@@ -1,10 +1,12 @@
+
 "use client";
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from "react";
 import { 
   useGameState, 
   centisecondsToDisplayMinutes, 
-  centisecondsToDisplaySeconds
+  centisecondsToDisplaySeconds,
+  type FormatAndTimingsProfileData // Import this
 } from "@/contexts/game-state-context";
 import { ControlCardWrapper } from "@/components/controls/control-card-wrapper";
 import { Label } from "@/components/ui/label";
@@ -16,61 +18,63 @@ export interface DurationSettingsCardRef {
   handleSave: () => boolean; 
   handleDiscard: () => void;
   getIsDirty: () => boolean;
+  setValues: (values: FormatAndTimingsProfileData) => void; // To set values from selected profile
 }
 
 interface DurationSettingsCardProps {
   onDirtyChange: (isDirty: boolean) => void;
+  initialValues: FormatAndTimingsProfileData; // Pass initial values from selected profile
+  // No need for selectedProfileId here, dispatch will handle it from parent
 }
 
 const narrowInputStyle = "w-24 text-sm";
 
 export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, DurationSettingsCardProps>((props, ref) => {
-  const { state, dispatch } = useGameState();
-  const { onDirtyChange } = props;
+  const { dispatch } = useGameState(); // Only need dispatch
+  const { onDirtyChange, initialValues } = props;
 
-  const [localWarmUpDurationInput, setLocalWarmUpDurationInput] = useState(centisecondsToDisplayMinutes(state.defaultWarmUpDuration));
-  const [localPeriodDurationInput, setLocalPeriodDurationInput] = useState(centisecondsToDisplayMinutes(state.defaultPeriodDuration));
-  const [localOTPeriodDurationInput, setLocalOTPeriodDurationInput] = useState(centisecondsToDisplayMinutes(state.defaultOTPeriodDuration));
-  const [localBreakDurationInput, setLocalBreakDurationInput] = useState(centisecondsToDisplaySeconds(state.defaultBreakDuration));
-  const [localPreOTBreakDurationInput, setLocalPreOTBreakDurationInput] = useState(centisecondsToDisplaySeconds(state.defaultPreOTBreakDuration));
-  const [localTimeoutDurationInput, setLocalTimeoutDurationInput] = useState(centisecondsToDisplaySeconds(state.defaultTimeoutDuration));
+  const [localWarmUpDurationInput, setLocalWarmUpDurationInput] = useState(centisecondsToDisplayMinutes(initialValues.defaultWarmUpDuration));
+  const [localPeriodDurationInput, setLocalPeriodDurationInput] = useState(centisecondsToDisplayMinutes(initialValues.defaultPeriodDuration));
+  const [localOTPeriodDurationInput, setLocalOTPeriodDurationInput] = useState(centisecondsToDisplayMinutes(initialValues.defaultOTPeriodDuration));
+  const [localBreakDurationInput, setLocalBreakDurationInput] = useState(centisecondsToDisplaySeconds(initialValues.defaultBreakDuration));
+  const [localPreOTBreakDurationInput, setLocalPreOTBreakDurationInput] = useState(centisecondsToDisplaySeconds(initialValues.defaultPreOTBreakDuration));
+  const [localTimeoutDurationInput, setLocalTimeoutDurationInput] = useState(centisecondsToDisplaySeconds(initialValues.defaultTimeoutDuration));
   
-  const [localAutoStartWarmUp, setLocalAutoStartWarmUp] = useState(state.autoStartWarmUp);
-  const [localAutoStartBreaks, setLocalAutoStartBreaks] = useState(state.autoStartBreaks);
-  const [localAutoStartPreOTBreaks, setLocalAutoStartPreOTBreaks] = useState(state.autoStartPreOTBreaks);
-  const [localAutoStartTimeouts, setLocalAutoStartTimeouts] = useState(state.autoStartTimeouts);
+  const [localAutoStartWarmUp, setLocalAutoStartWarmUp] = useState(initialValues.autoStartWarmUp);
+  const [localAutoStartBreaks, setLocalAutoStartBreaks] = useState(initialValues.autoStartBreaks);
+  const [localAutoStartPreOTBreaks, setLocalAutoStartPreOTBreaks] = useState(initialValues.autoStartPreOTBreaks);
+  const [localAutoStartTimeouts, setLocalAutoStartTimeouts] = useState(initialValues.autoStartTimeouts);
 
-  const [localNumRegularPeriodsInput, setLocalNumRegularPeriodsInput] = useState(String(state.numberOfRegularPeriods));
-  const [localNumOTPeriodsInput, setLocalNumOTPeriodsInput] = useState(String(state.numberOfOvertimePeriods));
+  const [localNumRegularPeriodsInput, setLocalNumRegularPeriodsInput] = useState(String(initialValues.numberOfRegularPeriods));
+  const [localNumOTPeriodsInput, setLocalNumOTPeriodsInput] = useState(String(initialValues.numberOfOvertimePeriods));
 
   const [isDirtyLocal, setIsDirtyLocal] = useState(false);
+
+  const setValuesFromProfile = (values: FormatAndTimingsProfileData) => {
+    setLocalWarmUpDurationInput(centisecondsToDisplayMinutes(values.defaultWarmUpDuration));
+    setLocalPeriodDurationInput(centisecondsToDisplayMinutes(values.defaultPeriodDuration));
+    setLocalOTPeriodDurationInput(centisecondsToDisplayMinutes(values.defaultOTPeriodDuration));
+    setLocalBreakDurationInput(centisecondsToDisplaySeconds(values.defaultBreakDuration));
+    setLocalPreOTBreakDurationInput(centisecondsToDisplaySeconds(values.defaultPreOTBreakDuration));
+    setLocalTimeoutDurationInput(centisecondsToDisplaySeconds(values.defaultTimeoutDuration));
+    setLocalAutoStartWarmUp(values.autoStartWarmUp);
+    setLocalAutoStartBreaks(values.autoStartBreaks);
+    setLocalAutoStartPreOTBreaks(values.autoStartPreOTBreaks);
+    setLocalAutoStartTimeouts(values.autoStartTimeouts);
+    setLocalNumRegularPeriodsInput(String(values.numberOfRegularPeriods));
+    setLocalNumOTPeriodsInput(String(values.numberOfOvertimePeriods));
+    setIsDirtyLocal(false); // Reset dirty state when loading new profile
+  };
+  
+  useEffect(() => {
+    setValuesFromProfile(initialValues);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValues]);
+
 
   useEffect(() => {
     onDirtyChange(isDirtyLocal);
   }, [isDirtyLocal, onDirtyChange]);
-
-  useEffect(() => {
-    if (!isDirtyLocal) {
-      setLocalWarmUpDurationInput(centisecondsToDisplayMinutes(state.defaultWarmUpDuration));
-      setLocalPeriodDurationInput(centisecondsToDisplayMinutes(state.defaultPeriodDuration));
-      setLocalOTPeriodDurationInput(centisecondsToDisplayMinutes(state.defaultOTPeriodDuration));
-      setLocalBreakDurationInput(centisecondsToDisplaySeconds(state.defaultBreakDuration));
-      setLocalPreOTBreakDurationInput(centisecondsToDisplaySeconds(state.defaultPreOTBreakDuration));
-      setLocalTimeoutDurationInput(centisecondsToDisplaySeconds(state.defaultTimeoutDuration));
-      setLocalAutoStartWarmUp(state.autoStartWarmUp);
-      setLocalAutoStartBreaks(state.autoStartBreaks);
-      setLocalAutoStartPreOTBreaks(state.autoStartPreOTBreaks);
-      setLocalAutoStartTimeouts(state.autoStartTimeouts);
-      setLocalNumRegularPeriodsInput(String(state.numberOfRegularPeriods));
-      setLocalNumOTPeriodsInput(String(state.numberOfOvertimePeriods));
-    }
-  }, [
-    state.defaultWarmUpDuration, state.defaultPeriodDuration, state.defaultOTPeriodDuration,
-    state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration,
-    state.autoStartWarmUp, state.autoStartBreaks, state.autoStartPreOTBreaks, state.autoStartTimeouts,
-    state.numberOfRegularPeriods, state.numberOfOvertimePeriods,
-    isDirtyLocal, // Important to prevent reset if user has pending changes
-  ]);
   
   const markDirty = () => setIsDirtyLocal(true);
 
@@ -110,38 +114,26 @@ export const DurationSettingsCard = forwardRef<DurationSettingsCardRef, Duration
       const finalNumOTPeriods = (isNaN(numOTPeriods) || numOTPeriods < 0) ? 1 : numOTPeriods;
       dispatch({ type: "SET_NUMBER_OF_OVERTIME_PERIODS", payload: finalNumOTPeriods });
 
-      if (localAutoStartWarmUp !== state.autoStartWarmUp) {
-        dispatch({ type: "SET_AUTO_START_WARM_UP_VALUE", payload: localAutoStartWarmUp });
-      }
-      if (localAutoStartBreaks !== state.autoStartBreaks) {
-        dispatch({ type: "SET_AUTO_START_BREAKS_VALUE", payload: localAutoStartBreaks });
-      }
-      if (localAutoStartPreOTBreaks !== state.autoStartPreOTBreaks) {
-        dispatch({ type: "SET_AUTO_START_PRE_OT_BREAKS_VALUE", payload: localAutoStartPreOTBreaks });
-      }
-      if (localAutoStartTimeouts !== state.autoStartTimeouts) {
-        dispatch({ type: "SET_AUTO_START_TIMEOUTS_VALUE", payload: localAutoStartTimeouts });
-      }
+      // No direct dispatch for auto-start values, parent will handle using new values
+      // dispatch({ type: "SET_AUTO_START_WARM_UP_VALUE", payload: localAutoStartWarmUp });
+      // dispatch({ type: "SET_AUTO_START_BREAKS_VALUE", payload: localAutoStartBreaks });
+      // dispatch({ type: "SET_AUTO_START_PRE_OT_BREAKS_VALUE", payload: localAutoStartPreOTBreaks });
+      // dispatch({ type: "SET_AUTO_START_TIMEOUTS_VALUE", payload: localAutoStartTimeouts });
+
+      // Dispatch all auto-start values
+      dispatch({ type: "SET_AUTO_START_WARM_UP_VALUE", payload: localAutoStartWarmUp });
+      dispatch({ type: "SET_AUTO_START_BREAKS_VALUE", payload: localAutoStartBreaks });
+      dispatch({ type: "SET_AUTO_START_PRE_OT_BREAKS_VALUE", payload: localAutoStartPreOTBreaks });
+      dispatch({ type: "SET_AUTO_START_TIMEOUTS_VALUE", payload: localAutoStartTimeouts });
       
       setIsDirtyLocal(false);
       return true;
     },
     handleDiscard: () => {
-      setLocalWarmUpDurationInput(centisecondsToDisplayMinutes(state.defaultWarmUpDuration));
-      setLocalPeriodDurationInput(centisecondsToDisplayMinutes(state.defaultPeriodDuration));
-      setLocalOTPeriodDurationInput(centisecondsToDisplayMinutes(state.defaultOTPeriodDuration));
-      setLocalBreakDurationInput(centisecondsToDisplaySeconds(state.defaultBreakDuration));
-      setLocalPreOTBreakDurationInput(centisecondsToDisplaySeconds(state.defaultPreOTBreakDuration));
-      setLocalTimeoutDurationInput(centisecondsToDisplaySeconds(state.defaultTimeoutDuration));
-      setLocalAutoStartWarmUp(state.autoStartWarmUp);
-      setLocalAutoStartBreaks(state.autoStartBreaks);
-      setLocalAutoStartPreOTBreaks(state.autoStartPreOTBreaks);
-      setLocalAutoStartTimeouts(state.autoStartTimeouts);
-      setLocalNumRegularPeriodsInput(String(state.numberOfRegularPeriods));
-      setLocalNumOTPeriodsInput(String(state.numberOfOvertimePeriods));
-      setIsDirtyLocal(false);
+      setValuesFromProfile(initialValues); // Discard to initialValues of the current profile
     },
     getIsDirty: () => isDirtyLocal,
+    setValues: setValuesFromProfile,
   }));
 
   return (
