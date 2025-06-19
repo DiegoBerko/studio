@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation'; // Added useRouter
+import { useSearchParams, useRouter } from 'next/navigation';
 import { DurationSettingsCard, type DurationSettingsCardRef } from "@/components/config/duration-settings-card";
 import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/config/penalty-settings-card";
 import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card";
@@ -30,7 +30,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle as FormDialogTitle, // Renamed to avoid conflict
+  DialogTitle as FormDialogTitle,
   DialogDescription as FormDialogDescription,
   DialogFooter as FormDialogFooter,
   DialogClose,
@@ -54,7 +54,7 @@ export default function ConfigPage() {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
   const searchParams = useSearchParams();
-  const router = useRouter(); // Added useRouter
+  const router = useRouter();
 
   const durationSettingsRef = useRef<DurationSettingsCardRef>(null);
   const penaltySettingsRef = useRef<PenaltySettingsCardRef>(null);
@@ -81,7 +81,6 @@ export default function ConfigPage() {
   const initialTab = urlTab && VALID_TAB_VALUES.includes(urlTab) ? urlTab : "formatAndTimings";
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  // Format & Timings Profile Management State
   const [isNewProfileDialogOpen, setIsNewProfileDialogOpen] = useState(false);
   const [newProfileName, setNewProfileName] = useState("");
   const [isEditProfileNameDialogOpen, setIsEditProfileNameDialogOpen] = useState(false);
@@ -101,18 +100,15 @@ export default function ConfigPage() {
       penaltySettingsRef.current.setValues(selectedProfile);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProfile.id]); // Depend only on profile ID to trigger reset of cards
+  }, [selectedProfile.id]); 
 
   const isFormatAndTimingsSectionDirty = isDurationDirty || isPenaltyDirty;
-  const pageIsDirty = isFormatAndTimingsSectionDirty || isSoundDirty || isTeamSettingsDirty || isCategorySettingsDirty;
+  const isSoundAndDisplaySectionDirty = isSoundDirty || isTeamSettingsDirty;
 
-  const handleSaveAllConfig = () => {
+
+  const handleSaveChanges_FormatAndTimings = () => {
     let durationSaveSuccess = true;
     let penaltySaveSuccess = true;
-    let soundSaveSuccess = true;
-    let teamSettingsSaveSuccess = true;
-    let categorySettingsSaveSuccess = true;
-
     if (durationSettingsRef.current && isDurationDirty) {
       durationSaveSuccess = durationSettingsRef.current.handleSave();
       if (durationSaveSuccess) setIsDurationDirty(false);
@@ -121,34 +117,14 @@ export default function ConfigPage() {
       penaltySaveSuccess = penaltySettingsRef.current.handleSave();
       if (penaltySaveSuccess) setIsPenaltyDirty(false);
     }
-    if (soundSettingsRef.current && isSoundDirty) {
-      soundSaveSuccess = soundSettingsRef.current.handleSave();
-      if (soundSaveSuccess) setIsSoundDirty(false);
-    }
-    if (teamSettingsRef.current && isTeamSettingsDirty) {
-      teamSettingsSaveSuccess = teamSettingsRef.current.handleSave();
-      if (teamSettingsSaveSuccess) setIsTeamSettingsDirty(false);
-    }
-    if (categorySettingsRef.current && isCategorySettingsDirty) {
-      categorySettingsSaveSuccess = categorySettingsRef.current.handleSave();
-      if (categorySettingsSaveSuccess) setIsCategorySettingsDirty(false);
-    }
-
-    if (durationSaveSuccess && penaltySaveSuccess && soundSaveSuccess && teamSettingsSaveSuccess && categorySettingsSaveSuccess) {
-      toast({
-        title: "Configuración Guardada",
-        description: "Todos los cambios de configuración han sido guardados exitosamente.",
-      });
+    if (durationSaveSuccess && penaltySaveSuccess) {
+      toast({ title: "Formato y Tiempos Guardados", description: "Los cambios en Formato y Tiempos han sido guardados." });
     } else {
-      toast({
-        title: "Error al Guardar Configuración",
-        description: "Algunas configuraciones no pudieron ser guardadas. Revisa los campos.",
-        variant: "destructive",
-      });
+      toast({ title: "Error al Guardar", description: "No se pudieron guardar todos los cambios en Formato y Tiempos.", variant: "destructive" });
     }
   };
 
-  const handleDiscardAllConfig = () => {
+  const handleDiscardChanges_FormatAndTimings = () => {
     if (durationSettingsRef.current && isDurationDirty) {
       durationSettingsRef.current.handleDiscard();
       setIsDurationDirty(false);
@@ -157,6 +133,28 @@ export default function ConfigPage() {
       penaltySettingsRef.current.handleDiscard();
       setIsPenaltyDirty(false);
     }
+    toast({ title: "Cambios Descartados", description: "Los cambios no guardados en Formato y Tiempos han sido revertidos." });
+  };
+
+  const handleSaveChanges_SoundAndDisplay = () => {
+    let soundSaveSuccess = true;
+    let teamSettingsSaveSuccess = true;
+    if (soundSettingsRef.current && isSoundDirty) {
+      soundSaveSuccess = soundSettingsRef.current.handleSave();
+      if (soundSaveSuccess) setIsSoundDirty(false);
+    }
+    if (teamSettingsRef.current && isTeamSettingsDirty) {
+      teamSettingsSaveSuccess = teamSettingsRef.current.handleSave();
+      if (teamSettingsSaveSuccess) setIsTeamSettingsDirty(false);
+    }
+    if (soundSaveSuccess && teamSettingsSaveSuccess) {
+      toast({ title: "Sonido y Display Guardados", description: "Los cambios en Sonido y Display han sido guardados." });
+    } else {
+      toast({ title: "Error al Guardar", description: "No se pudieron guardar todos los cambios en Sonido y Display.", variant: "destructive" });
+    }
+  };
+
+  const handleDiscardChanges_SoundAndDisplay = () => {
     if (soundSettingsRef.current && isSoundDirty) {
       soundSettingsRef.current.handleDiscard();
       setIsSoundDirty(false);
@@ -165,15 +163,28 @@ export default function ConfigPage() {
       teamSettingsRef.current.handleDiscard();
       setIsTeamSettingsDirty(false);
     }
+    toast({ title: "Cambios Descartados", description: "Los cambios no guardados en Sonido y Display han sido revertidos." });
+  };
+
+  const handleSaveChanges_Categories = () => {
+    if (categorySettingsRef.current && isCategorySettingsDirty) {
+      if (categorySettingsRef.current.handleSave()) {
+        setIsCategorySettingsDirty(false);
+        toast({ title: "Categorías Guardadas", description: "Los cambios en Categorías han sido guardados." });
+      } else {
+        toast({ title: "Error al Guardar", description: "No se pudieron guardar los cambios en Categorías.", variant: "destructive" });
+      }
+    }
+  };
+
+  const handleDiscardChanges_Categories = () => {
     if (categorySettingsRef.current && isCategorySettingsDirty) {
       categorySettingsRef.current.handleDiscard();
       setIsCategorySettingsDirty(false);
+      toast({ title: "Cambios Descartados", description: "Los cambios no guardados en Categorías han sido revertidos." });
     }
-    toast({
-      title: "Cambios de Configuración Descartados",
-      description: "Los cambios no guardados en la configuración han sido revertidos.",
-    });
   };
+
 
   const performExportActionWithDialog = (filename: string) => {
     if (!currentExportAction) return;
@@ -240,7 +251,7 @@ export default function ConfigPage() {
   const genericImportHandler = (
     event: React.ChangeEvent<HTMLInputElement>,
     sectionName: string,
-    requiredFields: string[], // Can be empty if no specific fields are strictly required at top level
+    requiredFields: string[],
     dispatchActionType: 
         | 'LOAD_FORMAT_AND_TIMINGS_PROFILES' 
         | 'LOAD_SOUND_AND_DISPLAY_CONFIG',
@@ -256,15 +267,12 @@ export default function ConfigPage() {
         if (typeof text !== 'string') throw new Error("Error al leer el archivo.");
         const importedConfig = JSON.parse(text);
 
-        // Basic validation for format profiles (expects an array)
         if (dispatchActionType === 'LOAD_FORMAT_AND_TIMINGS_PROFILES' && !Array.isArray(importedConfig)) {
             throw new Error(`Archivo de perfiles de ${sectionName} no válido. Se esperaba un array de perfiles.`);
         }
-        // Basic validation for other sections (expects an object)
         if (dispatchActionType !== 'LOAD_FORMAT_AND_TIMINGS_PROFILES' && (typeof importedConfig !== 'object' || Array.isArray(importedConfig))) {
             throw new Error(`Archivo de configuración para ${sectionName} no válido. Se esperaba un objeto.`);
         }
-
 
         if (requiredFields.length > 0) {
             const missingFields = requiredFields.filter(field => !(field in importedConfig));
@@ -276,7 +284,6 @@ export default function ConfigPage() {
         let payload: any;
         payload = importedConfig;
 
-
         dispatch({ type: dispatchActionType, payload });
         
         if (dispatchActionType === 'LOAD_FORMAT_AND_TIMINGS_PROFILES') {
@@ -284,7 +291,7 @@ export default function ConfigPage() {
             setIsPenaltyDirty(false);
         } else if (dispatchActionType === 'LOAD_SOUND_AND_DISPLAY_CONFIG') {
             setIsSoundDirty(false);
-            setIsTeamSettingsDirty(false); // TeamSettingsCard is under Sound & Display now
+            setIsTeamSettingsDirty(false);
         }
 
         toast({
@@ -308,9 +315,6 @@ export default function ConfigPage() {
   };
 
   const handleImportFormatAndTimings = (event: React.ChangeEvent<HTMLInputElement>) => {
-    // For profiles, the top level is an array, so requiredFields might be empty, 
-    // or we check for fields within each profile object if needed.
-    // Simple check here is that it's an array. More specific checks could be added.
     genericImportHandler(event, "Perfiles de Formato y Tiempos", 
       [], 
       'LOAD_FORMAT_AND_TIMINGS_PROFILES',
@@ -345,7 +349,6 @@ export default function ConfigPage() {
     setIsResetConfigDialogOpen(false);
   };
 
-  // --- Format & Timings Profile Management Handlers ---
   const handleCreateNewProfile = () => {
     if (!newProfileName.trim()) {
       toast({ title: "Nombre Requerido", description: "El nombre del perfil no puede estar vacío.", variant: "destructive" });
@@ -359,16 +362,17 @@ export default function ConfigPage() {
 
   const handleSelectProfile = (profileId: string) => {
     if (isFormatAndTimingsSectionDirty) {
-        // Consider adding a confirmation dialog here if there are unsaved changes
-        // For now, let's proceed but it might be better to warn the user.
-        // Or, automatically save changes before switching (needs careful thought).
-        console.warn("Cambiando de perfil con cambios no guardados en Formato y Tiempos.");
-        // Optionally, trigger save for current profile before switching
-        // durationSettingsRef.current?.handleSave();
-        // penaltySettingsRef.current?.handleSave();
+        const confirmSwitch = window.confirm("Tienes cambios sin guardar en Formato y Tiempos. ¿Deseas descartarlos y cambiar de perfil?");
+        if (!confirmSwitch) {
+            return;
+        }
+        // Discard changes for F&T before switching
+        if (durationSettingsRef.current) durationSettingsRef.current.handleDiscard();
+        if (penaltySettingsRef.current) penaltySettingsRef.current.handleDiscard();
+        setIsDurationDirty(false);
+        setIsPenaltyDirty(false);
     }
     dispatch({ type: 'SELECT_FORMAT_AND_TIMINGS_PROFILE', payload: { profileId } });
-    // Card values will update via useEffect dependency on selectedProfile.id
     setIsDurationDirty(false);
     setIsPenaltyDirty(false);
   };
@@ -408,24 +412,15 @@ export default function ConfigPage() {
     }
   };
 
-
   const tabContentClassName = "mt-6 p-0 sm:p-6 border-0 sm:border rounded-md sm:bg-card/30 sm:shadow-sm";
   const sectionCardClassName = "mb-8 p-6 border rounded-md bg-card shadow-sm";
+  const sectionActionsContainerClass = "mt-6 mb-4 flex justify-end gap-2 border-t pt-6";
+
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-primary-foreground">Configuración General</h1>
-        {pageIsDirty && (
-          <div className="flex gap-2">
-            <Button onClick={handleSaveAllConfig} size="sm">
-              <Save className="mr-2 h-4 w-4" /> Guardar Cambios
-            </Button>
-            <Button onClick={handleDiscardAllConfig} variant="outline" size="sm">
-              <Undo2 className="mr-2 h-4 w-4" /> Descartar Cambios
-            </Button>
-          </div>
-        )}
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -472,6 +467,17 @@ export default function ConfigPage() {
             <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} initialValues={selectedProfile} />
             <Separator />
             <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} initialValues={selectedProfile} />
+            
+            {isFormatAndTimingsSectionDirty && (
+              <div className={sectionActionsContainerClass}>
+                <Button onClick={handleSaveChanges_FormatAndTimings} size="sm">
+                  <Save className="mr-2 h-4 w-4" /> Guardar Cambios F&T
+                </Button>
+                <Button onClick={handleDiscardChanges_FormatAndTimings} variant="outline" size="sm">
+                  <Undo2 className="mr-2 h-4 w-4" /> Descartar Cambios F&T
+                </Button>
+              </div>
+            )}
             <Separator />
              <div className="space-y-3 pt-4">
                 <h3 className="text-lg font-semibold text-primary-foreground">Exportar/Importar Perfiles de Formato y Tiempos</h3>
@@ -496,6 +502,17 @@ export default function ConfigPage() {
             <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
             <Separator />
             <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty}/>
+            
+            {isSoundAndDisplaySectionDirty && (
+              <div className={sectionActionsContainerClass}>
+                <Button onClick={handleSaveChanges_SoundAndDisplay} size="sm">
+                  <Save className="mr-2 h-4 w-4" /> Guardar Cambios S&D
+                </Button>
+                <Button onClick={handleDiscardChanges_SoundAndDisplay} variant="outline" size="sm">
+                  <Undo2 className="mr-2 h-4 w-4" /> Descartar Cambios S&D
+                </Button>
+              </div>
+            )}
             <Separator />
             <div className="space-y-3 pt-4">
                 <h3 className="text-lg font-semibold text-primary-foreground">Exportar/Importar Configuración de Sonido y Display</h3>
@@ -518,22 +535,21 @@ export default function ConfigPage() {
         <TabsContent value="categoriesAndTeams" className={tabContentClassName}>
           <div className="space-y-8">
             <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
+            {isCategorySettingsDirty && (
+              <div className={cn(sectionActionsContainerClass, "mt-0 mb-6")}> {/* Adjusted margins for this specific case */}
+                <Button onClick={handleSaveChanges_Categories} size="sm">
+                  <Save className="mr-2 h-4 w-4" /> Guardar Cambios de Categorías
+                </Button>
+                <Button onClick={handleDiscardChanges_Categories} variant="outline" size="sm">
+                  <Undo2 className="mr-2 h-4 w-4" /> Descartar Cambios de Categorías
+                </Button>
+              </div>
+            )}
             <Separator />
             <TeamsManagementTab />
           </div>
         </TabsContent>
       </Tabs>
-
-      {pageIsDirty && (
-        <div className="mt-8 flex justify-end gap-2">
-          <Button onClick={handleSaveAllConfig}>
-            <Save className="mr-2 h-4 w-4" /> Guardar Cambios Pendientes
-          </Button>
-          <Button onClick={handleDiscardAllConfig} variant="outline">
-            <Undo2 className="mr-2 h-4 w-4" /> Descartar Cambios Pendientes
-          </Button>
-        </div>
-      )}
 
       <Separator className="my-10" />
 
@@ -599,7 +615,6 @@ export default function ConfigPage() {
         </AlertDialog>
       )}
 
-      {/* Dialog for New Profile Name */}
       <Dialog open={isNewProfileDialogOpen} onOpenChange={setIsNewProfileDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -620,7 +635,6 @@ export default function ConfigPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog for Edit Profile Name */}
       <Dialog open={isEditProfileNameDialogOpen} onOpenChange={setIsEditProfileNameDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -641,7 +655,6 @@ export default function ConfigPage() {
         </DialogContent>
       </Dialog>
 
-       {/* Dialog for Confirm Delete Profile */}
        {profileToDelete && (
         <AlertDialog open={!!profileToDelete} onOpenChange={() => setProfileToDelete(null)}>
             <AlertDialogContent>
@@ -663,3 +676,6 @@ export default function ConfigPage() {
     </div>
   );
 }
+
+
+    
