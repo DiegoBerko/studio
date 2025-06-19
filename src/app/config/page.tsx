@@ -88,6 +88,14 @@ export default function ConfigPage() {
   const [profileToDelete, setProfileToDelete] = useState<FormatAndTimingsProfile | null>(null);
 
 
+  useEffect(() => {
+    // Sync URL with activeTab state
+    const currentUrlTab = searchParams.get('tab');
+    if (activeTab !== currentUrlTab && VALID_TAB_VALUES.includes(activeTab)) {
+      router.push(`/config?tab=${activeTab}`, { scroll: false });
+    }
+  }, [activeTab, router, searchParams]);
+
   const selectedProfile = useMemo(() => {
     return state.formatAndTimingsProfiles.find(p => p.id === state.selectedFormatAndTimingsProfileId) || state.formatAndTimingsProfiles[0] || createDefaultFormatAndTimingsProfile();
   }, [state.formatAndTimingsProfiles, state.selectedFormatAndTimingsProfileId]);
@@ -99,6 +107,8 @@ export default function ConfigPage() {
     if (penaltySettingsRef.current) {
       penaltySettingsRef.current.setValues(selectedProfile);
     }
+    setIsDurationDirty(false);
+    setIsPenaltyDirty(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProfile.id]); 
 
@@ -275,7 +285,8 @@ export default function ConfigPage() {
         }
 
         if (requiredFields.length > 0) {
-            const missingFields = requiredFields.filter(field => !(field in importedConfig));
+            const dataToCheck = dispatchActionType === 'LOAD_FORMAT_AND_TIMINGS_PROFILES' ? importedConfig[0] : importedConfig;
+            const missingFields = requiredFields.filter(field => !(field in dataToCheck));
             if (missingFields.length > 0) { 
                 throw new Error(`Archivo de configuración para ${sectionName} no válido. Faltan campos: ${missingFields.join(', ')}`);
             }
@@ -316,7 +327,7 @@ export default function ConfigPage() {
 
   const handleImportFormatAndTimings = (event: React.ChangeEvent<HTMLInputElement>) => {
     genericImportHandler(event, "Perfiles de Formato y Tiempos", 
-      [], 
+      ['name', 'defaultPeriodDuration'],  // Check for core fields in the first profile
       'LOAD_FORMAT_AND_TIMINGS_PROFILES',
       fileInputFormatAndTimingsRef
     );
@@ -362,7 +373,7 @@ export default function ConfigPage() {
 
   const handleSelectProfile = (profileId: string) => {
     if (isFormatAndTimingsSectionDirty) {
-        const confirmSwitch = window.confirm("Tienes cambios sin guardar en Formato y Tiempos. ¿Deseas descartarlos y cambiar de perfil?");
+        const confirmSwitch = window.confirm("Tiene cambios sin guardar en Formato y Tiempos. ¿Desea descartarlos y cambiar de perfil?");
         if (!confirmSwitch) {
             return;
         }
@@ -373,8 +384,8 @@ export default function ConfigPage() {
         setIsPenaltyDirty(false);
     }
     dispatch({ type: 'SELECT_FORMAT_AND_TIMINGS_PROFILE', payload: { profileId } });
-    setIsDurationDirty(false);
-    setIsPenaltyDirty(false);
+    // setIsDurationDirty(false); // These are now handled by useEffect on selectedProfile.id change
+    // setIsPenaltyDirty(false);
   };
   
   const handlePrepareEditProfileName = () => {
@@ -412,6 +423,34 @@ export default function ConfigPage() {
     }
   };
 
+  const handleTabChange = (newTabValue: string) => {
+    let canSwitch = true;
+    let discardAction: (() => void) | null = null;
+    let sectionName = "";
+
+    if (activeTab === "formatAndTimings" && isFormatAndTimingsSectionDirty) {
+      sectionName = "Formato y Tiempos";
+      canSwitch = window.confirm(`Tiene cambios sin guardar en ${sectionName}. ¿Desea descartarlos y cambiar de pestaña?`);
+      if (canSwitch) discardAction = handleDiscardChanges_FormatAndTimings;
+    } else if (activeTab === "soundAndDisplay" && isSoundAndDisplaySectionDirty) {
+      sectionName = "Sonido y Display";
+      canSwitch = window.confirm(`Tiene cambios sin guardar en ${sectionName}. ¿Desea descartarlos y cambiar de pestaña?`);
+      if (canSwitch) discardAction = handleDiscardChanges_SoundAndDisplay;
+    } else if (activeTab === "categoriesAndTeams" && isCategorySettingsDirty) { // Only check categories for this tab
+      sectionName = "Categorías";
+      canSwitch = window.confirm(`Tiene cambios sin guardar en ${sectionName}. ¿Desea descartarlos y cambiar de pestaña?`);
+      if (canSwitch) discardAction = handleDiscardChanges_Categories;
+    }
+
+    if (canSwitch) {
+      if (discardAction) {
+        discardAction();
+      }
+      setActiveTab(newTabValue);
+      // URL update is now handled by useEffect on activeTab change
+    }
+  };
+
   const tabContentClassName = "mt-6 p-0 sm:p-6 border-0 sm:border rounded-md sm:bg-card/30 sm:shadow-sm";
   const sectionCardClassName = "mb-8 p-6 border rounded-md bg-card shadow-sm";
   const sectionActionsContainerClass = "mt-6 mb-4 flex justify-end gap-2 border-t pt-6";
@@ -423,7 +462,7 @@ export default function ConfigPage() {
         <h1 className="text-3xl font-bold text-primary-foreground">Configuración General</h1>
       </div>
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 h-auto sm:h-10">
           <TabsTrigger value="formatAndTimings" className="py-2 sm:py-1.5">Formato y Tiempos</TabsTrigger>
           <TabsTrigger value="soundAndDisplay" className="py-2 sm:py-1.5">Sonido y Display</TabsTrigger>
@@ -536,7 +575,7 @@ export default function ConfigPage() {
           <div className="space-y-8">
             <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
             {isCategorySettingsDirty && (
-              <div className={cn(sectionActionsContainerClass, "mt-0 mb-6")}> {/* Adjusted margins for this specific case */}
+              <div className={cn(sectionActionsContainerClass, "mt-0 mb-6")}>
                 <Button onClick={handleSaveChanges_Categories} size="sm">
                   <Save className="mr-2 h-4 w-4" /> Guardar Cambios de Categorías
                 </Button>
@@ -676,6 +715,3 @@ export default function ConfigPage() {
     </div>
   );
 }
-
-
-    
