@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Undo2, Upload, Download, RotateCcw, FileJson } from 'lucide-react';
-import { useGameState, type ConfigFields, type CategoryData } from '@/contexts/game-state-context';
+import { Save, Undo2, Upload, Download, RotateCcw } from 'lucide-react';
+import { useGameState, type ConfigFields } from '@/contexts/game-state-context';
 import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
@@ -50,8 +50,6 @@ type ExportableSoundAndDisplayConfig = Pick<ConfigFields,
   | 'isMonitorModeEnabled'
 >;
 
-type ExportableCategoriesConfig = Pick<ConfigFields, 'availableCategories' | 'selectedMatchCategory'>;
-
 
 export default function ConfigPage() {
   const { state, dispatch } = useGameState();
@@ -66,7 +64,7 @@ export default function ConfigPage() {
   
   const fileInputRefFormatAndTimings = useRef<HTMLInputElement>(null);
   const fileInputRefSoundAndDisplay = useRef<HTMLInputElement>(null);
-  const fileInputRefCategories = useRef<HTMLInputElement>(null);
+  
 
 
   const [localFormatAndTimingsConfigName, setLocalFormatAndTimingsConfigName] = useState(state.formatAndTimingsConfigName || '');
@@ -205,8 +203,8 @@ export default function ConfigPage() {
         });
         return;
     }
-    localStorage.setItem('lastExportFilename', filename.trim()); // Save for next time
-    currentExportAction(); // This will use the validated currentExportFilename
+    localStorage.setItem('lastExportFilename', filename.trim()); 
+    currentExportAction(); 
     setIsExportDialogOpen(false);
     setCurrentExportAction(null);
   };
@@ -216,13 +214,13 @@ export default function ConfigPage() {
     const suggestedFilename = lastFilename || `${suggestedBaseName}_config.json`;
     setCurrentExportFilename(suggestedFilename);
 
-    setCurrentExportAction(() => () => { // This inner function is what performExportActionWithDialog calls
+    setCurrentExportAction(() => () => { 
         const jsonString = JSON.stringify(configData, null, 2);
         const blob = new Blob([jsonString], { type: "application/json" });
         const href = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = href;
-        link.download = currentExportFilename.trim(); // Use the (potentially edited) filename from dialog
+        link.download = currentExportFilename.trim(); 
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -248,6 +246,7 @@ export default function ConfigPage() {
       autoStartWarmUp: state.autoStartWarmUp,
       autoStartBreaks: state.autoStartBreaks,
       autoStartPreOTBreaks: state.autoStartPreOTBreaks,
+      autoStartTimeouts: state.autoStartTimeouts,
       numberOfRegularPeriods: state.numberOfRegularPeriods,
       numberOfOvertimePeriods: state.numberOfOvertimePeriods,
       playersPerTeamOnIce: state.playersPerTeamOnIce,
@@ -269,13 +268,6 @@ export default function ConfigPage() {
     exportSection("Configuración de Sonido y Display", configToExport, "icevision_sonido_display");
   };
   
-  const handleExportCategories = () => {
-    const configToExport: ExportableCategoriesConfig = {
-      availableCategories: state.availableCategories,
-      selectedMatchCategory: state.selectedMatchCategory,
-    };
-    exportSection("Configuración de Categorías", configToExport, "icevision_categorias");
-  };
   
   const genericImportHandler = (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -283,8 +275,7 @@ export default function ConfigPage() {
     requiredFields: string[],
     dispatchActionType: 
         | 'LOAD_FORMAT_AND_TIMINGS_CONFIG' 
-        | 'LOAD_SOUND_AND_DISPLAY_CONFIG' 
-        | 'LOAD_CATEGORIES_CONFIG',
+        | 'LOAD_SOUND_AND_DISPLAY_CONFIG',
     fileInputRef: React.RefObject<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
@@ -298,25 +289,18 @@ export default function ConfigPage() {
         const importedConfig = JSON.parse(text) as Partial<ConfigFields>;
 
         const missingFields = requiredFields.filter(field => !(field in importedConfig));
-        if (missingFields.length > 0 && requiredFields.length > 0) { // Check if any required fields are actually expected
+        if (missingFields.length > 0 && requiredFields.length > 0) { 
           throw new Error(`Archivo de configuración para ${sectionName} no válido. Faltan campos: ${missingFields.join(', ')}`);
         }
         
-        // Type assertion for payload
+        
         let payload: any;
-        if (dispatchActionType === 'LOAD_CATEGORIES_CONFIG') {
-            payload = {
-                availableCategories: importedConfig.availableCategories,
-                selectedMatchCategory: importedConfig.selectedMatchCategory,
-            } as Pick<ConfigFields, 'availableCategories' | 'selectedMatchCategory'>;
-        } else {
-            payload = importedConfig;
-        }
+        payload = importedConfig;
 
 
         dispatch({ type: dispatchActionType, payload });
         
-        // Reset relevant dirty flags after successful import
+        
         if (dispatchActionType === 'LOAD_FORMAT_AND_TIMINGS_CONFIG') {
             setIsFormatAndTimingsConfigNameDirty(false);
             setIsDurationDirty(false);
@@ -324,8 +308,6 @@ export default function ConfigPage() {
         } else if (dispatchActionType === 'LOAD_SOUND_AND_DISPLAY_CONFIG') {
             setIsSoundDirty(false);
             setIsTeamSettingsDirty(false);
-        } else if (dispatchActionType === 'LOAD_CATEGORIES_CONFIG') {
-            setIsCategorySettingsDirty(false);
         }
 
         toast({
@@ -350,7 +332,7 @@ export default function ConfigPage() {
 
   const handleImportFormatAndTimings = (event: React.ChangeEvent<HTMLInputElement>) => {
     genericImportHandler(event, "Formato y Tiempos", 
-      ['formatAndTimingsConfigName', 'defaultPeriodDuration'], // Sample required fields
+      ['formatAndTimingsConfigName', 'defaultPeriodDuration'], 
       'LOAD_FORMAT_AND_TIMINGS_CONFIG',
       fileInputRefFormatAndTimings
     );
@@ -358,20 +340,12 @@ export default function ConfigPage() {
 
   const handleImportSoundAndDisplay = (event: React.ChangeEvent<HTMLInputElement>) => {
     genericImportHandler(event, "Sonido y Display",
-      ['playSoundAtPeriodEnd', 'isMonitorModeEnabled'], // Sample required fields
+      ['playSoundAtPeriodEnd', 'isMonitorModeEnabled'], 
       'LOAD_SOUND_AND_DISPLAY_CONFIG',
       fileInputRefSoundAndDisplay
     );
   };
   
-  const handleImportCategories = (event: React.ChangeEvent<HTMLInputElement>) => {
-    genericImportHandler(event, "Categorías",
-      ['availableCategories'], // Sample required field
-      'LOAD_CATEGORIES_CONFIG',
-      fileInputRefCategories
-    );
-  };
-
 
   const handlePrepareResetConfig = () => {
     setIsResetConfigDialogOpen(true);
@@ -379,7 +353,7 @@ export default function ConfigPage() {
 
   const performConfigReset = () => {
     dispatch({ type: 'RESET_CONFIG_TO_DEFAULTS' });
-    setLocalFormatAndTimingsConfigName(initialFormatAndTimingsConfigNameForReset); // Reset specific name
+    setLocalFormatAndTimingsConfigName(initialFormatAndTimingsConfigNameForReset); 
     setIsFormatAndTimingsConfigNameDirty(false);
     setIsDurationDirty(false);
     setIsPenaltyDirty(false);
@@ -485,25 +459,6 @@ export default function ConfigPage() {
         <TabsContent value="categoriesAndTeams" className={tabContentClassName}>
           <div className="space-y-8">
             <CategorySettingsCard ref={categorySettingsRef} onDirtyChange={setIsCategorySettingsDirty} />
-             <Separator />
-            <div className="space-y-3 pt-0"> {/* Adjusted pt-0 as CategorySettingsCard has its own padding */}
-                <h3 className="text-lg font-semibold text-primary-foreground">Exportar/Importar Configuración de Categorías</h3>
-                 <p className="text-sm text-muted-foreground">
-                    Guarda o carga la lista de categorías disponibles y la categoría seleccionada por defecto para los partidos.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3">
-                    <Button onClick={handleExportCategories} variant="outline" className="flex-1">
-                        <Download className="mr-2 h-4 w-4" /> Exportar Categorías (JSON)
-                    </Button>
-                    <Button onClick={() => fileInputRefCategories.current?.click()} variant="outline" className="flex-1">
-                        <Upload className="mr-2 h-4 w-4" /> Importar Categorías (JSON)
-                    </Button>
-                     <input
-                        type="file" ref={fileInputRefCategories} onChange={handleImportCategories}
-                        accept=".json" className="hidden"
-                    />
-                </div>
-            </div>
             <Separator />
             <TeamsManagementTab />
           </div>
@@ -539,7 +494,7 @@ export default function ConfigPage() {
       {isExportDialogOpen && (
         <AlertDialog open={isExportDialogOpen} onOpenChange={(open) => {
             if (!open) {
-                setCurrentExportAction(null); // Clear action when dialog closes
+                setCurrentExportAction(null); 
             }
             setIsExportDialogOpen(open);
         }}>
@@ -587,3 +542,4 @@ export default function ConfigPage() {
     </div>
   );
 }
+

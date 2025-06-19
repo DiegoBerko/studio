@@ -111,7 +111,7 @@ export type GameAction =
   | { type: 'START_TIMEOUT' }
   | { type: 'END_TIMEOUT' }
   | { type: 'MANUAL_END_GAME' } // New action
-  | { type: 'SET_FORMAT_AND_TIMINGS_CONFIG_NAME'; payload: string } // New action for specific config name
+  | { type: 'SET_FORMAT_AND_TIMINGS_CONFIG_NAME'; payload: string }
   | { type: 'SET_DEFAULT_WARM_UP_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_PERIOD_DURATION'; payload: number }
   | { type: 'SET_DEFAULT_OT_PERIOD_DURATION'; payload: number }
@@ -319,7 +319,7 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
       newPenalties.push({ ...p });
       continue;
     }
-    if (p.remainingTime <= 0) { // Ensure finished penalties are filtered out here
+    if (p.remainingTime <= 0) { 
         continue;
     }
 
@@ -364,7 +364,7 @@ const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
 const cleanPenaltiesForStorage = (penalties?: Penalty[]): Penalty[] => {
   if (!penalties) return [];
   return penalties.map(p => {
-    if (p._status && p._status !== 'pending_puck') {
+    if (p._status && p._status !== 'pending_puck') { // Preserve 'pending_puck' status
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { _status, ...rest } = p;
       return rest as Penalty; 
@@ -405,19 +405,19 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...initialGlobalState,
         ...hydratedBasePartial,
         formatAndTimingsConfigName: action.payload?.formatAndTimingsConfigName ?? initialGlobalState.formatAndTimingsConfigName,
-        availableCategories: hydratedCategories, // Use robustly hydrated categories
-        teams: (action.payload?.teams || initialGlobalState.teams).map(t => ({...t, subName: t.subName || undefined })), // Ensure teams is always an array and subName is correctly undefined
-        playHornTrigger: initialGlobalState.playHornTrigger, // Reset playHornTrigger on hydration
+        availableCategories: hydratedCategories, 
+        teams: (action.payload?.teams || initialGlobalState.teams).map(t => ({...t, subName: t.subName || undefined })), 
+        playHornTrigger: initialGlobalState.playHornTrigger, 
         homeTeamSubName: action.payload?.homeTeamSubName,
         awayTeamSubName: action.payload?.awayTeamSubName,
         isMonitorModeEnabled: action.payload?.isMonitorModeEnabled ?? initialGlobalState.isMonitorModeEnabled,
       };
       
-      // Ensure selectedMatchCategory is valid against the (potentially converted) hydratedCategories
+      
       if (!hydratedBase.availableCategories.find(c => c.id === hydratedBase.selectedMatchCategory) && hydratedBase.availableCategories.length > 0) {
         hydratedBase.selectedMatchCategory = hydratedBase.availableCategories[0].id;
       } else if (hydratedBase.availableCategories.length === 0) {
-        hydratedBase.selectedMatchCategory = ''; // Fallback if no categories
+        hydratedBase.selectedMatchCategory = ''; 
       }
 
 
@@ -461,7 +461,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             initialHydratedTimeCs = hydratedTimeoutDurationCs;
          }
       } else if (hydratedBase.periodDisplayOverride === 'End of Game') {
-        initialHydratedTimeCs = 0; // Game ended, time is 0
+        initialHydratedTimeCs = 0; 
       } else if (hydratedPeriod > hydratedNumberOfRegularPeriods) {
         initialHydratedTimeCs = hydratedOTPeriodDurationCs;
         hydratedBase.periodDisplayOverride = null;
@@ -690,7 +690,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         initialDuration: action.payload.penalty.initialDuration,
         remainingTime: action.payload.penalty.remainingTime,
         id: (typeof window !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random().toString(36).slice(2)),
-        _status: 'pending_puck', // Nueva penalidad inicia como 'pending_puck'
+        _status: 'pending_puck', 
       };
       let penalties = [...state[`${action.payload.team}Penalties`], newPenalty];
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
@@ -757,8 +757,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         const elapsedCs = Math.floor(elapsedMs / 10);
         newCalculatedTimeCs = Math.max(0, state.remainingTimeAtStartCs - elapsedCs);
 
-        // Penalties only tick if the main game clock is running (not during breaks/timeouts/warmup/end)
-        // and the game clock actually advanced a second.
+        
         const gameClockWasTickingForPenalties =
           state.periodDisplayOverride === null &&
           state.currentPeriod > 0;
@@ -767,7 +766,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           const oldSecondBoundary = Math.floor(state.currentTime / CENTISECONDS_PER_SECOND);
           const newSecondBoundary = Math.floor(newCalculatedTimeCs / CENTISECONDS_PER_SECOND);
 
-          if (newSecondBoundary < oldSecondBoundary) { // A second has passed on the game clock
+          if (newSecondBoundary < oldSecondBoundary) { 
             const decrementRunningPenalties = (penalties: Penalty[]): Penalty[] => {
               return penalties.map(p => {
                 if (p._status === 'running' && p.remainingTime > 0) {
@@ -792,7 +791,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
          awayPenaltiesResult = state.awayPenalties;
       }
 
-      // Always recalculate statuses and sort, as penalties might have finished or new ones activated
+      
       homePenaltiesResult = updatePenaltyStatusesOnly(homePenaltiesResult, state.maxConcurrentPenalties);
       homePenaltiesResult = sortPenaltiesByStatus(homePenaltiesResult);
       awayPenaltiesResult = updatePenaltyStatusesOnly(awayPenaltiesResult, state.maxConcurrentPenalties);
@@ -810,7 +809,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           awayPenalties: awayPenaltiesResult,
         };
         const transitionResult = handleAutoTransition(stateBeforeTransition);
-        newStateWithoutMeta = transitionResult; // handleAutoTransition now returns the full state slice
+        newStateWithoutMeta = transitionResult; 
         newPlayHornTrigger = transitionResult.playHornTrigger;
 
       } else {
@@ -820,7 +819,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           homePenalties: homePenaltiesResult,
           awayPenalties: awayPenaltiesResult,
         };
-        if (state.isClockRunning && newCalculatedTimeCs <= 0) { // Should be caught by above, but as a fallback
+        if (state.isClockRunning && newCalculatedTimeCs <= 0) { 
             newStateWithoutMeta.isClockRunning = false;
             newStateWithoutMeta.clockStartTimeMs = null;
             newStateWithoutMeta.remainingTimeAtStartCs = null;
@@ -1041,7 +1040,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       if (!action.payload) {
         newStateWithoutMeta.showAliasInPenaltyPlayerSelector = false;
         newStateWithoutMeta.showAliasInControlsPenaltyList = false;
-        newStateWithoutMeta.showAliasInScoreboardPenalties = false; // Also turn off scoreboard alias if player selection is off
+        newStateWithoutMeta.showAliasInScoreboardPenalties = false; 
       }
       break;
     case 'SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR':
@@ -1196,7 +1195,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const autoStartWarmUp = state.autoStartWarmUp ?? initialsToKeepConfigAndTeams.autoStartWarmUp;
 
       newStateWithoutMeta = {
-        ...state, // Keeps current config values, teams, availableCategories, selectedMatchCategory
+        ...state, 
         homeScore: initialsToKeepConfigAndTeams.homeScore,
         awayScore: initialsToKeepConfigAndTeams.awayScore,
         currentPeriod: 0,
@@ -1433,19 +1432,8 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
              console.error('Error fetching default-sound-display.json:', error);
         }
         
-        // Attempt to load categories config
-        try {
-          const catRes = await fetch('/defaults/default-categories.json');
-          if (catRes.ok) {
-            const catConfig = await catRes.json() as Pick<ConfigFields, 'availableCategories' | 'selectedMatchCategory'>;
-            if (catConfig) configFromFile = { ...(configFromFile || {}), ...catConfig };
-            console.log("Loaded default categories config from file.");
-          } else {
-             console.warn(`Default categories file '/defaults/default-categories.json' not found (status: ${catRes.status}) or failed to load.`);
-          }
-        } catch (error) {
-            console.error('Error fetching default-categories.json:', error);
-        }
+        // Categories are now taken from initialGlobalState if not in localStorage
+        // No attempt to load /defaults/default-categories.json
 
 
         try {
@@ -1468,6 +1456,12 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         if (teamsFromFile) {
           finalPayloadForHydration.teams = teamsFromFile.map(t => ({...t, subName: t.subName || undefined}));
         }
+        // Ensure categories are from initialGlobalState if not already set by localStorage earlier
+        if (!finalPayloadForHydration.availableCategories || finalPayloadForHydration.availableCategories.length === 0) {
+            finalPayloadForHydration.availableCategories = initialGlobalState.availableCategories;
+            finalPayloadForHydration.selectedMatchCategory = initialGlobalState.selectedMatchCategory;
+        }
+
         delete finalPayloadForHydration._lastUpdatedTimestamp;
       }
       
@@ -1610,8 +1604,8 @@ export const getPeriodText = (period: number, numRegPeriods: number): string => 
     const overtimeNumber = period - numRegPeriods;
     if (overtimeNumber === 1 && numRegPeriods > 0) return 'OT';
     if (overtimeNumber > 0 && numRegPeriods > 0) return `OT${overtimeNumber}`;
-    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT'; // Case where numRegPeriods is 0
-    if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`; // Case where numRegPeriods is 0
+    if (overtimeNumber === 1 && numRegPeriods === 0) return 'OT'; 
+    if (overtimeNumber > 1 && numRegPeriods === 0) return `OT${overtimeNumber}`; 
     return "---";
 };
 
@@ -1642,3 +1636,4 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
   const category = availableCategories.find(cat => cat && typeof cat === 'object' && cat.id === categoryId);
   return category ? category.name : undefined;
 };
+
