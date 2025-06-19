@@ -1,8 +1,7 @@
-
 [
   {
-    "id": "default-profile-initial",
-    "name": "Predeterminado",
+    "id": "default-profile-from-file-uuid",
+    "name": "Predeterminado (Archivo)",
     "defaultWarmUpDuration": 30000,
     "defaultPeriodDuration": 120000,
     "defaultOTPeriodDuration": 30000,

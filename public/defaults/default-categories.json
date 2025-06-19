@@ -1,11 +1,7 @@
-
-{
-  "availableCategories": [
-    { "id": "A", "name": "A" },
-    { "id": "B", "name": "B" },
-    { "id": "C", "name": "C" },
-    { "id": "Menores", "name": "Menores" },
-    { "id": "Damas", "name": "Damas" }
-  ],
-  "selectedMatchCategory": "A"
-}
+[
+  { "id": "A", "name": "A" },
+  { "id": "B", "name": "B" },
+  { "id": "C", "name": "C" },
+  { "id": "Menores", "name": "Menores" },
+  { "id": "Damas", "name": "Damas" }
+]
