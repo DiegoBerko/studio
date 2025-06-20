@@ -162,7 +162,7 @@ export type GameAction =
   | { type: 'SET_MONITOR_MODE_ENABLED'; payload: boolean }
   | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<Pick<ConfigFields, 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl' | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties' | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties' | 'isMonitorModeEnabled'>> }
   | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
-  | { type: 'LOAD_CATEGORIES_CONFIG'; payload: CategoryData[] }
+  // | { type: 'LOAD_CATEGORIES_CONFIG'; payload: CategoryData[] } // This was removed, categories come from IN_CODE or localStorage
   | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
   | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState }
@@ -179,12 +179,12 @@ export type GameAction =
 
 const defaultInitialProfile = createDefaultFormatAndTimingsProfile();
 
-// This initialGlobalState is now primarily a fallback if file loading fails
+// This initialGlobalState is now primarily a fallback if file loading fails or localStorage is empty
 const initialGlobalState: GameState = {
   homeScore: 0,
   awayScore: 0,
   currentPeriod: 0,
-  currentTime: defaultInitialProfile.defaultWarmUpDuration, // Will be overwritten by profile or file
+  currentTime: defaultInitialProfile.defaultWarmUpDuration, 
   isClockRunning: false,
   periodDisplayOverride: 'Warm-up',
   homePenalties: [],
@@ -209,8 +209,8 @@ const initialGlobalState: GameState = {
   numberOfOvertimePeriods: IN_CODE_INITIAL_NUMBER_OF_OVERTIME_PERIODS,
   playersPerTeamOnIce: IN_CODE_INITIAL_PLAYERS_PER_TEAM_ON_ICE,
   // Format & Timings Profiles
-  formatAndTimingsProfiles: [defaultInitialProfile], // Fallback
-  selectedFormatAndTimingsProfileId: defaultInitialProfile.id, // Fallback
+  formatAndTimingsProfiles: [defaultInitialProfile], 
+  selectedFormatAndTimingsProfileId: defaultInitialProfile.id, 
   // Sound & Display
   playSoundAtPeriodEnd: IN_CODE_INITIAL_PLAY_SOUND_AT_PERIOD_END,
   customHornSoundDataUrl: IN_CODE_INITIAL_CUSTOM_HORN_SOUND_DATA_URL,
@@ -221,8 +221,8 @@ const initialGlobalState: GameState = {
   showAliasInScoreboardPenalties: IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
   isMonitorModeEnabled: IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED,
   // Categories
-  availableCategories: IN_CODE_INITIAL_AVAILABLE_CATEGORIES, // Fallback
-  selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY, // Fallback
+  availableCategories: IN_CODE_INITIAL_AVAILABLE_CATEGORIES, 
+  selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY, 
   // Game Runtime State
   preTimeoutState: null,
   clockStartTimeMs: null,
@@ -343,6 +343,7 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
       continue;
     }
     if (p.remainingTime <= 0) { 
+        // Penalties with 0 time are effectively removed here by not being pushed to newPenalties
         continue;
     }
 
@@ -386,7 +387,7 @@ const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
 const cleanPenaltiesForStorage = (penalties?: Penalty[]): Penalty[] => {
   if (!penalties) return [];
   return penalties.map(p => {
-    if (p._status && p._status !== 'pending_puck') {
+    if (p._status && p._status !== 'pending_puck') { // Keep 'pending_puck'
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { _status, ...rest } = p;
       return rest as Penalty;
@@ -475,6 +476,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       hydratedBase.clockStartTimeMs = null;
       hydratedBase.remainingTimeAtStartCs = null;
 
+      // Restore penalties including 'pending_puck' status from localStorage
       const rawHomePenaltiesFromStorage = action.payload?.homePenalties || [];
       const rawAwayPenaltiesFromStorage = action.payload?.awayPenalties || [];
 
@@ -1336,42 +1338,46 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         newStateWithoutMeta.selectedMatchCategory = '';
       }
       break;
-    case 'LOAD_CATEGORIES_CONFIG': // Used by direct file import for categories
-      newStateWithoutMeta = { ...state, availableCategories: action.payload };
-      if (!action.payload.find(c => c.id === state.selectedMatchCategory) && action.payload.length > 0) {
-        newStateWithoutMeta.selectedMatchCategory = action.payload[0].id;
-      } else if (action.payload.length === 0) {
-        newStateWithoutMeta.selectedMatchCategory = '';
-      }
-      break;
+    // case 'LOAD_CATEGORIES_CONFIG': // Removed as categories are not loaded from a separate file anymore
+    //   newStateWithoutMeta = { ...state, availableCategories: action.payload };
+    //   if (!action.payload.find(c => c.id === state.selectedMatchCategory) && action.payload.length > 0) {
+    //     newStateWithoutMeta.selectedMatchCategory = action.payload[0].id;
+    //   } else if (action.payload.length === 0) {
+    //     newStateWithoutMeta.selectedMatchCategory = '';
+    //   }
+    //   break;
     case 'SET_SELECTED_MATCH_CATEGORY':
       newStateWithoutMeta = { ...state, selectedMatchCategory: action.payload };
       break;
     case 'RESET_CONFIG_TO_DEFAULTS': {
-      const defaultProfileData = createDefaultFormatAndTimingsProfile(); // Uses IN_CODE fallbacks
+      const factoryDefaultProfile = createDefaultFormatAndTimingsProfile();
       let updatedProfiles = state.formatAndTimingsProfiles;
       let selectedProfileId = state.selectedFormatAndTimingsProfileId;
 
+      // Find the currently selected profile and reset its data fields to factory defaults, keeping its id and name.
       if (selectedProfileId) {
-        updatedProfiles = state.formatAndTimingsProfiles.map(p =>
-          p.id === selectedProfileId ? { ...defaultProfileData, id: p.id, name: p.name } : p
-        );
-      } else if (state.formatAndTimingsProfiles.length > 0) {
-         selectedProfileId = state.formatAndTimingsProfiles[0].id;
-         updatedProfiles = state.formatAndTimingsProfiles.map(p =>
-            p.id === selectedProfileId ? { ...defaultProfileData, id: p.id, name: p.name } : p
-         );
-      } else {
-        const newDefaultProfile = createDefaultFormatAndTimingsProfile();
-        updatedProfiles = [newDefaultProfile];
-        selectedProfileId = newDefaultProfile.id;
+          updatedProfiles = state.formatAndTimingsProfiles.map(p =>
+              p.id === selectedProfileId ? { ...factoryDefaultProfile, id: p.id, name: p.name } : p
+          );
+      } else if (state.formatAndTimingsProfiles.length > 0) { // Should not happen if a profile is always selected
+          selectedProfileId = state.formatAndTimingsProfiles[0].id;
+          updatedProfiles = state.formatAndTimingsProfiles.map(p =>
+              p.id === selectedProfileId ? { ...factoryDefaultProfile, id: p.id, name: p.name } : p
+          );
+      } else { // Should not happen if there's always at least one profile
+          const newDefault = createDefaultFormatAndTimingsProfile();
+          updatedProfiles = [newDefault];
+          selectedProfileId = newDefault.id;
       }
+      
+      const activeProfileAfterReset = updatedProfiles.find(p => p.id === selectedProfileId) || factoryDefaultProfile;
       
       tempState = {
         ...state,
-        ... (updatedProfiles.find(p => p.id === selectedProfileId) || defaultProfileData),
+        ...activeProfileAfterReset, // Apply the reset profile data to the root state
         formatAndTimingsProfiles: updatedProfiles,
         selectedFormatAndTimingsProfileId: selectedProfileId,
+        // Reset Sound & Display to in-code initial values
         playSoundAtPeriodEnd: IN_CODE_INITIAL_PLAY_SOUND_AT_PERIOD_END,
         customHornSoundDataUrl: IN_CODE_INITIAL_CUSTOM_HORN_SOUND_DATA_URL,
         enableTeamSelectionInMiniScoreboard: IN_CODE_INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD,
@@ -1380,6 +1386,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInControlsPenaltyList: IN_CODE_INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
         showAliasInScoreboardPenalties: IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
         isMonitorModeEnabled: IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED,
+        // Reset Categories to in-code initial values
         availableCategories: IN_CODE_INITIAL_AVAILABLE_CATEGORIES,
         selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY,
       };
@@ -1663,12 +1670,8 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
             isMonitorModeEnabled: initialGlobalState.isMonitorModeEnabled,
           }
         );
-        const categoriesConfig = await fetchConfig(
-          '/defaults/categories.custom.json',
-          '/defaults/default-categories.json',
-          initialGlobalState.availableCategories,
-           (data) => Array.isArray(data) && (data.length === 0 || (data.length > 0 && data.every(c => c.id && c.name)))
-        );
+        const categoriesConfig = IN_CODE_INITIAL_AVAILABLE_CATEGORIES; // Categories are now always from IN_CODE for factory default
+
         const teamsConfig = await fetchConfig(
           '/defaults/teams.custom.json',
           '/defaults/default-teams.json',
