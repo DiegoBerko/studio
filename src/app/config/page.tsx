@@ -8,14 +8,14 @@ import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/c
 import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card";
 import { TeamSettingsCard, type TeamSettingsCardRef } from "@/components/config/team-settings-card";
 import { CategorySettingsCard, type CategorySettingsCardRef } from "@/components/config/category-settings-card";
-import { LayoutSettingsCard } from "@/components/config/layout-settings-card";
+import { LayoutSettingsCard, type LayoutSettingsCardRef } from "@/components/config/layout-settings-card";
 import { TeamsManagementTab } from '@/components/config/teams-management-tab';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Undo2, Upload, Download, RotateCcw, Plus, Edit3, Trash2, XCircle } from 'lucide-react';
-import { useGameState, type ConfigFields, type FormatAndTimingsProfile, type FormatAndTimingsProfileData, createDefaultFormatAndTimingsProfile, type CategoryData, ScoreboardLayoutSettings } from '@/contexts/game-state-context';
+import { useGameState, type ConfigFields, type FormatAndTimingsProfile, type FormatAndTimingsProfileData, createDefaultFormatAndTimingsProfile, type CategoryData, type ScoreboardLayoutProfile, createDefaultScoreboardLayoutProfile } from '@/contexts/game-state-context';
 import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
@@ -39,6 +39,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
+import isEqual from 'lodash.isequal';
 
 
 const VALID_TAB_VALUES = ["formatAndTimings", "soundAndDisplay", "categoriesAndTeams"];
@@ -47,7 +48,7 @@ type ExportableSoundAndDisplayConfig = Pick<ConfigFields,
   | 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl'
   | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties'
   | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties'
-  | 'isMonitorModeEnabled' | 'scoreboardLayout'
+  | 'isMonitorModeEnabled' | 'scoreboardLayoutProfiles'
 >;
 
 
@@ -62,6 +63,7 @@ export default function ConfigPage() {
   const soundSettingsRef = useRef<SoundSettingsCardRef>(null);
   const teamSettingsRef = useRef<TeamSettingsCardRef>(null);
   const categorySettingsRef = useRef<CategorySettingsCardRef>(null);
+  const layoutSettingsRef = useRef<LayoutSettingsCardRef>(null);
   
   const fileInputFormatAndTimingsRef = useRef<HTMLInputElement>(null);
   const fileInputSoundAndDisplayRef = useRef<HTMLInputElement>(null);
@@ -82,14 +84,23 @@ export default function ConfigPage() {
   const initialTab = urlTab && VALID_TAB_VALUES.includes(urlTab) ? urlTab : "formatAndTimings";
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  const [isNewProfileDialogOpen, setIsNewProfileDialogOpen] = useState(false);
-  const [newProfileName, setNewProfileName] = useState("");
-  const [isEditProfileNameDialogOpen, setIsEditProfileNameDialogOpen] = useState(false);
-  const [editingProfileName, setEditingProfileName] = useState("");
-  const [profileToDelete, setProfileToDelete] = useState<FormatAndTimingsProfile | null>(null);
+  // States for Format & Timings Profiles
+  const [isNewFTProfileDialogOpen, setIsNewFTProfileDialogOpen] = useState(false);
+  const [newFTProfileName, setNewFTProfileName] = useState("");
+  const [isEditFTProfileNameDialogOpen, setIsEditFTProfileNameDialogOpen] = useState(false);
+  const [editingFTProfileName, setEditingFTProfileName] = useState("");
+  const [ftProfileToDelete, setFtProfileToDelete] = useState<FormatAndTimingsProfile | null>(null);
+  const [isConfirmSwitchFTProfileDialogOpen, setIsConfirmSwitchFTProfileDialogOpen] = useState(false);
+  const [pendingFTProfileIdToSelect, setPendingFTProfileIdToSelect] = useState<string | null>(null);
 
-  const [isConfirmSwitchProfileDialogOpen, setIsConfirmSwitchProfileDialogOpen] = useState(false);
-  const [pendingProfileIdToSelect, setPendingProfileIdToSelect] = useState<string | null>(null);
+  // States for Layout Profiles
+  const [isNewLayoutProfileDialogOpen, setIsNewLayoutProfileDialogOpen] = useState(false);
+  const [newLayoutProfileName, setNewLayoutProfileName] = useState("");
+  const [isEditLayoutProfileNameDialogOpen, setIsEditLayoutProfileNameDialogOpen] = useState(false);
+  const [editingLayoutProfileName, setEditingLayoutProfileName] = useState("");
+  const [layoutProfileToDelete, setLayoutProfileToDelete] = useState<ScoreboardLayoutProfile | null>(null);
+  const [isConfirmSwitchLayoutProfileDialogOpen, setIsConfirmSwitchLayoutProfileDialogOpen] = useState(false);
+  const [pendingLayoutProfileIdToSelect, setPendingLayoutProfileIdToSelect] = useState<string | null>(null);
 
   const [isConfirmSwitchTabDialogOpen, setIsConfirmSwitchTabDialogOpen] = useState(false);
   const [pendingTabSwitchData, setPendingTabSwitchData] = useState<{ newTabValue: string; discardAction: (() => void) | null; sectionName: string } | null>(null);
@@ -102,24 +113,30 @@ export default function ConfigPage() {
     }
   }, [activeTab, router, searchParams]);
 
-  const selectedProfile = useMemo(() => {
+  const selectedFTProfile = useMemo(() => {
     return state.formatAndTimingsProfiles.find(p => p.id === state.selectedFormatAndTimingsProfileId) || state.formatAndTimingsProfiles[0] || createDefaultFormatAndTimingsProfile();
   }, [state.formatAndTimingsProfiles, state.selectedFormatAndTimingsProfileId]);
 
+  const selectedLayoutProfile = useMemo(() => {
+    return state.scoreboardLayoutProfiles.find(p => p.id === state.selectedScoreboardLayoutProfileId) || state.scoreboardLayoutProfiles[0] || createDefaultScoreboardLayoutProfile();
+  }, [state.scoreboardLayoutProfiles, state.selectedScoreboardLayoutProfileId]);
+
+  const isLayoutDirty = useMemo(() => {
+    if (!selectedLayoutProfile) return false;
+    const { id, name, ...savedSettings } = selectedLayoutProfile;
+    return !isEqual(savedSettings, state.scoreboardLayout);
+  }, [state.scoreboardLayout, selectedLayoutProfile]);
+
   useEffect(() => {
-    if (durationSettingsRef.current) {
-      durationSettingsRef.current.setValues(selectedProfile);
-    }
-    if (penaltySettingsRef.current) {
-      penaltySettingsRef.current.setValues(selectedProfile);
-    }
+    if (durationSettingsRef.current) durationSettingsRef.current.setValues(selectedFTProfile);
+    if (penaltySettingsRef.current) penaltySettingsRef.current.setValues(selectedFTProfile);
     setIsDurationDirty(false);
     setIsPenaltyDirty(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProfile.id]); 
+  }, [selectedFTProfile.id]); 
 
   const isFormatAndTimingsSectionDirty = isDurationDirty || isPenaltyDirty;
-  const isSoundAndDisplaySectionDirty = isSoundDirty || isTeamSettingsDirty;
+  const isSoundAndDisplaySectionDirty = isSoundDirty || isTeamSettingsDirty || isLayoutDirty;
 
   const handleSaveChanges_FormatAndTimings = () => {
     let durationSaveSuccess = true;
@@ -152,32 +169,22 @@ export default function ConfigPage() {
   };
 
   const handleSaveChanges_SoundAndDisplay = () => {
-    let soundSaveSuccess = true;
-    let teamSettingsSaveSuccess = true;
-    if (soundSettingsRef.current && isSoundDirty) {
-      soundSaveSuccess = soundSettingsRef.current.handleSave();
-      if (soundSaveSuccess) setIsSoundDirty(false);
-    }
-    if (teamSettingsRef.current && isTeamSettingsDirty) {
-      teamSettingsSaveSuccess = teamSettingsRef.current.handleSave();
-      if (teamSettingsSaveSuccess) setIsTeamSettingsDirty(false);
-    }
-    if (soundSaveSuccess && teamSettingsSaveSuccess) {
-      toast({ title: "Sonido y Display Guardados", description: "Los cambios en Sonido y Display han sido guardados en la configuración activa." });
-    } else {
-      toast({ title: "Error al Guardar", description: "No se pudieron guardar todos los cambios en Sonido y Display.", variant: "destructive" });
-    }
+    if (soundSettingsRef.current && isSoundDirty) soundSettingsRef.current.handleSave();
+    if (teamSettingsRef.current && isTeamSettingsDirty) teamSettingsRef.current.handleSave();
+    if (layoutSettingsRef.current && isLayoutDirty) layoutSettingsRef.current.handleSave();
+    
+    setIsSoundDirty(false);
+    setIsTeamSettingsDirty(false);
+    // isLayoutDirty will update via memoization
+    
+    toast({ title: "Sonido y Display Guardados", description: "Los cambios en Sonido y Display han sido guardados en la configuración activa." });
   };
 
   const handleDiscardChanges_SoundAndDisplay = () => {
-    if (soundSettingsRef.current && isSoundDirty) {
-      soundSettingsRef.current.handleDiscard();
-      setIsSoundDirty(false);
-    }
-    if (teamSettingsRef.current && isTeamSettingsDirty) {
-      teamSettingsRef.current.handleDiscard();
-      setIsTeamSettingsDirty(false);
-    }
+    if (soundSettingsRef.current && isSoundDirty) { soundSettingsRef.current.handleDiscard(); setIsSoundDirty(false); }
+    if (teamSettingsRef.current && isTeamSettingsDirty) { teamSettingsRef.current.handleDiscard(); setIsTeamSettingsDirty(false); }
+    if (layoutSettingsRef.current && isLayoutDirty) { layoutSettingsRef.current.handleDiscard(); }
+    
     toast({ title: "Cambios Descartados", description: "Los cambios no guardados en Sonido y Display han sido revertidos." });
   };
 
@@ -259,7 +266,7 @@ export default function ConfigPage() {
       showAliasInControlsPenaltyList: state.showAliasInControlsPenaltyList,
       showAliasInScoreboardPenalties: state.showAliasInScoreboardPenalties,
       isMonitorModeEnabled: state.isMonitorModeEnabled,
-      scoreboardLayout: state.scoreboardLayout,
+      scoreboardLayoutProfiles: state.scoreboardLayoutProfiles,
     };
     exportSection("Configuración de Sonido y Display", configToExport, "icevision_sonido_display");
   };
@@ -347,7 +354,7 @@ export default function ConfigPage() {
 
   const handleImportSoundAndDisplay = (event: React.ChangeEvent<HTMLInputElement>) => {
     genericImportHandler(event, "Sonido y Display",
-      ['playSoundAtPeriodEnd', 'isMonitorModeEnabled', 'scoreboardLayout'], 
+      ['playSoundAtPeriodEnd', 'scoreboardLayoutProfiles'], 
       'LOAD_SOUND_AND_DISPLAY_CONFIG',
       fileInputSoundAndDisplayRef
     );
@@ -372,72 +379,139 @@ export default function ConfigPage() {
     setIsResetConfigDialogOpen(false);
   };
 
-  const handleCreateNewProfile = () => {
-    if (!newProfileName.trim()) {
+  const handleCreateNewFTProfile = () => {
+    if (!newFTProfileName.trim()) {
       toast({ title: "Nombre Requerido", description: "El nombre del perfil no puede estar vacío.", variant: "destructive" });
       return;
     }
-    dispatch({ type: 'ADD_FORMAT_AND_TIMINGS_PROFILE', payload: { name: newProfileName.trim() } });
-    toast({ title: "Perfil Creado", description: `Perfil "${newProfileName.trim()}" añadido.` });
-    setNewProfileName("");
-    setIsNewProfileDialogOpen(false);
+    dispatch({ type: 'ADD_FORMAT_AND_TIMINGS_PROFILE', payload: { name: newFTProfileName.trim() } });
+    toast({ title: "Perfil Creado", description: `Perfil "${newFTProfileName.trim()}" añadido.` });
+    setNewFTProfileName("");
+    setIsNewFTProfileDialogOpen(false);
   };
 
-  const handleSelectProfile = (profileId: string) => {
+  const handleSelectFTProfile = (profileId: string) => {
     if (isFormatAndTimingsSectionDirty) {
-        setPendingProfileIdToSelect(profileId);
-        setIsConfirmSwitchProfileDialogOpen(true);
+        setPendingFTProfileIdToSelect(profileId);
+        setIsConfirmSwitchFTProfileDialogOpen(true);
     } else {
         dispatch({ type: 'SELECT_FORMAT_AND_TIMINGS_PROFILE', payload: { profileId } });
     }
   };
 
-  const confirmSwitchProfile = () => {
-    if (pendingProfileIdToSelect) {
+  const confirmSwitchFTProfile = () => {
+    if (pendingFTProfileIdToSelect) {
         if (durationSettingsRef.current) durationSettingsRef.current.handleDiscard();
         if (penaltySettingsRef.current) penaltySettingsRef.current.handleDiscard();
         setIsDurationDirty(false);
         setIsPenaltyDirty(false);
-        dispatch({ type: 'SELECT_FORMAT_AND_TIMINGS_PROFILE', payload: { profileId: pendingProfileIdToSelect } });
+        dispatch({ type: 'SELECT_FORMAT_AND_TIMINGS_PROFILE', payload: { profileId: pendingFTProfileIdToSelect } });
     }
-    setIsConfirmSwitchProfileDialogOpen(false);
-    setPendingProfileIdToSelect(null);
+    setIsConfirmSwitchFTProfileDialogOpen(false);
+    setPendingFTProfileIdToSelect(null);
   };
   
-  const handlePrepareEditProfileName = () => {
-    if (selectedProfile) {
-      setEditingProfileName(selectedProfile.name);
-      setIsEditProfileNameDialogOpen(true);
+  const handlePrepareEditFTProfileName = () => {
+    if (selectedFTProfile) {
+      setEditingFTProfileName(selectedFTProfile.name);
+      setIsEditFTProfileNameDialogOpen(true);
     }
   };
 
-  const handleUpdateProfileName = () => {
-    if (!editingProfileName.trim()) {
+  const handleUpdateFTProfileName = () => {
+    if (!editingFTProfileName.trim()) {
       toast({ title: "Nombre Requerido", description: "El nombre del perfil no puede estar vacío.", variant: "destructive" });
       return;
     }
-    if (selectedProfile) {
-      dispatch({ type: 'UPDATE_FORMAT_AND_TIMINGS_PROFILE_NAME', payload: { profileId: selectedProfile.id, newName: editingProfileName.trim() } });
+    if (selectedFTProfile) {
+      dispatch({ type: 'UPDATE_FORMAT_AND_TIMINGS_PROFILE_NAME', payload: { profileId: selectedFTProfile.id, newName: editingFTProfileName.trim() } });
       toast({ title: "Nombre de Perfil Actualizado" });
     }
-    setIsEditProfileNameDialogOpen(false);
+    setIsEditFTProfileNameDialogOpen(false);
   };
 
-  const handlePrepareDeleteProfile = () => {
-    if (selectedProfile && state.formatAndTimingsProfiles.length > 1) {
-      setProfileToDelete(selectedProfile);
+  const handlePrepareDeleteFTProfile = () => {
+    if (selectedFTProfile && state.formatAndTimingsProfiles.length > 1) {
+      setFtProfileToDelete(selectedFTProfile);
     } else if (state.formatAndTimingsProfiles.length <= 1) {
         toast({ title: "Acción no permitida", description: "Debe existir al menos un perfil de formato y tiempos.", variant: "destructive" });
     }
   };
 
-  const confirmDeleteProfile = () => {
-    if (profileToDelete) {
-      dispatch({ type: 'DELETE_FORMAT_AND_TIMINGS_PROFILE', payload: { profileId: profileToDelete.id } });
-      toast({ title: "Perfil Eliminado", description: `Perfil "${profileToDelete.name}" eliminado.` });
-      setProfileToDelete(null);
+  const confirmDeleteFTProfile = () => {
+    if (ftProfileToDelete) {
+      dispatch({ type: 'DELETE_FORMAT_AND_TIMINGS_PROFILE', payload: { profileId: ftProfileToDelete.id } });
+      toast({ title: "Perfil Eliminado", description: `Perfil "${ftProfileToDelete.name}" eliminado.` });
+      setFtProfileToDelete(null);
     }
   };
+
+  // --- Layout Profile Handlers ---
+
+  const handleCreateNewLayoutProfile = () => {
+    if (!newLayoutProfileName.trim()) {
+        toast({ title: "Nombre Requerido", description: "El nombre del perfil no puede estar vacío.", variant: "destructive" });
+        return;
+    }
+    dispatch({ type: 'ADD_SCOREBOARD_LAYOUT_PROFILE', payload: { name: newLayoutProfileName.trim() } });
+    toast({ title: "Perfil de Diseño Creado", description: `Perfil "${newLayoutProfileName.trim()}" añadido.` });
+    setNewLayoutProfileName("");
+    setIsNewLayoutProfileDialogOpen(false);
+  };
+
+  const handleSelectLayoutProfile = (profileId: string) => {
+    if (isLayoutDirty) {
+      setPendingLayoutProfileIdToSelect(profileId);
+      setIsConfirmSwitchLayoutProfileDialogOpen(true);
+    } else {
+      dispatch({ type: 'SELECT_SCOREBOARD_LAYOUT_PROFILE', payload: { profileId } });
+    }
+  };
+  
+  const confirmSwitchLayoutProfile = () => {
+    if (pendingLayoutProfileIdToSelect) {
+      if (layoutSettingsRef.current) layoutSettingsRef.current.handleDiscard();
+      dispatch({ type: 'SELECT_SCOREBOARD_LAYOUT_PROFILE', payload: { profileId: pendingLayoutProfileIdToSelect } });
+    }
+    setIsConfirmSwitchLayoutProfileDialogOpen(false);
+    setPendingLayoutProfileIdToSelect(null);
+  };
+
+  const handlePrepareEditLayoutProfileName = () => {
+    if (selectedLayoutProfile) {
+      setEditingLayoutProfileName(selectedLayoutProfile.name);
+      setIsEditLayoutProfileNameDialogOpen(true);
+    }
+  };
+
+  const handleUpdateLayoutProfileName = () => {
+    if (!editingLayoutProfileName.trim()) {
+      toast({ title: "Nombre Requerido", description: "El nombre del perfil no puede estar vacío.", variant: "destructive" });
+      return;
+    }
+    if (selectedLayoutProfile) {
+      dispatch({ type: 'UPDATE_SCOREBOARD_LAYOUT_PROFILE_NAME', payload: { profileId: selectedLayoutProfile.id, newName: editingLayoutProfileName.trim() } });
+      toast({ title: "Nombre de Perfil de Diseño Actualizado" });
+    }
+    setIsEditLayoutProfileNameDialogOpen(false);
+  };
+
+  const handlePrepareDeleteLayoutProfile = () => {
+    if (selectedLayoutProfile && state.scoreboardLayoutProfiles.length > 1) {
+      setLayoutProfileToDelete(selectedLayoutProfile);
+    } else if (state.scoreboardLayoutProfiles.length <= 1) {
+      toast({ title: "Acción no permitida", description: "Debe existir al menos un perfil de diseño.", variant: "destructive" });
+    }
+  };
+
+  const confirmDeleteLayoutProfile = () => {
+    if (layoutProfileToDelete) {
+      dispatch({ type: 'DELETE_SCOREBOARD_LAYOUT_PROFILE', payload: { profileId: layoutProfileToDelete.id } });
+      toast({ title: "Perfil de Diseño Eliminado", description: `Perfil "${layoutProfileToDelete.name}" eliminado.` });
+      setLayoutProfileToDelete(null);
+    }
+  };
+
 
   const handleTabChange = (newTabValue: string) => {
     let discardAction: (() => void) | null = null;
@@ -498,30 +572,25 @@ export default function ConfigPage() {
         <TabsContent value="formatAndTimings" className={tabContentClassName}>
           <div className="space-y-6">
             <div className={cn(sectionCardClassName, "mb-6")}>
-                <Label className="text-lg font-medium mb-2 block">Perfil de Configuración (Formato y Tiempos)</Label>
+                <Label className="text-lg font-medium mb-2 block">Perfil de Formato y Tiempos</Label>
                 <div className="flex items-center gap-2">
-                    <Select
-                        value={selectedProfile.id || ""}
-                        onValueChange={handleSelectProfile}
-                    >
+                    <Select value={selectedFTProfile.id || ""} onValueChange={handleSelectFTProfile}>
                         <SelectTrigger className="flex-grow text-base">
                             <SelectValue placeholder="Seleccionar perfil..." />
                         </SelectTrigger>
                         <SelectContent>
                             {state.formatAndTimingsProfiles.map(profile => (
-                                <SelectItem key={profile.id} value={profile.id} className="text-sm">
-                                    {profile.name}
-                                </SelectItem>
+                                <SelectItem key={profile.id} value={profile.id} className="text-sm">{profile.name}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
-                    <Button variant="outline" size="icon" onClick={() => setIsNewProfileDialogOpen(true)} aria-label="Crear nuevo perfil">
+                    <Button variant="outline" size="icon" onClick={() => setIsNewFTProfileDialogOpen(true)} aria-label="Crear nuevo perfil de formato y tiempos">
                         <Plus className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="icon" onClick={handlePrepareEditProfileName} disabled={!selectedProfile} aria-label="Editar nombre del perfil seleccionado">
+                    <Button variant="outline" size="icon" onClick={handlePrepareEditFTProfileName} disabled={!selectedFTProfile} aria-label="Editar nombre del perfil seleccionado">
                         <Edit3 className="h-4 w-4" />
                     </Button>
-                    <Button variant="destructive" size="icon" onClick={handlePrepareDeleteProfile} disabled={!selectedProfile || state.formatAndTimingsProfiles.length <= 1} aria-label="Eliminar perfil seleccionado">
+                    <Button variant="destructive" size="icon" onClick={handlePrepareDeleteFTProfile} disabled={!selectedFTProfile || state.formatAndTimingsProfiles.length <= 1} aria-label="Eliminar perfil seleccionado">
                         <Trash2 className="h-4 w-4" />
                     </Button>
                 </div>
@@ -529,9 +598,9 @@ export default function ConfigPage() {
                     Crea y selecciona diferentes perfiles para guardar conjuntos de configuraciones de formato y tiempos.
                 </p>
             </div>
-            <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} initialValues={selectedProfile} />
+            <PenaltySettingsCard ref={penaltySettingsRef} onDirtyChange={setIsPenaltyDirty} initialValues={selectedFTProfile} />
             <Separator />
-            <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} initialValues={selectedProfile} />
+            <DurationSettingsCard ref={durationSettingsRef} onDirtyChange={setIsDurationDirty} initialValues={selectedFTProfile} />
             
             {isFormatAndTimingsSectionDirty && (
               <div className={sectionActionsContainerClass}>
@@ -568,7 +637,34 @@ export default function ConfigPage() {
             <Separator />
             <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty}/>
             <Separator />
-            <LayoutSettingsCard />
+            <div className={cn(sectionCardClassName, "mb-6")}>
+                <Label className="text-lg font-medium mb-2 block">Perfil de Diseño del Scoreboard</Label>
+                <div className="flex items-center gap-2">
+                    <Select value={selectedLayoutProfile.id || ""} onValueChange={handleSelectLayoutProfile}>
+                        <SelectTrigger className="flex-grow text-base">
+                            <SelectValue placeholder="Seleccionar perfil de diseño..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {state.scoreboardLayoutProfiles.map(profile => (
+                                <SelectItem key={profile.id} value={profile.id} className="text-sm">{profile.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="icon" onClick={() => setIsNewLayoutProfileDialogOpen(true)} aria-label="Crear nuevo perfil de diseño">
+                        <Plus className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={handlePrepareEditLayoutProfileName} disabled={!selectedLayoutProfile} aria-label="Editar nombre del perfil de diseño">
+                        <Edit3 className="h-4 w-4" />
+                    </Button>
+                    <Button variant="destructive" size="icon" onClick={handlePrepareDeleteLayoutProfile} disabled={!selectedLayoutProfile || state.scoreboardLayoutProfiles.length <= 1} aria-label="Eliminar perfil de diseño">
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                    Crea y selecciona diferentes perfiles para guardar conjuntos de configuraciones de diseño del scoreboard.
+                </p>
+            </div>
+            <LayoutSettingsCard ref={layoutSettingsRef} initialValues={selectedLayoutProfile} />
             
             {isSoundAndDisplaySectionDirty && (
               <div className={sectionActionsContainerClass}>
@@ -624,7 +720,7 @@ export default function ConfigPage() {
         <h2 className="text-xl font-semibold text-primary-foreground">Restablecer Todas las Configuraciones</h2>
         <p className="text-sm text-muted-foreground">
           Restablece todas las configuraciones de todas las secciones (el perfil de Formato y Tiempos actualmente seleccionado, Sonido y Display, y lista de Categorías) a sus valores predeterminados de fábrica. Esta acción no se puede deshacer.
-          La lista de Equipos y Jugadores NO será afectada. Otros perfiles de Formato y Tiempos no seleccionados no se verán afectados.
+          La lista de Equipos y Jugadores NO será afectada. Otros perfiles no seleccionados no se verán afectados.
         </p>
         <div className="flex justify-start">
           <Button onClick={handlePrepareResetConfig} variant="destructive" >
@@ -635,9 +731,7 @@ export default function ConfigPage() {
 
       {isExportDialogOpen && (
         <AlertDialog open={isExportDialogOpen} onOpenChange={(open) => {
-            if (!open) {
-                setCurrentExportAction(null); 
-            }
+            if (!open) { setCurrentExportAction(null); }
             setIsExportDialogOpen(open);
         }}>
           <AlertDialogContent>
@@ -647,17 +741,10 @@ export default function ConfigPage() {
                 Ingresa el nombre deseado para el archivo de configuración. Se añadirá la extensión ".json" automáticamente si no se incluye.
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <Input
-              value={currentExportFilename}
-              onChange={(e) => setCurrentExportFilename(e.target.value)}
-              placeholder="nombre_de_configuracion.json"
-              className="my-4"
-            />
+            <Input value={currentExportFilename} onChange={(e) => setCurrentExportFilename(e.target.value)} placeholder="nombre_de_configuracion.json" className="my-4" />
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => { setIsExportDialogOpen(false); setCurrentExportAction(null); }}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={() => performExportActionWithDialog(currentExportFilename)}>
-                Exportar
-              </AlertDialogAction>
+              <AlertDialogAction onClick={() => performExportActionWithDialog(currentExportFilename)}>Exportar</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -669,111 +756,140 @@ export default function ConfigPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Restablecimiento</AlertDialogTitle>
               <AlertDialogDescription>
-                Esto restablecerá el perfil de Formato y Tiempos actualmente seleccionado, Sonido y Display, y lista de Categorías a sus valores predeterminados de fábrica. La lista de Equipos y sus jugadores NO se verá afectada. Otros perfiles de Formato y Tiempos no seleccionados no se verán afectados. ¿Estás seguro?
+                Esto restablecerá el perfil actualmente seleccionado para cada sección (Formato y Tiempos, Diseño) y los ajustes de Sonido, Display y Categorías a sus valores predeterminados. La lista de Equipos y sus jugadores NO se verá afectada. Otros perfiles no seleccionados tampoco. ¿Estás seguro?
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setIsResetConfigDialogOpen(false)}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={performConfigReset} className="bg-destructive hover:bg-destructive/90">
-                Confirmar Restablecimiento
-              </AlertDialogAction>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={performConfigReset} className="bg-destructive hover:bg-destructive/90">Confirmar Restablecimiento</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
 
-      <Dialog open={isNewProfileDialogOpen} onOpenChange={setIsNewProfileDialogOpen}>
+      {/* --- Format & Timings Dialogs --- */}
+      <Dialog open={isNewFTProfileDialogOpen} onOpenChange={setIsNewFTProfileDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <FormDialogTitle>Nuevo Perfil de Formato y Tiempos</FormDialogTitle>
             <FormDialogDescription>Ingresa un nombre para el nuevo perfil.</FormDialogDescription>
           </DialogHeader>
-          <Input
-            value={newProfileName}
-            onChange={(e) => setNewProfileName(e.target.value)}
-            placeholder="Nombre del perfil"
-            className="my-4"
-            onKeyDown={(e) => {if (e.key === 'Enter') handleCreateNewProfile();}}
-          />
+          <Input value={newFTProfileName} onChange={(e) => setNewFTProfileName(e.target.value)} placeholder="Nombre del perfil" className="my-4" onKeyDown={(e) => {if (e.key === 'Enter') handleCreateNewFTProfile();}} />
           <FormDialogFooter>
             <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-            <Button onClick={handleCreateNewProfile}>Crear Perfil</Button>
+            <Button onClick={handleCreateNewFTProfile}>Crear Perfil</Button>
           </FormDialogFooter>
         </DialogContent>
       </Dialog>
-
-      <Dialog open={isEditProfileNameDialogOpen} onOpenChange={setIsEditProfileNameDialogOpen}>
+      <Dialog open={isEditFTProfileNameDialogOpen} onOpenChange={setIsEditFTProfileNameDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <FormDialogTitle>Editar Nombre del Perfil</FormDialogTitle>
+            <FormDialogTitle>Editar Nombre de Perfil F&T</FormDialogTitle>
             <FormDialogDescription>Actualiza el nombre del perfil seleccionado.</FormDialogDescription>
           </DialogHeader>
-          <Input
-            value={editingProfileName}
-            onChange={(e) => setEditingProfileName(e.target.value)}
-            placeholder="Nombre del perfil"
-            className="my-4"
-            onKeyDown={(e) => {if (e.key === 'Enter') handleUpdateProfileName();}}
-          />
+          <Input value={editingFTProfileName} onChange={(e) => setEditingFTProfileName(e.target.value)} placeholder="Nombre del perfil" className="my-4" onKeyDown={(e) => {if (e.key === 'Enter') handleUpdateFTProfileName();}} />
           <FormDialogFooter>
             <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
-            <Button onClick={handleUpdateProfileName}>Guardar Nombre</Button>
+            <Button onClick={handleUpdateFTProfileName}>Guardar Nombre</Button>
           </FormDialogFooter>
         </DialogContent>
       </Dialog>
-
-       {profileToDelete && (
-        <AlertDialog open={!!profileToDelete} onOpenChange={() => setProfileToDelete(null)}>
+       {ftProfileToDelete && (
+        <AlertDialog open={!!ftProfileToDelete} onOpenChange={() => setFtProfileToDelete(null)}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                <AlertDialogTitle>Confirmar Eliminación de Perfil</AlertDialogTitle>
-                <AlertDialogDescription>
-                    ¿Estás seguro de que quieres eliminar el perfil "{profileToDelete.name}"? Esta acción no se puede deshacer.
-                </AlertDialogDescription>
+                <AlertDialogTitle>Confirmar Eliminación de Perfil F&T</AlertDialogTitle>
+                <AlertDialogDescription>¿Estás seguro de que quieres eliminar el perfil "{ftProfileToDelete.name}"? Esta acción no se puede deshacer.</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setProfileToDelete(null)}>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={confirmDeleteProfile} className="bg-destructive hover:bg-destructive/90">
-                    Eliminar Perfil
-                </AlertDialogAction>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeleteFTProfile} className="bg-destructive hover:bg-destructive/90">Eliminar Perfil</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
        )}
-
-      {isConfirmSwitchProfileDialogOpen && (
-        <AlertDialog open={isConfirmSwitchProfileDialogOpen} onOpenChange={setIsConfirmSwitchProfileDialogOpen}>
+      {isConfirmSwitchFTProfileDialogOpen && (
+        <AlertDialog open={isConfirmSwitchFTProfileDialogOpen} onOpenChange={setIsConfirmSwitchFTProfileDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Descartar Cambios</AlertDialogTitle>
-              <AlertDialogDescription>
-                Tienes cambios sin guardar en la sección de Formato y Tiempos. ¿Deseas descartarlos y cambiar de perfil?
-              </AlertDialogDescription>
+              <AlertDialogDescription>Tienes cambios sin guardar en la sección de Formato y Tiempos. ¿Deseas descartarlos y cambiar de perfil?</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => { setIsConfirmSwitchProfileDialogOpen(false); setPendingProfileIdToSelect(null); }}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmSwitchProfile}>
-                Descartar y Cambiar
-              </AlertDialogAction>
+              <AlertDialogCancel onClick={() => { setIsConfirmSwitchFTProfileDialogOpen(false); setPendingFTProfileIdToSelect(null); }}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmSwitchFTProfile}>Descartar y Cambiar</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       )}
 
+      {/* --- Layout Dialogs --- */}
+      <Dialog open={isNewLayoutProfileDialogOpen} onOpenChange={setIsNewLayoutProfileDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <FormDialogTitle>Nuevo Perfil de Diseño</FormDialogTitle>
+            <FormDialogDescription>Ingresa un nombre para el nuevo perfil de diseño.</FormDialogDescription>
+          </DialogHeader>
+          <Input value={newLayoutProfileName} onChange={(e) => setNewLayoutProfileName(e.target.value)} placeholder="Nombre del perfil" className="my-4" onKeyDown={(e) => { if (e.key === 'Enter') handleCreateNewLayoutProfile(); }} />
+          <FormDialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
+            <Button onClick={handleCreateNewLayoutProfile}>Crear Perfil</Button>
+          </FormDialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isEditLayoutProfileNameDialogOpen} onOpenChange={setIsEditLayoutProfileNameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <FormDialogTitle>Editar Nombre de Perfil de Diseño</FormDialogTitle>
+            <FormDialogDescription>Actualiza el nombre del perfil de diseño seleccionado.</FormDialogDescription>
+          </DialogHeader>
+          <Input value={editingLayoutProfileName} onChange={(e) => setEditingLayoutProfileName(e.target.value)} placeholder="Nombre del perfil" className="my-4" onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateLayoutProfileName(); }} />
+          <FormDialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>
+            <Button onClick={handleUpdateLayoutProfileName}>Guardar Nombre</Button>
+          </FormDialogFooter>
+        </DialogContent>
+      </Dialog>
+      {layoutProfileToDelete && (
+        <AlertDialog open={!!layoutProfileToDelete} onOpenChange={() => setLayoutProfileToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Eliminación de Perfil de Diseño</AlertDialogTitle>
+              <AlertDialogDescription>¿Estás seguro de que quieres eliminar el perfil de diseño "{layoutProfileToDelete.name}"? Esta acción no se puede deshacer.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteLayoutProfile} className="bg-destructive hover:bg-destructive/90">Eliminar Perfil</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+      {isConfirmSwitchLayoutProfileDialogOpen && (
+        <AlertDialog open={isConfirmSwitchLayoutProfileDialogOpen} onOpenChange={setIsConfirmSwitchLayoutProfileDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Descartar Cambios</AlertDialogTitle>
+              <AlertDialogDescription>Tienes cambios sin guardar en el diseño actual. ¿Deseas descartarlos y cambiar de perfil?</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => { setIsConfirmSwitchLayoutProfileDialogOpen(false); setPendingLayoutProfileIdToSelect(null); }}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmSwitchLayoutProfile}>Descartar y Cambiar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+
+      {/* --- Generic Dialogs --- */}
       {isConfirmSwitchTabDialogOpen && pendingTabSwitchData && (
         <AlertDialog open={isConfirmSwitchTabDialogOpen} onOpenChange={setIsConfirmSwitchTabDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Descartar Cambios</AlertDialogTitle>
-              <AlertDialogDescription>
-                Tienes cambios sin guardar en la sección de {pendingTabSwitchData.sectionName}. ¿Deseas descartarlos y cambiar de pestaña?
-              </AlertDialogDescription>
+              <AlertDialogDescription>Tienes cambios sin guardar en la sección de {pendingTabSwitchData.sectionName}. ¿Deseas descartarlos y cambiar de pestaña?</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => { setIsConfirmSwitchTabDialogOpen(false); setPendingTabSwitchData(null); }}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmSwitchTab}>
-                Descartar y Cambiar
-              </AlertDialogAction>
+              <AlertDialogAction onClick={confirmSwitchTab}>Descartar y Cambiar</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

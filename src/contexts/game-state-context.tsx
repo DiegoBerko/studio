@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
-import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings } from '@/types';
+import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings, ScoreboardLayoutProfile } from '@/types';
 
 // --- Constantes para la sincronización local ---
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
@@ -23,6 +23,7 @@ if (typeof window !== 'undefined') {
 
 // Initial values (used as fallback if files are not found or are invalid)
 const IN_CODE_INITIAL_PROFILE_NAME = "Predeterminado (App)";
+const IN_CODE_INITIAL_LAYOUT_PROFILE_NAME = "Diseño Predeterminado (App)";
 const IN_CODE_INITIAL_WARM_UP_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND;
 const IN_CODE_INITIAL_PERIOD_DURATION = 20 * 60 * CENTISECONDS_PER_SECOND;
 const IN_CODE_INITIAL_OT_PERIOD_DURATION = 5 * 60 * CENTISECONDS_PER_SECOND;
@@ -90,6 +91,12 @@ const createDefaultFormatAndTimingsProfile = (id?: string, name?: string): Forma
   numberOfRegularPeriods: IN_CODE_INITIAL_NUMBER_OF_REGULAR_PERIODS,
   numberOfOvertimePeriods: IN_CODE_INITIAL_NUMBER_OF_OVERTIME_PERIODS,
   playersPerTeamOnIce: IN_CODE_INITIAL_PLAYERS_PER_TEAM_ON_ICE,
+});
+
+const createDefaultScoreboardLayoutProfile = (id?: string, name?: string): ScoreboardLayoutProfile => ({
+    id: id || crypto.randomUUID(),
+    name: name || IN_CODE_INITIAL_LAYOUT_PROFILE_NAME,
+    ...IN_CODE_INITIAL_LAYOUT_SETTINGS
 });
 
 
@@ -182,7 +189,12 @@ export type GameAction =
   | { type: 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES'; payload: boolean }
   | { type: 'SET_MONITOR_MODE_ENABLED'; payload: boolean }
   | { type: 'UPDATE_LAYOUT_SETTINGS'; payload: Partial<ScoreboardLayoutSettings> }
-  | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<Pick<ConfigFields, 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl' | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties' | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties' | 'isMonitorModeEnabled' | 'scoreboardLayout'>> }
+  | { type: 'ADD_SCOREBOARD_LAYOUT_PROFILE'; payload: { name: string } }
+  | { type: 'UPDATE_SCOREBOARD_LAYOUT_PROFILE_NAME'; payload: { profileId: string; newName: string } }
+  | { type: 'DELETE_SCOREBOARD_LAYOUT_PROFILE'; payload: { profileId: string } }
+  | { type: 'SELECT_SCOREBOARD_LAYOUT_PROFILE'; payload: { profileId: string } }
+  | { type: 'SAVE_CURRENT_LAYOUT_TO_PROFILE' }
+  | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<Pick<ConfigFields, 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl' | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties' | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties' | 'isMonitorModeEnabled' | 'scoreboardLayoutProfiles'>> }
   | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
   | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
@@ -199,6 +211,7 @@ export type GameAction =
 
 
 const defaultInitialProfile = createDefaultFormatAndTimingsProfile();
+const defaultInitialLayoutProfile = createDefaultScoreboardLayoutProfile();
 
 // This initialGlobalState is now primarily a fallback if file loading fails or localStorage is empty
 const initialGlobalState: GameState = {
@@ -242,6 +255,8 @@ const initialGlobalState: GameState = {
   showAliasInScoreboardPenalties: IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
   isMonitorModeEnabled: IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED,
   scoreboardLayout: IN_CODE_INITIAL_LAYOUT_SETTINGS,
+  scoreboardLayoutProfiles: [defaultInitialLayoutProfile],
+  selectedScoreboardLayoutProfileId: defaultInitialLayoutProfile.id,
   // Categories
   availableCategories: IN_CODE_INITIAL_AVAILABLE_CATEGORIES, 
   selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY, 
@@ -418,7 +433,7 @@ const cleanPenaltiesForStorage = (penalties?: Penalty[]): Penalty[] => {
 };
 
 
-const applyProfileToState = (state: GameState, profileId: string | null): GameState => {
+const applyFormatAndTimingsProfileToState = (state: GameState, profileId: string | null): GameState => {
   const profileToApply = state.formatAndTimingsProfiles.find(p => p.id === profileId) || state.formatAndTimingsProfiles[0] || createDefaultFormatAndTimingsProfile();
   if (!profileToApply) return state; 
 
@@ -442,6 +457,19 @@ const applyProfileToState = (state: GameState, profileId: string | null): GameSt
   };
 };
 
+const applyScoreboardLayoutProfileToState = (state: GameState, profileId: string | null): GameState => {
+  const profileToApply = state.scoreboardLayoutProfiles.find(p => p.id === profileId) || state.scoreboardLayoutProfiles[0] || createDefaultScoreboardLayoutProfile();
+  if (!profileToApply) return state;
+
+  const { id, name, ...layoutSettings } = profileToApply;
+
+  return {
+    ...state,
+    selectedScoreboardLayoutProfileId: id,
+    scoreboardLayout: layoutSettings,
+  };
+};
+
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   let newStateWithoutMeta: Omit<GameState, '_lastActionOriginator' | '_lastUpdatedTimestamp' | 'playHornTrigger' | '_initialConfigLoadComplete'>;
@@ -451,40 +479,49 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
   switch (action.type) {
     case 'HYDRATE_FROM_STORAGE': {
-      const hydratedBasePartial: Partial<GameState> = {
-        ...(action.payload ?? {}),
-      };
-      
-      let hydratedProfiles = action.payload?.formatAndTimingsProfiles;
-      if (!hydratedProfiles || hydratedProfiles.length === 0) {
-        hydratedProfiles = state.formatAndTimingsProfiles; // Use state's profiles if payload's are empty (could be from file load)
-      }
-      
-      let hydratedSelectedProfileId = action.payload?.selectedFormatAndTimingsProfileId;
-      if (!hydratedSelectedProfileId || !hydratedProfiles.find(p => p.id === hydratedSelectedProfileId)) {
-        hydratedSelectedProfileId = hydratedProfiles.length > 0 ? hydratedProfiles[0].id : null;
-      }
+      let hydratedBasePartial: Partial<GameState> = { ...(action.payload ?? {}) };
 
-      const selectedProfileValues = hydratedProfiles.find(p => p.id === hydratedSelectedProfileId) || (hydratedProfiles.length > 0 ? hydratedProfiles[0] : createDefaultFormatAndTimingsProfile());
+      // Hydrate Format & Timings Profiles
+      let hydratedFormatProfiles = action.payload?.formatAndTimingsProfiles;
+      if (!hydratedFormatProfiles || hydratedFormatProfiles.length === 0) {
+        hydratedFormatProfiles = [createDefaultFormatAndTimingsProfile()];
+      }
+      let hydratedSelectedFormatProfileId = action.payload?.selectedFormatAndTimingsProfileId;
+      if (!hydratedSelectedFormatProfileId || !hydratedFormatProfiles.find(p => p.id === hydratedSelectedFormatProfileId)) {
+        hydratedSelectedFormatProfileId = hydratedFormatProfiles[0]?.id || null;
+      }
+      const selectedFormatProfileValues = hydratedFormatProfiles.find(p => p.id === hydratedSelectedFormatProfileId) || hydratedFormatProfiles[0];
 
-      let hydratedCategories: CategoryData[] = action.payload?.availableCategories || state.availableCategories;
+      // Hydrate Scoreboard Layout Profiles
+      let hydratedLayoutProfiles = action.payload?.scoreboardLayoutProfiles;
+      if (!hydratedLayoutProfiles || hydratedLayoutProfiles.length === 0) {
+        hydratedLayoutProfiles = [createDefaultScoreboardLayoutProfile()];
+      }
+      let hydratedSelectedLayoutProfileId = action.payload?.selectedScoreboardLayoutProfileId;
+      if (!hydratedSelectedLayoutProfileId || !hydratedLayoutProfiles.find(p => p.id === hydratedSelectedLayoutProfileId)) {
+        hydratedSelectedLayoutProfileId = hydratedLayoutProfiles[0]?.id || null;
+      }
+      const selectedLayoutProfileValues = hydratedLayoutProfiles.find(p => p.id === hydratedSelectedLayoutProfileId) || hydratedLayoutProfiles[0];
+      const { id: layoutId, name: layoutName, ...layoutSettings } = selectedLayoutProfileValues || createDefaultScoreboardLayoutProfile();
+
+      // Hydrate Categories
+      let hydratedCategories: CategoryData[] = action.payload?.availableCategories || [].concat(IN_CODE_INITIAL_AVAILABLE_CATEGORIES);
       if (Array.isArray(hydratedCategories) && hydratedCategories.length > 0 && typeof hydratedCategories[0] === 'string') {
          hydratedCategories = (hydratedCategories as unknown as string[]).map(name => ({ id: name, name: name }));
       }
       
       const hydratedBase: GameState = {
         ...initialGlobalState, 
-        ...selectedProfileValues, 
-        ...(action.payload ?? {}), // Apply explicit payload last to override others if needed
-        formatAndTimingsProfiles: hydratedProfiles,
-        selectedFormatAndTimingsProfileId: hydratedSelectedProfileId,
+        ...selectedFormatProfileValues, 
+        ...(action.payload ?? {}), 
+        formatAndTimingsProfiles: hydratedFormatProfiles,
+        selectedFormatAndTimingsProfileId: hydratedSelectedFormatProfileId,
+        scoreboardLayout: layoutSettings,
+        scoreboardLayoutProfiles: hydratedLayoutProfiles,
+        selectedScoreboardLayoutProfileId: hydratedSelectedLayoutProfileId,
         availableCategories: hydratedCategories, 
         teams: (action.payload?.teams || state.teams).map(t => ({...t, subName: t.subName || undefined })), 
         playHornTrigger: state.playHornTrigger, 
-        homeTeamSubName: action.payload?.homeTeamSubName || state.homeTeamSubName,
-        awayTeamSubName: action.payload?.awayTeamSubName || state.awayTeamSubName,
-        isMonitorModeEnabled: action.payload?.isMonitorModeEnabled ?? state.isMonitorModeEnabled,
-        scoreboardLayout: { ...IN_CODE_INITIAL_LAYOUT_SETTINGS, ...(action.payload?.scoreboardLayout || {}) },
         _initialConfigLoadComplete: true, 
       };
       
@@ -498,7 +535,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       hydratedBase.clockStartTimeMs = null;
       hydratedBase.remainingTimeAtStartCs = null;
 
-      // Restore penalties including 'pending_puck' status from localStorage
       const rawHomePenaltiesFromStorage = action.payload?.homePenalties || [];
       const rawAwayPenaltiesFromStorage = action.payload?.awayPenalties || [];
 
@@ -521,11 +557,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       } else if (hydratedBase.periodDisplayOverride === 'Pre-OT Break') {
          initialHydratedTimeCs = hydratedBase.defaultPreOTBreakDuration;
       } else if (hydratedBase.periodDisplayOverride === 'Time Out') {
-         if (hydratedBase.preTimeoutState) {
-            initialHydratedTimeCs = hydratedBase.defaultTimeoutDuration;
-         } else {
-            initialHydratedTimeCs = hydratedBase.defaultTimeoutDuration;
-         }
+         initialHydratedTimeCs = hydratedBase.defaultTimeoutDuration;
       } else if (hydratedBase.periodDisplayOverride === 'End of Game') {
         initialHydratedTimeCs = 0; 
       } else if (hydratedPeriod > hydratedBase.numberOfRegularPeriods) {
@@ -1029,7 +1061,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
       const newProfiles = [...state.formatAndTimingsProfiles, newProfile];
       tempState = { ...state, formatAndTimingsProfiles: newProfiles };
-      newStateWithoutMeta = applyProfileToState(tempState, newProfile.id);
+      newStateWithoutMeta = applyFormatAndTimingsProfileToState(tempState, newProfile.id);
       break;
     }
     case 'UPDATE_FORMAT_AND_TIMINGS_PROFILE_DATA': {
@@ -1039,7 +1071,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       );
       tempState = { ...state, formatAndTimingsProfiles: newProfiles };
       if (state.selectedFormatAndTimingsProfileId === profileId) {
-        newStateWithoutMeta = applyProfileToState(tempState, profileId);
+        newStateWithoutMeta = applyFormatAndTimingsProfileToState(tempState, profileId);
       } else {
         newStateWithoutMeta = tempState;
       }
@@ -1067,11 +1099,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         newSelectedId = newProfiles[0].id;
       }
       tempState = { ...state, formatAndTimingsProfiles: newProfiles, selectedFormatAndTimingsProfileId: newSelectedId };
-      newStateWithoutMeta = applyProfileToState(tempState, newSelectedId);
+      newStateWithoutMeta = applyFormatAndTimingsProfileToState(tempState, newSelectedId);
       break;
     }
     case 'SELECT_FORMAT_AND_TIMINGS_PROFILE': {
-      newStateWithoutMeta = applyProfileToState(state, action.payload.profileId);
+      newStateWithoutMeta = applyFormatAndTimingsProfileToState(state, action.payload.profileId);
       if (state.currentPeriod === 0 && state.periodDisplayOverride === 'Warm-up') {
         newStateWithoutMeta.currentTime = newStateWithoutMeta.defaultWarmUpDuration;
       } else if (state.periodDisplayOverride === null) {
@@ -1093,7 +1125,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
       const newSelectedId = profilesToLoad[0].id;
       tempState = { ...state, formatAndTimingsProfiles: profilesToLoad, selectedFormatAndTimingsProfileId: newSelectedId };
-      newStateWithoutMeta = applyProfileToState(tempState, newSelectedId);
+      newStateWithoutMeta = applyFormatAndTimingsProfileToState(tempState, newSelectedId);
       break;
     }
     case 'SET_DEFAULT_PERIOD_DURATION': {
@@ -1289,6 +1321,53 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'UPDATE_LAYOUT_SETTINGS':
       newStateWithoutMeta = { ...state, scoreboardLayout: { ...state.scoreboardLayout, ...action.payload } };
       break;
+    case 'ADD_SCOREBOARD_LAYOUT_PROFILE': {
+        const newProfile = createDefaultScoreboardLayoutProfile(crypto.randomUUID(), action.payload.name);
+        const newProfiles = [...state.scoreboardLayoutProfiles, newProfile];
+        tempState = { ...state, scoreboardLayoutProfiles: newProfiles };
+        newStateWithoutMeta = applyScoreboardLayoutProfileToState(tempState, newProfile.id);
+        break;
+    }
+    case 'UPDATE_SCOREBOARD_LAYOUT_PROFILE_NAME': {
+        const { profileId, newName } = action.payload;
+        newStateWithoutMeta = {
+            ...state,
+            scoreboardLayoutProfiles: state.scoreboardLayoutProfiles.map(p =>
+                p.id === profileId ? { ...p, name: newName } : p
+            ),
+        };
+        break;
+    }
+    case 'DELETE_SCOREBOARD_LAYOUT_PROFILE': {
+        let newProfiles = state.scoreboardLayoutProfiles.filter(p => p.id !== action.payload.profileId);
+        let newSelectedId = state.selectedScoreboardLayoutProfileId;
+
+        if (newProfiles.length === 0) {
+            const defaultProfile = createDefaultScoreboardLayoutProfile();
+            newProfiles = [defaultProfile];
+            newSelectedId = defaultProfile.id;
+        } else if (state.selectedScoreboardLayoutProfileId === action.payload.profileId) {
+            newSelectedId = newProfiles[0].id;
+        }
+        tempState = { ...state, scoreboardLayoutProfiles: newProfiles, selectedScoreboardLayoutProfileId: newSelectedId };
+        newStateWithoutMeta = applyScoreboardLayoutProfileToState(tempState, newSelectedId);
+        break;
+    }
+    case 'SELECT_SCOREBOARD_LAYOUT_PROFILE': {
+        newStateWithoutMeta = applyScoreboardLayoutProfileToState(state, action.payload.profileId);
+        break;
+    }
+    case 'SAVE_CURRENT_LAYOUT_TO_PROFILE': {
+        const profileId = state.selectedScoreboardLayoutProfileId;
+        if (!profileId) { newStateWithoutMeta = state; break; }
+        newStateWithoutMeta = {
+            ...state,
+            scoreboardLayoutProfiles: state.scoreboardLayoutProfiles.map(p =>
+                p.id === profileId ? { ...p, ...state.scoreboardLayout } : p
+            ),
+        };
+        break;
+    }
     case 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD':
       if (!action.payload) {
         newStateWithoutMeta = {
@@ -1342,6 +1421,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             showAliasInControls = false;
             showAliasInScoreboard = false;
         }
+        
+        let profilesToLoad = config.scoreboardLayoutProfiles;
+        if (!profilesToLoad || profilesToLoad.length === 0) {
+            profilesToLoad = [createDefaultScoreboardLayoutProfile()];
+        }
+        const newSelectedId = profilesToLoad[0].id;
+        const { id, name, ...layoutSettings } = profilesToLoad[0];
+
         newStateWithoutMeta = {
             ...state,
             playSoundAtPeriodEnd: config.playSoundAtPeriodEnd ?? state.playSoundAtPeriodEnd,
@@ -1352,7 +1439,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             showAliasInControlsPenaltyList: showAliasInControls,
             showAliasInScoreboardPenalties: showAliasInScoreboard,
             isMonitorModeEnabled: config.isMonitorModeEnabled ?? state.isMonitorModeEnabled,
-            scoreboardLayout: { ...state.scoreboardLayout, ...(config.scoreboardLayout || {}) },
+            scoreboardLayout: layoutSettings,
+            scoreboardLayoutProfiles: profilesToLoad,
+            selectedScoreboardLayoutProfileId: newSelectedId,
         };
         break;
     }
@@ -1368,33 +1457,30 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newStateWithoutMeta = { ...state, selectedMatchCategory: action.payload };
       break;
     case 'RESET_CONFIG_TO_DEFAULTS': {
-      const factoryDefaultProfile = createDefaultFormatAndTimingsProfile();
-      let updatedProfiles = state.formatAndTimingsProfiles;
-      let selectedProfileId = state.selectedFormatAndTimingsProfileId;
-
-      if (selectedProfileId) {
-          updatedProfiles = state.formatAndTimingsProfiles.map(p =>
-              p.id === selectedProfileId ? { ...factoryDefaultProfile, id: p.id, name: p.name } : p
-          );
-      } else if (state.formatAndTimingsProfiles.length > 0) {
-          selectedProfileId = state.formatAndTimingsProfiles[0].id;
-          updatedProfiles = state.formatAndTimingsProfiles.map(p =>
-              p.id === selectedProfileId ? { ...factoryDefaultProfile, id: p.id, name: p.name } : p
-          );
-      } else { 
-          const newDefault = createDefaultFormatAndTimingsProfile();
-          updatedProfiles = [newDefault];
-          selectedProfileId = newDefault.id;
+      const factoryDefaultFormatProfile = createDefaultFormatAndTimingsProfile();
+      let updatedFormatProfiles = state.formatAndTimingsProfiles;
+      let selectedFormatProfileId = state.selectedFormatAndTimingsProfileId;
+      if (selectedFormatProfileId) {
+          updatedFormatProfiles = state.formatAndTimingsProfiles.map(p => p.id === selectedFormatProfileId ? { ...factoryDefaultFormatProfile, id: p.id, name: p.name } : p);
       }
-      
-      const activeProfileAfterReset = updatedProfiles.find(p => p.id === selectedProfileId) || factoryDefaultProfile;
+      const activeFormatProfile = updatedFormatProfiles.find(p => p.id === selectedFormatProfileId) || factoryDefaultFormatProfile;
+
+      const factoryDefaultLayoutProfile = createDefaultScoreboardLayoutProfile();
+      let updatedLayoutProfiles = state.scoreboardLayoutProfiles;
+      let selectedLayoutProfileId = state.selectedScoreboardLayoutProfileId;
+      if (selectedLayoutProfileId) {
+          updatedLayoutProfiles = state.scoreboardLayoutProfiles.map(p => p.id === selectedLayoutProfileId ? { ...factoryDefaultLayoutProfile, id: p.id, name: p.name } : p);
+      }
+      const { id, name, ...layoutSettings } = updatedLayoutProfiles.find(p => p.id === selectedLayoutProfileId) || factoryDefaultLayoutProfile;
       
       tempState = {
         ...state,
-        ...activeProfileAfterReset,
-        formatAndTimingsProfiles: updatedProfiles,
-        selectedFormatAndTimingsProfileId: selectedProfileId,
-        // Reset Sound & Display to in-code initial values
+        ...activeFormatProfile,
+        formatAndTimingsProfiles: updatedFormatProfiles,
+        selectedFormatAndTimingsProfileId: selectedFormatProfileId,
+        scoreboardLayout: layoutSettings,
+        scoreboardLayoutProfiles: updatedLayoutProfiles,
+        selectedScoreboardLayoutProfileId: selectedLayoutProfileId,
         playSoundAtPeriodEnd: IN_CODE_INITIAL_PLAY_SOUND_AT_PERIOD_END,
         customHornSoundDataUrl: IN_CODE_INITIAL_CUSTOM_HORN_SOUND_DATA_URL,
         enableTeamSelectionInMiniScoreboard: IN_CODE_INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD,
@@ -1403,7 +1489,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInControlsPenaltyList: IN_CODE_INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
         showAliasInScoreboardPenalties: IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
         isMonitorModeEnabled: IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED,
-        scoreboardLayout: IN_CODE_INITIAL_LAYOUT_SETTINGS,
         availableCategories: IN_CODE_INITIAL_AVAILABLE_CATEGORIES,
         selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY,
       };
@@ -1685,7 +1770,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
             showAliasInControlsPenaltyList: initialGlobalState.showAliasInControlsPenaltyList,
             showAliasInScoreboardPenalties: initialGlobalState.showAliasInScoreboardPenalties,
             isMonitorModeEnabled: initialGlobalState.isMonitorModeEnabled,
-            scoreboardLayout: initialGlobalState.scoreboardLayout,
+            scoreboardLayoutProfiles: initialGlobalState.scoreboardLayoutProfiles,
           }
         );
         const categoriesConfig = await fetchConfig(
@@ -1736,8 +1821,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
     } else {
       console.warn('BroadcastChannel API not available. Multi-tab sync will not work.');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Removed state from dependencies to ensure this runs only once on mount
+  }, []); 
   
   useEffect(() => { 
     return () => {
@@ -1781,7 +1865,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         clearInterval(timerId);
       }
     };
-  }, [state.isClockRunning, state.clockStartTimeMs, state.remainingTimeAtStartCs, state.currentTime, state.homePenalties, state.awayPenalties, state.periodDisplayOverride, state.preTimeoutState, isPageVisible, isLoading, state._initialConfigLoadComplete, state.defaultPeriodDuration, state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration, state.defaultWarmUpDuration, state.autoStartBreaks, state.autoStartPreOTBreaks, state.autoStartTimeouts, state.autoStartWarmUp, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, state.currentPeriod, state.maxConcurrentPenalties]);
+  }, [state]);
 
 
   return (
@@ -1882,4 +1966,4 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
   return category ? category.name : undefined;
 };
 
-export { createDefaultFormatAndTimingsProfile };
+export { createDefaultFormatAndTimingsProfile, createDefaultScoreboardLayoutProfile };

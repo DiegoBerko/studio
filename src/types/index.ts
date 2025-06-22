@@ -81,6 +81,12 @@ export interface ScoreboardLayoutSettings {
   scoreLabelGap: number;
 }
 
+// New: Full Scoreboard Layout Profile structure
+export interface ScoreboardLayoutProfile extends ScoreboardLayoutSettings {
+  id: string;
+  name: string;
+}
+
 
 // Combined ConfigFields - Represents the *active/effective* settings from the selected profile
 export interface ConfigFields extends FormatAndTimingsProfileData {
@@ -94,8 +100,11 @@ export interface ConfigFields extends FormatAndTimingsProfileData {
   showAliasInScoreboardPenalties: boolean;
   isMonitorModeEnabled: boolean;
 
-  // Layout settings
+  // Layout settings (the active/live one)
   scoreboardLayout: ScoreboardLayoutSettings;
+  // Saved layout profiles
+  scoreboardLayoutProfiles: ScoreboardLayoutProfile[];
+  selectedScoreboardLayoutProfileId: string | null;
 
   // Categories settings
   availableCategories: CategoryData[];
