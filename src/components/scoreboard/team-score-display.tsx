@@ -154,7 +154,7 @@ export function TeamScoreDisplay({
       </div>
 
       <p 
-        className="text-muted-foreground -mt-0.5 md:-mt-1 mb-1 md:mb-1.5"
+        className="text-muted-foreground -mt-0.5 md:-mt-1"
         style={{ fontSize: `${layout.teamLabelSize}rem`}}
       >
         ({teamDisplayName})
@@ -164,7 +164,10 @@ export function TeamScoreDisplay({
             "font-bold font-headline text-accent tabular-nums tracking-tighter",
             flash && "animate-score-flash"
           )}
-        style={{ fontSize: `${layout.scoreSize}rem`}}
+        style={{
+          fontSize: `${layout.scoreSize}rem`,
+          marginTop: `${layout.scoreLabelGap}rem`
+        }}
       >
         {score}
       </div>

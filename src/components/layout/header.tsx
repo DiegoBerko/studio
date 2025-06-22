@@ -78,11 +78,11 @@ export function Header() {
       onMouseEnter={handleHeaderMouseEnter}
       onMouseLeave={handleHeaderMouseLeave}
       className={cn(
-        "sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
+        "top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60",
         "transition-all duration-300 ease-in-out",
         isScoreboardPage
-          ? (isVisible ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-full pointer-events-none")
-          : "opacity-100 translate-y-0 pointer-events-auto"
+          ? (isVisible ? "absolute opacity-100 translate-y-0 pointer-events-auto" : "absolute opacity-0 -translate-y-full pointer-events-none")
+          : "sticky opacity-100 translate-y-0 pointer-events-auto"
       )}
     >
       <div className="container flex h-14 max-w-screen-2xl items-center">

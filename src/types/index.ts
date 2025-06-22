@@ -77,6 +77,8 @@ export interface ScoreboardLayoutSettings {
   primaryColor: string;
   accentColor: string;
   backgroundColor: string;
+  mainContentGap: number;
+  scoreLabelGap: number;
 }
 
 

@@ -11,8 +11,9 @@ export function FullScoreboard() {
 
   return (
     <div 
-      className="space-y-6 md:space-y-8 lg:space-y-10 xl:space-y-12 transition-transform duration-200"
+      className="flex flex-col transition-transform duration-200"
       style={{
+        gap: `${scoreboardLayout.mainContentGap}rem`,
         paddingTop: `${scoreboardLayout.scoreboardVerticalPosition}rem`,
         transform: `translateX(${scoreboardLayout.scoreboardHorizontalPosition}rem)`
       }}

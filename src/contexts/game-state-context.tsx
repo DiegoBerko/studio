@@ -47,7 +47,7 @@ const IN_CODE_INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST = true;
 const IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES = true;
 const IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED = false;
 
-const IN_CODE_INITIAL_LAYOUT_SETTINGS: ScoreboardLayoutSettings = {
+export const IN_CODE_INITIAL_LAYOUT_SETTINGS: ScoreboardLayoutSettings = {
   scoreboardVerticalPosition: 2, // rem
   scoreboardHorizontalPosition: 0, // rem
   clockSize: 12, // rem
@@ -64,6 +64,8 @@ const IN_CODE_INITIAL_LAYOUT_SETTINGS: ScoreboardLayoutSettings = {
   primaryColor: '223 65% 33%',
   accentColor: '40 100% 67%',
   backgroundColor: '223 70% 11%',
+  mainContentGap: 3, // rem
+  scoreLabelGap: 0.25, // rem
 };
 
 const IN_CODE_INITIAL_CATEGORIES_RAW = ['A', 'B', 'C', 'Menores', 'Damas'];
