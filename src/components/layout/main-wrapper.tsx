@@ -25,11 +25,7 @@ export function MainWrapper({ children }: { children: ReactNode }) {
 
   let mainClassName;
   if (isScoreboardPage) {
-    if (state.isMonitorModeEnabled) {
-      mainClassName = "w-full pl-8 sm:pl-12 lg:pl-16 pr-0 pb-8 pt-0"; // Monitor mode: double left padding, zero right
-    } else {
-      mainClassName = "w-full px-4 sm:px-6 lg:px-8 pb-8 pt-0"; // Default scoreboard padding
-    }
+    mainClassName = "w-full px-4 sm:px-6 lg:px-8 pb-8 pt-0"; // Default scoreboard padding
   } else {
     mainClassName = "container py-8"; // Default for other pages
   }

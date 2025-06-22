@@ -1,5 +1,6 @@
 
 
+
 export interface Penalty {
   id: string;
   playerNumber: string;
@@ -98,7 +99,6 @@ export interface ConfigFields extends FormatAndTimingsProfileData {
   showAliasInPenaltyPlayerSelector: boolean;
   showAliasInControlsPenaltyList: boolean;
   showAliasInScoreboardPenalties: boolean;
-  isMonitorModeEnabled: boolean;
 
   // Layout settings (the active/live one)
   scoreboardLayout: ScoreboardLayoutSettings;

@@ -48,7 +48,7 @@ type ExportableSoundAndDisplayConfig = Pick<ConfigFields,
   | 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl'
   | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties'
   | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties'
-  | 'isMonitorModeEnabled' | 'scoreboardLayoutProfiles'
+  | 'scoreboardLayoutProfiles'
 >;
 
 
@@ -265,7 +265,6 @@ export default function ConfigPage() {
       showAliasInPenaltyPlayerSelector: state.showAliasInPenaltyPlayerSelector,
       showAliasInControlsPenaltyList: state.showAliasInControlsPenaltyList,
       showAliasInScoreboardPenalties: state.showAliasInScoreboardPenalties,
-      isMonitorModeEnabled: state.isMonitorModeEnabled,
       scoreboardLayoutProfiles: state.scoreboardLayoutProfiles,
     };
     exportSection("Configuración de Sonido y Display", configToExport, "icevision_sonido_display");

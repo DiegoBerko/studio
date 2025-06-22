@@ -46,10 +46,9 @@ const IN_CODE_INITIAL_ENABLE_PLAYER_SELECTION_FOR_PENALTIES = true;
 const IN_CODE_INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR = true;
 const IN_CODE_INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST = true;
 const IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES = true;
-const IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED = false;
 
 export const IN_CODE_INITIAL_LAYOUT_SETTINGS: ScoreboardLayoutSettings = {
-  scoreboardVerticalPosition: 2, // rem
+  scoreboardVerticalPosition: -4, // rem
   scoreboardHorizontalPosition: 0, // rem
   clockSize: 12, // rem
   teamNameSize: 3, // rem
@@ -66,7 +65,7 @@ export const IN_CODE_INITIAL_LAYOUT_SETTINGS: ScoreboardLayoutSettings = {
   accentColor: '40 100% 67%',
   backgroundColor: '223 70% 11%',
   mainContentGap: 3, // rem
-  scoreLabelGap: 0.25, // rem
+  scoreLabelGap: -2, // rem
 };
 
 const IN_CODE_INITIAL_CATEGORIES_RAW = ['A', 'B', 'C', 'Menores', 'Damas'];
@@ -187,14 +186,13 @@ export type GameAction =
   | { type: 'SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES'; payload: boolean }
-  | { type: 'SET_MONITOR_MODE_ENABLED'; payload: boolean }
   | { type: 'UPDATE_LAYOUT_SETTINGS'; payload: Partial<ScoreboardLayoutSettings> }
   | { type: 'ADD_SCOREBOARD_LAYOUT_PROFILE'; payload: { name: string } }
   | { type: 'UPDATE_SCOREBOARD_LAYOUT_PROFILE_NAME'; payload: { profileId: string; newName: string } }
   | { type: 'DELETE_SCOREBOARD_LAYOUT_PROFILE'; payload: { profileId: string } }
   | { type: 'SELECT_SCOREBOARD_LAYOUT_PROFILE'; payload: { profileId: string } }
   | { type: 'SAVE_CURRENT_LAYOUT_TO_PROFILE' }
-  | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<Pick<ConfigFields, 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl' | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties' | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties' | 'isMonitorModeEnabled' | 'scoreboardLayoutProfiles'>> }
+  | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<Pick<ConfigFields, 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl' | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties' | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties' | 'scoreboardLayoutProfiles'>> }
   | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
   | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
@@ -253,7 +251,6 @@ const initialGlobalState: GameState = {
   showAliasInPenaltyPlayerSelector: IN_CODE_INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR,
   showAliasInControlsPenaltyList: IN_CODE_INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
   showAliasInScoreboardPenalties: IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
-  isMonitorModeEnabled: IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED,
   scoreboardLayout: IN_CODE_INITIAL_LAYOUT_SETTINGS,
   scoreboardLayoutProfiles: [defaultInitialLayoutProfile],
   selectedScoreboardLayoutProfileId: defaultInitialLayoutProfile.id,
@@ -1399,9 +1396,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES':
       newStateWithoutMeta = { ...state, showAliasInScoreboardPenalties: action.payload };
       break;
-    case 'SET_MONITOR_MODE_ENABLED':
-      newStateWithoutMeta = { ...state, isMonitorModeEnabled: action.payload };
-      break;
     case 'LOAD_SOUND_AND_DISPLAY_CONFIG': {
         const config = action.payload;
         let enableTeamUsage = config.enableTeamSelectionInMiniScoreboard ?? state.enableTeamSelectionInMiniScoreboard;
@@ -1438,7 +1432,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             showAliasInPenaltyPlayerSelector: showAliasInSelector,
             showAliasInControlsPenaltyList: showAliasInControls,
             showAliasInScoreboardPenalties: showAliasInScoreboard,
-            isMonitorModeEnabled: config.isMonitorModeEnabled ?? state.isMonitorModeEnabled,
             scoreboardLayout: layoutSettings,
             scoreboardLayoutProfiles: profilesToLoad,
             selectedScoreboardLayoutProfileId: newSelectedId,
@@ -1488,7 +1481,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInPenaltyPlayerSelector: IN_CODE_INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR,
         showAliasInControlsPenaltyList: IN_CODE_INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
         showAliasInScoreboardPenalties: IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
-        isMonitorModeEnabled: IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED,
         availableCategories: IN_CODE_INITIAL_AVAILABLE_CATEGORIES,
         selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY,
       };
@@ -1769,7 +1761,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
             showAliasInPenaltyPlayerSelector: initialGlobalState.showAliasInPenaltyPlayerSelector,
             showAliasInControlsPenaltyList: initialGlobalState.showAliasInControlsPenaltyList,
             showAliasInScoreboardPenalties: initialGlobalState.showAliasInScoreboardPenalties,
-            isMonitorModeEnabled: initialGlobalState.isMonitorModeEnabled,
             scoreboardLayoutProfiles: initialGlobalState.scoreboardLayoutProfiles,
           }
         );

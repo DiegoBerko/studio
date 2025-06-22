@@ -10,25 +10,22 @@ interface PenaltiesDisplayProps {
   teamDisplayType: "Local" | "Visitante"; // Para mostrar (Local) o (Visitante)
   teamName: string; // Nombre real del equipo desde el estado
   penalties: Penalty[];
-  isMonitorMode: boolean; // New prop for monitor mode
 }
 
-export function PenaltiesDisplay({ teamDisplayType, teamName, penalties, isMonitorMode }: PenaltiesDisplayProps) {
+export function PenaltiesDisplay({ teamDisplayType, teamName, penalties }: PenaltiesDisplayProps) {
   const { state } = useGameState();
   const { scoreboardLayout } = state;
 
   return (
     <Card className="bg-card shadow-lg flex-1 min-w-[300px]">
-      {!isMonitorMode && (
-        <CardHeader>
-          <CardTitle 
-            className="text-primary-foreground truncate"
-            style={{ fontSize: `${scoreboardLayout.penaltiesTitleSize}rem` }}
-          >
-            Penalidades
-          </CardTitle>
-        </CardHeader>
-      )}
+      <CardHeader>
+        <CardTitle 
+          className="text-primary-foreground truncate"
+          style={{ fontSize: `${scoreboardLayout.penaltiesTitleSize}rem` }}
+        >
+          Penalidades
+        </CardTitle>
+      </CardHeader>
       <CardContent className="space-y-3 lg:space-y-4 pt-6">
         {penalties.length === 0 ? (
           <p 
