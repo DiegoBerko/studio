@@ -162,7 +162,7 @@ export function LayoutSettingsCard() {
           </div>
         </div>
         <div className="border-t pt-6">
-          <h4 className="text-base font-semibold mb-3">Tamaños de Texto y Iconos (en rem)</h4>
+          <h4 className="text-base font-semibold mb-3">Tamaños de Texto e Iconos (en rem)</h4>
            <div className="space-y-4">
             <SliderControl label="Reloj Principal" value={scoreboardLayout.clockSize} onValueChange={(v) => handleValueChange('clockSize', v)} min={6} max={20} step={0.5} />
             <SliderControl label="Nombre Equipo" value={scoreboardLayout.teamNameSize} onValueChange={(v) => handleValueChange('teamNameSize', v)} min={1.5} max={6} step={0.1} />
