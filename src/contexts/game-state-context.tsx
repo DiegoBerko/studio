@@ -3,7 +3,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
-import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData } from '@/types';
+import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings } from '@/types';
 
 // --- Constantes para la sincronización local ---
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
@@ -46,6 +46,24 @@ const IN_CODE_INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR = true;
 const IN_CODE_INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST = true;
 const IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES = true;
 const IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED = false;
+
+const IN_CODE_INITIAL_LAYOUT_SETTINGS: ScoreboardLayoutSettings = {
+  scoreboardVerticalPosition: 2, // rem
+  clockSize: 12, // rem
+  teamNameSize: 3, // rem
+  scoreSize: 8, // rem
+  periodSize: 4.5, // rem
+  playersOnIceIconSize: 1.75, // rem
+  categorySize: 1.25, // rem
+  teamLabelSize: 1, // rem
+  penaltiesTitleSize: 2, // rem
+  penaltyPlayerNumberSize: 3.5, // rem
+  penaltyTimeSize: 3.5, // rem
+  penaltyPlayerIconSize: 2.5, // rem
+  primaryColor: '223 65% 33%',
+  accentColor: '40 100% 67%',
+  backgroundColor: '223 70% 11%',
+};
 
 const IN_CODE_INITIAL_CATEGORIES_RAW = ['A', 'B', 'C', 'Menores', 'Damas'];
 const IN_CODE_INITIAL_AVAILABLE_CATEGORIES: CategoryData[] = IN_CODE_INITIAL_CATEGORIES_RAW.map(name => ({ id: name, name: name }));
@@ -160,7 +178,8 @@ export type GameAction =
   | { type: 'SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST'; payload: boolean }
   | { type: 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES'; payload: boolean }
   | { type: 'SET_MONITOR_MODE_ENABLED'; payload: boolean }
-  | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<Pick<ConfigFields, 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl' | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties' | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties' | 'isMonitorModeEnabled'>> }
+  | { type: 'UPDATE_LAYOUT_SETTINGS'; payload: Partial<ScoreboardLayoutSettings> }
+  | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<Pick<ConfigFields, 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl' | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties' | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties' | 'isMonitorModeEnabled' | 'scoreboardLayout'>> }
   | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
   | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
@@ -219,6 +238,7 @@ const initialGlobalState: GameState = {
   showAliasInControlsPenaltyList: IN_CODE_INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
   showAliasInScoreboardPenalties: IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
   isMonitorModeEnabled: IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED,
+  scoreboardLayout: IN_CODE_INITIAL_LAYOUT_SETTINGS,
   // Categories
   availableCategories: IN_CODE_INITIAL_AVAILABLE_CATEGORIES, 
   selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY, 
@@ -461,6 +481,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         homeTeamSubName: action.payload?.homeTeamSubName || state.homeTeamSubName,
         awayTeamSubName: action.payload?.awayTeamSubName || state.awayTeamSubName,
         isMonitorModeEnabled: action.payload?.isMonitorModeEnabled ?? state.isMonitorModeEnabled,
+        scoreboardLayout: { ...IN_CODE_INITIAL_LAYOUT_SETTINGS, ...(action.payload?.scoreboardLayout || {}) },
         _initialConfigLoadComplete: true, 
       };
       
@@ -1262,6 +1283,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_CUSTOM_HORN_SOUND_DATA_URL':
       newStateWithoutMeta = { ...state, customHornSoundDataUrl: action.payload };
       break;
+    case 'UPDATE_LAYOUT_SETTINGS':
+      newStateWithoutMeta = { ...state, scoreboardLayout: { ...state.scoreboardLayout, ...action.payload } };
+      break;
     case 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD':
       if (!action.payload) {
         newStateWithoutMeta = {
@@ -1325,6 +1349,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             showAliasInControlsPenaltyList: showAliasInControls,
             showAliasInScoreboardPenalties: showAliasInScoreboard,
             isMonitorModeEnabled: config.isMonitorModeEnabled ?? state.isMonitorModeEnabled,
+            scoreboardLayout: { ...state.scoreboardLayout, ...(config.scoreboardLayout || {}) },
         };
         break;
     }
@@ -1344,17 +1369,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       let updatedProfiles = state.formatAndTimingsProfiles;
       let selectedProfileId = state.selectedFormatAndTimingsProfileId;
 
-      // Find the currently selected profile and reset its data fields to factory defaults, keeping its id and name.
       if (selectedProfileId) {
           updatedProfiles = state.formatAndTimingsProfiles.map(p =>
               p.id === selectedProfileId ? { ...factoryDefaultProfile, id: p.id, name: p.name } : p
           );
-      } else if (state.formatAndTimingsProfiles.length > 0) { // Should not happen if a profile is always selected
+      } else if (state.formatAndTimingsProfiles.length > 0) {
           selectedProfileId = state.formatAndTimingsProfiles[0].id;
           updatedProfiles = state.formatAndTimingsProfiles.map(p =>
               p.id === selectedProfileId ? { ...factoryDefaultProfile, id: p.id, name: p.name } : p
           );
-      } else { // Should not happen if there's always at least one profile
+      } else { 
           const newDefault = createDefaultFormatAndTimingsProfile();
           updatedProfiles = [newDefault];
           selectedProfileId = newDefault.id;
@@ -1364,7 +1388,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       
       tempState = {
         ...state,
-        ...activeProfileAfterReset, // Apply the reset profile data to the root state
+        ...activeProfileAfterReset,
         formatAndTimingsProfiles: updatedProfiles,
         selectedFormatAndTimingsProfileId: selectedProfileId,
         // Reset Sound & Display to in-code initial values
@@ -1376,7 +1400,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInControlsPenaltyList: IN_CODE_INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
         showAliasInScoreboardPenalties: IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
         isMonitorModeEnabled: IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED,
-        // Reset Categories to in-code initial values
+        scoreboardLayout: IN_CODE_INITIAL_LAYOUT_SETTINGS,
         availableCategories: IN_CODE_INITIAL_AVAILABLE_CATEGORIES,
         selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY,
       };
@@ -1658,6 +1682,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
             showAliasInControlsPenaltyList: initialGlobalState.showAliasInControlsPenaltyList,
             showAliasInScoreboardPenalties: initialGlobalState.showAliasInScoreboardPenalties,
             isMonitorModeEnabled: initialGlobalState.isMonitorModeEnabled,
+            scoreboardLayout: initialGlobalState.scoreboardLayout,
           }
         );
         const categoriesConfig = await fetchConfig(
@@ -1753,12 +1778,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         clearInterval(timerId);
       }
     };
-  }, [
-      dispatch,
-      isPageVisible, 
-      isLoading,
-      state,
-  ]);
+  }, [state, dispatch, isPageVisible, isLoading]);
 
 
   return (

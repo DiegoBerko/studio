@@ -9,6 +9,7 @@ import { ListFilter } from 'lucide-react'; // Icon for category
 
 export function CompactHeaderScoreboard() {
   const { state } = useGameState();
+  const { scoreboardLayout } = state;
 
   const activeHomePenaltiesCount = state.homePenalties.filter(p => p._status === 'running').length;
   const playersOnIceForHome = Math.max(0, state.playersPerTeamOnIce - activeHomePenaltiesCount);
@@ -21,9 +22,12 @@ export function CompactHeaderScoreboard() {
   return (
     <Card className="bg-card shadow-xl relative">
        {matchCategoryName && (
-        <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 md:bottom-4 md:left-4 flex items-baseline gap-1 px-2 py-1 bg-primary/20 text-primary-foreground rounded-md backdrop-blur-sm z-10">
-            <span className="text-xs sm:text-sm md:text-base font-medium">Cat.</span>
-            <span className="text-sm sm:text-base md:text-lg lg:text-xl font-semibold">{matchCategoryName}</span>
+        <div 
+          className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 md:bottom-4 md:left-4 flex items-baseline gap-1 px-2 py-1 bg-primary/20 text-primary-foreground rounded-md backdrop-blur-sm z-10"
+          style={{ fontSize: `${scoreboardLayout.categorySize}rem`}}
+        >
+            <span className="opacity-80">Cat.</span>
+            <span className="font-semibold">{matchCategoryName}</span>
         </div>
       )}
       <CardContent className="p-4 md:p-6 grid grid-cols-[auto_1fr_auto] items-center gap-x-6 md:gap-x-8 lg:gap-x-10">
@@ -33,6 +37,7 @@ export function CompactHeaderScoreboard() {
           score={state.homeScore}
           playersOnIce={playersOnIceForHome}
           configuredPlayersPerTeam={state.playersPerTeamOnIce}
+          layout={scoreboardLayout}
         />
         <ClockDisplay />
         <TeamScoreDisplay 
@@ -41,6 +46,7 @@ export function CompactHeaderScoreboard() {
           score={state.awayScore} 
           playersOnIce={playersOnIceForAway}
           configuredPlayersPerTeam={state.playersPerTeamOnIce}
+          layout={scoreboardLayout}
         />
       </CardContent>
     </Card>

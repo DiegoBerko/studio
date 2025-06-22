@@ -1,4 +1,5 @@
 
+
 export interface Penalty {
   id: string;
   playerNumber: string;
@@ -58,11 +59,28 @@ export interface FormatAndTimingsProfile extends FormatAndTimingsProfileData {
   name: string;
 }
 
+// New: Settings for scoreboard visual layout
+export interface ScoreboardLayoutSettings {
+  scoreboardVerticalPosition: number;
+  clockSize: number;
+  teamNameSize: number;
+  scoreSize: number;
+  periodSize: number;
+  playersOnIceIconSize: number;
+  categorySize: number;
+  teamLabelSize: number;
+  penaltiesTitleSize: number;
+  penaltyPlayerNumberSize: number;
+  penaltyTimeSize: number;
+  penaltyPlayerIconSize: number;
+  primaryColor: string;
+  accentColor: string;
+  backgroundColor: string;
+}
+
 
 // Combined ConfigFields - Represents the *active/effective* settings from the selected profile
 export interface ConfigFields extends FormatAndTimingsProfileData {
-  // formatAndTimingsConfigName: string; // This will be part of FormatAndTimingsProfile instead
-  
   // Sound & Display settings
   playSoundAtPeriodEnd: boolean;
   customHornSoundDataUrl: string | null;
@@ -72,6 +90,9 @@ export interface ConfigFields extends FormatAndTimingsProfileData {
   showAliasInControlsPenaltyList: boolean;
   showAliasInScoreboardPenalties: boolean;
   isMonitorModeEnabled: boolean;
+
+  // Layout settings
+  scoreboardLayout: ScoreboardLayoutSettings;
 
   // Categories settings
   availableCategories: CategoryData[];

@@ -4,13 +4,24 @@
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import type { ReactNode } from 'react';
+import React, { useEffect } from 'react';
 import { SoundPlayer } from '@/components/audio/sound-player'; // Import SoundPlayer
 import { useGameState } from '@/contexts/game-state-context';
 
 export function MainWrapper({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { state } = useGameState();
+  const { scoreboardLayout } = state;
   const isScoreboardPage = pathname === '/';
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const root = document.documentElement;
+      root.style.setProperty('--background', scoreboardLayout.backgroundColor);
+      root.style.setProperty('--primary', scoreboardLayout.primaryColor);
+      root.style.setProperty('--accent', scoreboardLayout.accentColor);
+    }
+  }, [scoreboardLayout.backgroundColor, scoreboardLayout.primaryColor, scoreboardLayout.accentColor]);
 
   let mainClassName;
   if (isScoreboardPage) {
@@ -32,4 +43,3 @@ export function MainWrapper({ children }: { children: ReactNode }) {
     </>
   );
 }
-

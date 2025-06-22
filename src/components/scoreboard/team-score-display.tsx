@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { User } from 'lucide-react';
+import type { ScoreboardLayoutSettings } from '@/types';
 
 interface TeamScoreDisplayProps {
   teamActualName: string;
@@ -11,6 +12,7 @@ interface TeamScoreDisplayProps {
   score: number;
   playersOnIce?: number;
   configuredPlayersPerTeam?: number;
+  layout: ScoreboardLayoutSettings;
   className?: string;
 }
 
@@ -25,6 +27,7 @@ export function TeamScoreDisplay({
   score,
   playersOnIce = 0,
   configuredPlayersPerTeam = 0,
+  layout,
   className
 }: TeamScoreDisplayProps) {
   const [flash, setFlash] = useState(false);
@@ -102,13 +105,19 @@ export function TeamScoreDisplay({
   return (
     <div className={cn(
         "flex flex-col items-center text-center",
-        // Adjusted min-width to constrain visible characters for scrolling
         "min-w-[120px] sm:min-w-[140px] md:min-w-[160px] lg:min-w-[180px] xl:min-w-[200px]",
         className
       )}>
       <div className="flex justify-center items-center gap-1 mb-1 h-5 md:h-6 lg:h-7">
         {playersOnIce > 0 && Array(playersOnIce).fill(null).map((_, index) => (
-          <User key={index} className="h-5 w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 text-primary-foreground/80" />
+          <User 
+            key={index} 
+            className="text-primary-foreground/80" 
+            style={{ 
+              height: `${layout.playersOnIceIconSize}rem`,
+              width: `${layout.playersOnIceIconSize}rem`
+            }}
+          />
         ))}
         {configuredPlayersPerTeam > 0 && playersOnIce === 0 && (
           <span className="text-sm md:text-base lg:text-lg text-destructive animate-pulse">0 JUGADORES</span>
@@ -117,11 +126,12 @@ export function TeamScoreDisplay({
 
       <div
         className={cn(
-          "text-xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-foreground uppercase tracking-wide w-full h-[1.2em] relative",
-          isLongName ? "overflow-hidden" : "text-center" // Apply text-center only for short names
+          "font-bold text-foreground uppercase tracking-wide w-full h-[1.2em] relative",
+          isLongName ? "overflow-hidden" : "text-center"
         )}
         ref={isLongName ? containerRef : null} 
         title={teamActualName}
+        style={{ fontSize: `${layout.teamNameSize}rem` }}
       >
         {isLongName ? (
           <span
@@ -137,18 +147,24 @@ export function TeamScoreDisplay({
             {teamActualName}
           </span>
         ) : (
-          <span className="truncate"> {/* Simple span for short names, truncate as safety */}
+          <span className="truncate">
             {teamActualName}
           </span>
         )}
       </div>
 
-      <p className="text-sm md:text-base lg:text-lg text-muted-foreground -mt-0.5 md:-mt-1 mb-1 md:mb-1.5">({teamDisplayName})</p>
+      <p 
+        className="text-muted-foreground -mt-0.5 md:-mt-1 mb-1 md:mb-1.5"
+        style={{ fontSize: `${layout.teamLabelSize}rem`}}
+      >
+        ({teamDisplayName})
+      </p>
       <div
         className={cn(
-            "text-5xl md:text-7xl lg:text-8xl xl:text-9xl font-bold font-headline text-accent tabular-nums tracking-tighter",
+            "font-bold font-headline text-accent tabular-nums tracking-tighter",
             flash && "animate-score-flash"
           )}
+        style={{ fontSize: `${layout.scoreSize}rem`}}
       >
         {score}
       </div>

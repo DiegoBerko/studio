@@ -8,13 +8,14 @@ import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/c
 import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card";
 import { TeamSettingsCard, type TeamSettingsCardRef } from "@/components/config/team-settings-card";
 import { CategorySettingsCard, type CategorySettingsCardRef } from "@/components/config/category-settings-card";
+import { LayoutSettingsCard, type LayoutSettingsCardRef } from "@/components/config/layout-settings-card";
 import { TeamsManagementTab } from '@/components/config/teams-management-tab';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Undo2, Upload, Download, RotateCcw, Plus, Edit3, Trash2, XCircle } from 'lucide-react';
-import { useGameState, type ConfigFields, type FormatAndTimingsProfile, type FormatAndTimingsProfileData, createDefaultFormatAndTimingsProfile, type CategoryData } from '@/contexts/game-state-context';
+import { useGameState, type ConfigFields, type FormatAndTimingsProfile, type FormatAndTimingsProfileData, createDefaultFormatAndTimingsProfile, type CategoryData, ScoreboardLayoutSettings } from '@/contexts/game-state-context';
 import { Separator } from "@/components/ui/separator";
 import {
   AlertDialog,
@@ -46,7 +47,7 @@ type ExportableSoundAndDisplayConfig = Pick<ConfigFields,
   | 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl'
   | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties'
   | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties'
-  | 'isMonitorModeEnabled'
+  | 'isMonitorModeEnabled' | 'scoreboardLayout'
 >;
 
 
@@ -61,6 +62,7 @@ export default function ConfigPage() {
   const soundSettingsRef = useRef<SoundSettingsCardRef>(null);
   const teamSettingsRef = useRef<TeamSettingsCardRef>(null);
   const categorySettingsRef = useRef<CategorySettingsCardRef>(null);
+  const layoutSettingsRef = useRef<LayoutSettingsCardRef>(null);
   
   const fileInputFormatAndTimingsRef = useRef<HTMLInputElement>(null);
   const fileInputSoundAndDisplayRef = useRef<HTMLInputElement>(null);
@@ -70,6 +72,7 @@ export default function ConfigPage() {
   const [isSoundDirty, setIsSoundDirty] = useState(false);
   const [isTeamSettingsDirty, setIsTeamSettingsDirty] = useState(false);
   const [isCategorySettingsDirty, setIsCategorySettingsDirty] = useState(false);
+  const [isLayoutSettingsDirty, setIsLayoutSettingsDirty] = useState(false);
   
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [currentExportFilename, setCurrentExportFilename] = useState('');
@@ -118,7 +121,7 @@ export default function ConfigPage() {
   }, [selectedProfile.id]); 
 
   const isFormatAndTimingsSectionDirty = isDurationDirty || isPenaltyDirty;
-  const isSoundAndDisplaySectionDirty = isSoundDirty || isTeamSettingsDirty;
+  const isSoundAndDisplaySectionDirty = isSoundDirty || isTeamSettingsDirty || isLayoutSettingsDirty;
 
   const handleSaveChanges_FormatAndTimings = () => {
     let durationSaveSuccess = true;
@@ -153,6 +156,7 @@ export default function ConfigPage() {
   const handleSaveChanges_SoundAndDisplay = () => {
     let soundSaveSuccess = true;
     let teamSettingsSaveSuccess = true;
+    let layoutSettingsSaveSuccess = true;
     if (soundSettingsRef.current && isSoundDirty) {
       soundSaveSuccess = soundSettingsRef.current.handleSave();
       if (soundSaveSuccess) setIsSoundDirty(false);
@@ -161,7 +165,11 @@ export default function ConfigPage() {
       teamSettingsSaveSuccess = teamSettingsRef.current.handleSave();
       if (teamSettingsSaveSuccess) setIsTeamSettingsDirty(false);
     }
-    if (soundSaveSuccess && teamSettingsSaveSuccess) {
+    if (layoutSettingsRef.current && isLayoutSettingsDirty) {
+      layoutSettingsSaveSuccess = layoutSettingsRef.current.handleSave();
+      if (layoutSettingsSaveSuccess) setIsLayoutSettingsDirty(false);
+    }
+    if (soundSaveSuccess && teamSettingsSaveSuccess && layoutSettingsSaveSuccess) {
       toast({ title: "Sonido y Display Guardados", description: "Los cambios en Sonido y Display han sido guardados en la configuración activa." });
     } else {
       toast({ title: "Error al Guardar", description: "No se pudieron guardar todos los cambios en Sonido y Display.", variant: "destructive" });
@@ -176,6 +184,10 @@ export default function ConfigPage() {
     if (teamSettingsRef.current && isTeamSettingsDirty) {
       teamSettingsRef.current.handleDiscard();
       setIsTeamSettingsDirty(false);
+    }
+    if (layoutSettingsRef.current && isLayoutSettingsDirty) {
+      layoutSettingsRef.current.handleDiscard();
+      setIsLayoutSettingsDirty(false);
     }
     toast({ title: "Cambios Descartados", description: "Los cambios no guardados en Sonido y Display han sido revertidos." });
   };
@@ -258,6 +270,7 @@ export default function ConfigPage() {
       showAliasInControlsPenaltyList: state.showAliasInControlsPenaltyList,
       showAliasInScoreboardPenalties: state.showAliasInScoreboardPenalties,
       isMonitorModeEnabled: state.isMonitorModeEnabled,
+      scoreboardLayout: state.scoreboardLayout,
     };
     exportSection("Configuración de Sonido y Display", configToExport, "icevision_sonido_display");
   };
@@ -313,6 +326,7 @@ export default function ConfigPage() {
         } else if (dispatchActionType === 'LOAD_SOUND_AND_DISPLAY_CONFIG') {
             setIsSoundDirty(false);
             setIsTeamSettingsDirty(false);
+            setIsLayoutSettingsDirty(false);
         }
 
         toast({
@@ -345,7 +359,7 @@ export default function ConfigPage() {
 
   const handleImportSoundAndDisplay = (event: React.ChangeEvent<HTMLInputElement>) => {
     genericImportHandler(event, "Sonido y Display",
-      ['playSoundAtPeriodEnd', 'isMonitorModeEnabled'], 
+      ['playSoundAtPeriodEnd', 'isMonitorModeEnabled', 'scoreboardLayout'], 
       'LOAD_SOUND_AND_DISPLAY_CONFIG',
       fileInputSoundAndDisplayRef
     );
@@ -362,6 +376,7 @@ export default function ConfigPage() {
     setIsSoundDirty(false);
     setIsTeamSettingsDirty(false);
     setIsCategorySettingsDirty(false);
+    setIsLayoutSettingsDirty(false);
 
     toast({
       title: "Configuración Restablecida",
@@ -565,6 +580,8 @@ export default function ConfigPage() {
             <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
             <Separator />
             <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty}/>
+            <Separator />
+            <LayoutSettingsCard ref={layoutSettingsRef} onDirtyChange={setIsLayoutSettingsDirty} />
             
             {isSoundAndDisplaySectionDirty && (
               <div className={sectionActionsContainerClass}>
@@ -777,4 +794,3 @@ export default function ConfigPage() {
     </div>
   );
 }
-

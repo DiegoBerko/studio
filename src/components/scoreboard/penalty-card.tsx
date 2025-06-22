@@ -13,7 +13,7 @@ interface PenaltyCardProps {
   teamName: string; 
 }
 
-const CagedUserIcon = ({ className }: { className?: string }) => (
+const CagedUserIcon = ({ size, className }: { size: number; className?: string }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 24 24"
@@ -21,6 +21,7 @@ const CagedUserIcon = ({ className }: { className?: string }) => (
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}
+    style={{ width: `${size}rem`, height: `${size}rem` }}
   >
     <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" strokeWidth="2" stroke="hsl(var(--destructive))" />
     <circle cx="12" cy="7" r="4" strokeWidth="2" stroke="hsl(var(--destructive))" />
@@ -34,6 +35,7 @@ const CagedUserIcon = ({ className }: { className?: string }) => (
 
 export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
   const { state } = useGameState();
+  const { scoreboardLayout } = state;
 
   const currentTeamSubName = state.homeTeamName === teamName ? state.homeTeamSubName : state.awayTeamName;
 
@@ -71,8 +73,9 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
       <>
         {'\u00A0\u00A0\u00A0'} 
         <span 
-          className="text-xl md:text-2xl lg:text-3xl xl:text-4xl text-muted-foreground font-normal" 
+          className="text-muted-foreground font-normal" 
           title={name} 
+          style={{ fontSize: '0.6em', lineHeight: 1 }}
         >
           {displayName}
         </span>
@@ -92,26 +95,43 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
       <CardContent className="p-3 md:p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
-            <CagedUserIcon className="h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10 text-primary-foreground" />
-            <span className="font-semibold text-3xl md:text-4xl lg:text-5xl xl:text-6xl">
+            <CagedUserIcon size={scoreboardLayout.penaltyPlayerIconSize} className="text-primary-foreground" />
+            <span 
+              className="font-semibold"
+              style={{ fontSize: `${scoreboardLayout.penaltyPlayerNumberSize}rem`, lineHeight: 1 }}
+            >
               {penalty.playerNumber || 'S/N'}
               {renderPlayerAlias()}
             </span>
           </div>
-          <div className="flex items-center gap-1 md:gap-2 text-accent font-mono text-3xl md:text-4xl lg:text-5xl xl:text-6xl">
-            <Clock className="h-4 w-4 md:h-6 md:w-6 lg:h-7 lg:w-7 text-accent" />
+          <div 
+            className="flex items-center gap-1 md:gap-2 text-accent font-mono"
+            style={{ fontSize: `${scoreboardLayout.penaltyTimeSize}rem`, lineHeight: 1 }}
+          >
+            <Clock 
+              className="text-accent"
+              style={{
+                height: `${scoreboardLayout.penaltyTimeSize * 0.5}rem`,
+                width: `${scoreboardLayout.penaltyTimeSize * 0.5}rem`,
+              }}
+            />
             {formatTime(penalty.remainingTime * 100, { showTenths: false })}
           </div>
         </div>
         <div className="flex justify-between items-center">
-          <div className="text-sm md:text-base lg:text-lg xl:text-xl text-muted-foreground mt-1">
+          <div 
+            className="text-muted-foreground mt-1"
+            style={{ fontSize: `${scoreboardLayout.penaltyTimeSize * 0.4}rem` }}
+          >
             ({formatTime(penalty.initialDuration * 100, { showTenths: false })} Min)
           </div>
           {statusText && (
             <div className={cn(
-                "text-sm md:text-base lg:text-lg mt-1 italic",
+                "mt-1 italic",
                  isPendingPuck ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground/80"
-              )}>
+              )}
+              style={{ fontSize: `${scoreboardLayout.penaltyTimeSize * 0.4}rem` }}
+            >
               {statusText}
             </div>
           )}
@@ -120,4 +140,3 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
     </Card>
   );
 }
-
