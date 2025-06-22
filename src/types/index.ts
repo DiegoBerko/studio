@@ -62,6 +62,7 @@ export interface FormatAndTimingsProfile extends FormatAndTimingsProfileData {
 // New: Settings for scoreboard visual layout
 export interface ScoreboardLayoutSettings {
   scoreboardVerticalPosition: number;
+  scoreboardHorizontalPosition: number;
   clockSize: number;
   teamNameSize: number;
   scoreSize: number;

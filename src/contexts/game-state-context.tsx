@@ -49,6 +49,7 @@ const IN_CODE_INITIAL_IS_MONITOR_MODE_ENABLED = false;
 
 const IN_CODE_INITIAL_LAYOUT_SETTINGS: ScoreboardLayoutSettings = {
   scoreboardVerticalPosition: 2, // rem
+  scoreboardHorizontalPosition: 0, // rem
   clockSize: 12, // rem
   teamNameSize: 3, // rem
   scoreSize: 8, // rem
@@ -1778,7 +1779,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         clearInterval(timerId);
       }
     };
-  }, [state, dispatch, isPageVisible, isLoading]);
+  }, [state.isClockRunning, state.clockStartTimeMs, state.remainingTimeAtStartCs, state.currentTime, state.homePenalties, state.awayPenalties, state.periodDisplayOverride, state.preTimeoutState, isPageVisible, isLoading, state._initialConfigLoadComplete, state.defaultPeriodDuration, state.defaultBreakDuration, state.defaultPreOTBreakDuration, state.defaultTimeoutDuration, state.defaultWarmUpDuration, state.autoStartBreaks, state.autoStartPreOTBreaks, state.autoStartTimeouts, state.autoStartWarmUp, state.numberOfRegularPeriods, state.numberOfOvertimePeriods, state.currentPeriod, state.maxConcurrentPenalties]);
 
 
   return (

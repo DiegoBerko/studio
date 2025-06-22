@@ -11,8 +11,11 @@ export function FullScoreboard() {
 
   return (
     <div 
-      className="space-y-6 md:space-y-8 lg:space-y-10 xl:space-y-12"
-      style={{ paddingTop: `${scoreboardLayout.scoreboardVerticalPosition}rem` }}
+      className="space-y-6 md:space-y-8 lg:space-y-10 xl:space-y-12 transition-transform duration-200"
+      style={{
+        paddingTop: `${scoreboardLayout.scoreboardVerticalPosition}rem`,
+        transform: `translateX(${scoreboardLayout.scoreboardHorizontalPosition}rem)`
+      }}
     >
       <CompactHeaderScoreboard />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 lg:gap-10 xl:gap-12">
