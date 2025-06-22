@@ -338,13 +338,12 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
   let concurrentRunningCount = 0;
 
   for (const p of penalties) {
+    if (p.remainingTime <= 0 && p._status !== 'pending_puck') {
+      continue;
+    }
     if (p._status === 'pending_puck') {
       newPenalties.push({ ...p });
       continue;
-    }
-    if (p.remainingTime <= 0) { 
-        // Penalties with 0 time are effectively removed here by not being pushed to newPenalties
-        continue;
     }
 
     let currentStatus: Penalty['_status'] = undefined;
@@ -387,7 +386,8 @@ const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
 const cleanPenaltiesForStorage = (penalties?: Penalty[]): Penalty[] => {
   if (!penalties) return [];
   return penalties.map(p => {
-    if (p._status && p._status !== 'pending_puck') { // Keep 'pending_puck'
+    // Keep 'pending_puck' status, remove all other transient statuses
+    if (p._status && p._status !== 'pending_puck') {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { _status, ...rest } = p;
       return rest as Penalty;
@@ -1758,7 +1758,30 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         clearInterval(timerId);
       }
     };
-  }, [state.isClockRunning, state.clockStartTimeMs, state.remainingTimeAtStartCs, isPageVisible, isLoading, state._initialConfigLoadComplete]);
+  }, [
+      dispatch,
+      state.isClockRunning, 
+      state.clockStartTimeMs, 
+      state.remainingTimeAtStartCs, 
+      isPageVisible, 
+      isLoading, 
+      state._initialConfigLoadComplete,
+      // Add all state values that the TICK logic depends on to prevent stale closures
+      state.homePenalties,
+      state.awayPenalties,
+      state.maxConcurrentPenalties,
+      state.periodDisplayOverride,
+      state.currentPeriod,
+      state.preTimeoutState,
+      state.numberOfRegularPeriods,
+      state.numberOfOvertimePeriods,
+      state.defaultPeriodDuration,
+      state.defaultOTPeriodDuration,
+      state.defaultBreakDuration,
+      state.defaultPreOTBreakDuration,
+      state.autoStartBreaks,
+      state.autoStartPreOTBreaks,
+  ]);
 
 
   return (
@@ -1860,4 +1883,3 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
 };
 
 export { createDefaultFormatAndTimingsProfile };
-
