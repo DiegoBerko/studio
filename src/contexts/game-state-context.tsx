@@ -162,7 +162,6 @@ export type GameAction =
   | { type: 'SET_MONITOR_MODE_ENABLED'; payload: boolean }
   | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<Pick<ConfigFields, 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl' | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties' | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties' | 'isMonitorModeEnabled'>> }
   | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
-  // | { type: 'LOAD_CATEGORIES_CONFIG'; payload: CategoryData[] } // This was removed, categories come from IN_CODE or localStorage
   | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
   | { type: 'SET_STATE_FROM_LOCAL_BROADCAST'; payload: GameState }
@@ -338,6 +337,7 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
   let concurrentRunningCount = 0;
 
   for (const p of penalties) {
+    // This is the fix: Omitting penalties that have finished their time.
     if (p.remainingTime <= 0 && p._status !== 'pending_puck') {
       continue;
     }
@@ -1338,14 +1338,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         newStateWithoutMeta.selectedMatchCategory = '';
       }
       break;
-    // case 'LOAD_CATEGORIES_CONFIG': // Removed as categories are not loaded from a separate file anymore
-    //   newStateWithoutMeta = { ...state, availableCategories: action.payload };
-    //   if (!action.payload.find(c => c.id === state.selectedMatchCategory) && action.payload.length > 0) {
-    //     newStateWithoutMeta.selectedMatchCategory = action.payload[0].id;
-    //   } else if (action.payload.length === 0) {
-    //     newStateWithoutMeta.selectedMatchCategory = '';
-    //   }
-    //   break;
     case 'SET_SELECTED_MATCH_CATEGORY':
       newStateWithoutMeta = { ...state, selectedMatchCategory: action.payload };
       break;
@@ -1670,7 +1662,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
             isMonitorModeEnabled: initialGlobalState.isMonitorModeEnabled,
           }
         );
-        const categoriesConfig = IN_CODE_INITIAL_AVAILABLE_CATEGORIES; // Categories are now always from IN_CODE for factory default
+        const categoriesConfig = IN_CODE_INITIAL_AVAILABLE_CATEGORIES;
 
         const teamsConfig = await fetchConfig(
           '/defaults/teams.custom.json',
@@ -1760,27 +1752,9 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [
       dispatch,
-      state.isClockRunning, 
-      state.clockStartTimeMs, 
-      state.remainingTimeAtStartCs, 
       isPageVisible, 
-      isLoading, 
-      state._initialConfigLoadComplete,
-      // Add all state values that the TICK logic depends on to prevent stale closures
-      state.homePenalties,
-      state.awayPenalties,
-      state.maxConcurrentPenalties,
-      state.periodDisplayOverride,
-      state.currentPeriod,
-      state.preTimeoutState,
-      state.numberOfRegularPeriods,
-      state.numberOfOvertimePeriods,
-      state.defaultPeriodDuration,
-      state.defaultOTPeriodDuration,
-      state.defaultBreakDuration,
-      state.defaultPreOTBreakDuration,
-      state.autoStartBreaks,
-      state.autoStartPreOTBreaks,
+      isLoading,
+      state, // Add the whole state as a dependency to prevent stale closures.
   ]);
 
 
