@@ -337,7 +337,6 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
   let concurrentRunningCount = 0;
 
   for (const p of penalties) {
-    // This is the fix: Omitting penalties that have finished their time.
     if (p.remainingTime <= 0 && p._status !== 'pending_puck') {
       continue;
     }
@@ -386,7 +385,6 @@ const sortPenaltiesByStatus = (penalties: Penalty[]): Penalty[] => {
 const cleanPenaltiesForStorage = (penalties?: Penalty[]): Penalty[] => {
   if (!penalties) return [];
   return penalties.map(p => {
-    // Keep 'pending_puck' status, remove all other transient statuses
     if (p._status && p._status !== 'pending_puck') {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { _status, ...rest } = p;
@@ -1662,7 +1660,12 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
             isMonitorModeEnabled: initialGlobalState.isMonitorModeEnabled,
           }
         );
-        const categoriesConfig = IN_CODE_INITIAL_AVAILABLE_CATEGORIES;
+        const categoriesConfig = await fetchConfig(
+          '/defaults/categories.custom.json',
+          '/defaults/default-categories.json',
+          initialGlobalState.availableCategories,
+          (data) => Array.isArray(data)
+        );
 
         const teamsConfig = await fetchConfig(
           '/defaults/teams.custom.json',
@@ -1754,7 +1757,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       dispatch,
       isPageVisible, 
       isLoading,
-      state, // Add the whole state as a dependency to prevent stale closures.
+      state,
   ]);
 
 
