@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { MiniScoreboard } from '@/components/controls/mini-scoreboard';
 import { TimeControlCard } from '@/components/controls/time-control-card';
 import { PenaltyControlCard } from '@/components/controls/penalty-control-card';
@@ -9,7 +10,7 @@ import { useGameState } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { RefreshCw, AlertTriangle, PlayCircle } from 'lucide-react'; // Added PlayCircle
+import { RefreshCw, AlertTriangle, PlayCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const CONTROLS_LOCK_KEY = 'icevision-controls-lock-id';
@@ -155,7 +156,9 @@ export default function ControlsPage() {
         }
         
         event.preventDefault();
-        dispatch({ type: 'TOGGLE_CLOCK' });
+        flushSync(() => {
+          dispatch({ type: 'TOGGLE_CLOCK' });
+        });
       }
     };
 
@@ -183,12 +186,20 @@ export default function ControlsPage() {
 
 
   const handleResetGame = () => {
-    dispatch({ type: 'RESET_GAME_STATE' });
+    flushSync(() => {
+      dispatch({ type: 'RESET_GAME_STATE' });
+    });
     toast({
       title: "Nuevo Partido Iniciado",
       description: "El estado del juego ha sido restablecido.",
     });
     setShowResetConfirmation(false);
+  };
+
+  const handleActivatePendingPuckPenalties = () => {
+    flushSync(() => {
+      dispatch({ type: 'ACTIVATE_PENDING_PUCK_PENALTIES' });
+    });
   };
 
   const hasPendingPuckPenalties = useMemo(() => {
@@ -245,7 +256,7 @@ export default function ControlsPage() {
             variant="destructive"
             size="lg"
             className="px-8 py-4 text-base font-semibold h-auto" 
-            onClick={() => dispatch({ type: 'ACTIVATE_PENDING_PUCK_PENALTIES' })}
+            onClick={handleActivatePendingPuckPenalties}
           >
             <PlayCircle className="mr-2 h-5 w-5" /> 
             ACTIVAR PENALIDADES (PUCK EN JUEGO)
@@ -290,4 +301,3 @@ export default function ControlsPage() {
     </div>
   );
 }
-

@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { useGameState, formatTime } from '@/contexts/game-state-context';
 import type { Penalty, Team, PlayerData } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -114,14 +115,16 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     }
 
     const durationSec = parseInt(penaltyDurationSeconds, 10);
-    dispatch({
-      type: 'ADD_PENALTY',
-      payload: {
-        team,
-        // The `playerNumber` on the penalty object is the one that will be displayed and used for game logic.
-        // It can be the player's actual number, or a manually entered one for the penalty.
-        penalty: { playerNumber: trimmedPlayerNumberForPenalty.toUpperCase(), initialDuration: durationSec, remainingTime: durationSec },
-      },
+    flushSync(() => {
+      dispatch({
+        type: 'ADD_PENALTY',
+        payload: {
+          team,
+          // The `playerNumber` on the penalty object is the one that will be displayed and used for game logic.
+          // It can be the player's actual number, or a manually entered one for the penalty.
+          penalty: { playerNumber: trimmedPlayerNumberForPenalty.toUpperCase(), initialDuration: durationSec, remainingTime: durationSec },
+        },
+      });
     });
     toast({ title: "Penalidad Agregada", description: `Jugador ${trimmedPlayerNumberForPenalty.toUpperCase()}${selectedPlayerName ? ` (${selectedPlayerName})` : ''} de ${teamName} recibió una penalidad de ${formatTime(durationSec * 100)}.` });
     
@@ -131,12 +134,16 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   };
 
   const handleRemovePenalty = (penaltyId: string) => {
-    dispatch({ type: 'REMOVE_PENALTY', payload: { team, penaltyId } });
+    flushSync(() => {
+      dispatch({ type: 'REMOVE_PENALTY', payload: { team, penaltyId } });
+    });
     toast({ title: "Penalidad Removida", description: `Penalidad para ${teamName} removida.` });
   };
 
   const handleAdjustPenaltyTime = (penaltyId: string, deltaSeconds: number) => {
-    dispatch({ type: 'ADJUST_PENALTY_TIME', payload: { team, penaltyId, delta: deltaSeconds } });
+    flushSync(() => {
+      dispatch({ type: 'ADJUST_PENALTY_TIME', payload: { team, penaltyId, delta: deltaSeconds } });
+    });
     const penalty = penalties.find(p => p.id === penaltyId);
     if (penalty) {
         toast({ title: "Tiempo de Penalidad Ajustado", description: `Tiempo para Jugador ${penalty.playerNumber} (${teamName}) ajustado en ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s.` });
@@ -170,9 +177,11 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
       const endIndex = currentTeamPenalties.findIndex(p => p.id === targetPenaltyId);
 
       if (startIndex !== -1 && endIndex !== -1) {
-        dispatch({
-          type: 'REORDER_PENALTIES',
-          payload: { team, startIndex, endIndex },
+        flushSync(() => {
+          dispatch({
+            type: 'REORDER_PENALTIES',
+            payload: { team, startIndex, endIndex },
+          });
         });
         toast({ title: "Penalidades Reordenadas", description: `Orden de penalidades para ${teamName} actualizado.` });
       }
@@ -439,4 +448,3 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     </ControlCardWrapper>
   );
 }
-

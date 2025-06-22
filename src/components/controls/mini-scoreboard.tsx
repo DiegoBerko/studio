@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes, getCategoryNameById, type TeamData } from '@/contexts/game-state-context';
 import type { Team } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
@@ -96,14 +97,18 @@ export function MiniScoreboard() {
   }, [editingSegment]);
 
   const handleScoreAdjust = (team: Team, delta: number) => {
-    dispatch({ type: 'ADJUST_SCORE', payload: { team, delta } });
+    flushSync(() => {
+      dispatch({ type: 'ADJUST_SCORE', payload: { team, delta } });
+    });
     const teamName = team === 'home' ? state.homeTeamName : state.awayTeamName;
     toast({ title: `Puntuación de ${teamName} Actualizada`, description: `Puntuación ${delta > 0 ? 'aumentada' : 'disminuida'} en ${Math.abs(delta)}.` });
   };
 
   const handleTimeAdjust = (deltaSeconds: number) => {
     if (state.periodDisplayOverride === "End of Game") return;
-    dispatch({ type: 'ADJUST_TIME', payload: deltaSeconds * 100 });
+    flushSync(() => {
+      dispatch({ type: 'ADJUST_TIME', payload: deltaSeconds * 100 });
+    });
     toast({
       title: "Reloj Ajustado",
       description: `Tiempo ajustado en ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds} segundo${Math.abs(deltaSeconds) === 1 ? '' : 's'}.`
@@ -119,15 +124,21 @@ export function MiniScoreboard() {
     const hasDefaultTeamNames = (state.homeTeamName.trim().toUpperCase() === 'LOCAL' || state.homeTeamName.trim() === '') ||
                                 (state.awayTeamName.trim().toUpperCase() === 'VISITANTE' || state.awayTeamName.trim() === '');
 
+    const toggleAction = () => {
+      flushSync(() => {
+        dispatch({ type: 'TOGGLE_CLOCK' });
+      });
+    };
+
     if (!state.isClockRunning && isFirstGameAction && hasDefaultTeamNames && state.enableTeamSelectionInMiniScoreboard) {
       checkAndConfirm(
         true,
         "Nombres de Equipo por Defecto",
         "Uno o ambos equipos aún tienen los nombres predeterminados ('Local', 'Visitante') o están vacíos. ¿Deseas iniciar la entrada en calor de todas formas o prefieres actualizar los nombres primero?",
-        () => dispatch({ type: 'TOGGLE_CLOCK' })
+        toggleAction
       );
     } else {
-      dispatch({ type: 'TOGGLE_CLOCK' });
+      toggleAction();
     }
   };
 
@@ -156,21 +167,31 @@ export function MiniScoreboard() {
   const handlePreviousPeriod = () => {
     setEditingSegment(null);
 
-    if (state.periodDisplayOverride === "End of Game") {
+    const actionToGoToLastPeriod = () => {
+      flushSync(() => {
+        const lastGamePeriod = MAX_TOTAL_GAME_PERIODS;
+        if (lastGamePeriod >= 1) {
+          dispatch({ type: 'SET_PERIOD', payload: lastGamePeriod });
+        } else {
+          dispatch({ type: 'SET_PERIOD', payload: 0 });
+        }
+      });
       const lastGamePeriod = MAX_TOTAL_GAME_PERIODS;
       if (lastGamePeriod >= 1) {
-        dispatch({ type: 'SET_PERIOD', payload: lastGamePeriod });
         toast({
           title: "Regreso al Último Período",
           description: `Se ha vuelto a ${getPeriodText(lastGamePeriod, state.numberOfRegularPeriods)}. El reloj está pausado.`,
         });
-      } else { 
-        dispatch({ type: 'SET_PERIOD', payload: 0 });
+      } else {
         toast({
           title: "Regreso a Entrada en Calor",
           description: `Se ha vuelto a la Entrada en Calor. El reloj está pausado (a menos que autoStartWarmUp esté activo).`,
         });
       }
+    };
+
+    if (state.periodDisplayOverride === "End of Game") {
+      actionToGoToLastPeriod();
       return;
     }
 
@@ -181,7 +202,9 @@ export function MiniScoreboard() {
 
     if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
       const actionToConfirm = () => {
-        dispatch({ type: 'SET_PERIOD', payload: state.currentPeriod });
+        flushSync(() => {
+          dispatch({ type: 'SET_PERIOD', payload: state.currentPeriod });
+        });
         toast({ title: "Período Restaurado", description: `Retornando a ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
       };
 
@@ -197,7 +220,9 @@ export function MiniScoreboard() {
     } else {
       if (state.currentPeriod === 1) {
         const actionToConfirm = () => {
-          dispatch({ type: 'SET_PERIOD', payload: 0 });
+          flushSync(() => {
+            dispatch({ type: 'SET_PERIOD', payload: 0 });
+          });
           toast({ title: "Entrada en Calor Reiniciada", description: `Reloj de Entrada en Calor (${centisecondsToDisplayMinutes(state.defaultWarmUpDuration)} min) ${state.autoStartWarmUp ? 'corriendo.' : 'pausado.'}` });
         };
         const shouldConfirm = state.currentTime > 0 && state.currentTime < state.defaultPeriodDuration;
@@ -209,8 +234,10 @@ export function MiniScoreboard() {
         );
       } else if (state.currentPeriod > 1) {
         const actionToConfirm = () => {
-          dispatch({ type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' });
           const periodBeforeIntendedBreak = state.currentPeriod -1;
+          flushSync(() => {
+            dispatch({ type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' });
+          });
           const isPreOT = periodBeforeIntendedBreak >= state.numberOfRegularPeriods;
           const breakType = isPreOT ? "Pre-OT Break" : "Break";
           const durationCs = isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration;
@@ -242,7 +269,9 @@ export function MiniScoreboard() {
 
     if (state.periodDisplayOverride === "Time Out") {
       if (state.currentTime <= 0) {
-        dispatch({ type: 'END_TIMEOUT' });
+        flushSync(() => {
+          dispatch({ type: 'END_TIMEOUT' });
+        });
         toast({ title: "Time Out Finalizado", description: "Juego reanudado al estado anterior." });
       } else {
         toast({ title: "Time Out en Curso", description: "El tiempo de Time Out aún no ha finalizado." });
@@ -252,7 +281,9 @@ export function MiniScoreboard() {
 
     if (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up") {
       const actionToConfirm = () => {
-        dispatch({ type: 'SET_PERIOD', payload: 1 });
+        flushSync(() => {
+          dispatch({ type: 'SET_PERIOD', payload: 1 });
+        });
         toast({ title: "1er Período Iniciado", description: `Reloj de 1er Período (${centisecondsToDisplayMinutes(state.defaultPeriodDuration)} min) pausado.` });
       };
       const shouldConfirm = state.currentTime > 0 && state.currentTime < state.defaultWarmUpDuration;
@@ -266,7 +297,9 @@ export function MiniScoreboard() {
       const nextNumericPeriod = state.currentPeriod + 1;
       if (nextNumericPeriod <= MAX_TOTAL_GAME_PERIODS) {
         const actionToConfirm = () => {
-            dispatch({ type: 'SET_PERIOD', payload: nextNumericPeriod });
+            flushSync(() => {
+              dispatch({ type: 'SET_PERIOD', payload: nextNumericPeriod });
+            });
             toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(nextNumericPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
         };
 
@@ -281,7 +314,9 @@ export function MiniScoreboard() {
         );
       } else { 
         const actionToConfirm = () => {
-          dispatch({ type: 'MANUAL_END_GAME' });
+          flushSync(() => {
+            dispatch({ type: 'MANUAL_END_GAME' });
+          });
           toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
         };
         const currentBreakDurationCs = state.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
@@ -296,7 +331,9 @@ export function MiniScoreboard() {
     } else if (state.periodDisplayOverride === null) { // Active game period
       if (state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) { 
         const actionToConfirm = () => {
-          dispatch({ type: 'MANUAL_END_GAME' });
+          flushSync(() => {
+            dispatch({ type: 'MANUAL_END_GAME' });
+          });
           toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
         };
         const shouldConfirm = state.currentTime > 0;
@@ -308,7 +345,9 @@ export function MiniScoreboard() {
         );
       } else if (MAX_TOTAL_GAME_PERIODS === 0 && state.currentPeriod === 0) { 
          const actionToConfirm = () => {
-          dispatch({ type: 'MANUAL_END_GAME' });
+          flushSync(() => {
+            dispatch({ type: 'MANUAL_END_GAME' });
+          });
           toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
         };
         const shouldConfirm = state.currentTime > 0;
@@ -321,15 +360,16 @@ export function MiniScoreboard() {
       } else { 
         const actionToConfirm = () => {
           const isPreOT = state.currentPeriod >= state.numberOfRegularPeriods;
+          flushSync(() => {
+            if (isPreOT) {
+              dispatch({ type: 'START_PRE_OT_BREAK' });
+            } else {
+              dispatch({ type: 'START_BREAK' });
+            }
+          });
           const breakType = isPreOT ? "Pre-OT Break" : "Break";
           const durationCs = isPreOT ? state.defaultPreOTBreakDuration : state.defaultBreakDuration;
           const autoStart = isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks;
-
-          if (isPreOT) {
-              dispatch({ type: 'START_PRE_OT_BREAK' });
-          } else {
-              dispatch({ type: 'START_BREAK' });
-          }
           toast({
               title: `${breakType} Iniciado`,
               description: `${breakType} iniciado después de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)} (${centisecondsToDisplayMinutes(durationCs)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
@@ -434,8 +474,11 @@ export function MiniScoreboard() {
 
     const payloadMinutes = Math.floor(newTimeCs / 6000);
     const payloadSeconds = Math.floor((newTimeCs % 6000) / 100);
-
-    dispatch({ type: 'SET_TIME', payload: { minutes: payloadMinutes, seconds: payloadSeconds } });
+    
+    flushSync(() => {
+      dispatch({ type: 'SET_TIME', payload: { minutes: payloadMinutes, seconds: payloadSeconds } });
+    });
+    
     toast({
       title: "Reloj Actualizado",
       description: `Tiempo establecido a ${formatTime(newTimeCs, { showTenths: newTimeCs < 6000, includeMinutesForTenths: true })}`,
@@ -457,7 +500,9 @@ export function MiniScoreboard() {
   const playersOnIceForAway = Math.max(0, state.playersPerTeamOnIce - activeAwayPenaltiesCount);
 
   const handleMatchCategoryChange = (categoryId: string) => {
-    dispatch({ type: 'SET_SELECTED_MATCH_CATEGORY', payload: categoryId });
+    flushSync(() => {
+      dispatch({ type: 'SET_SELECTED_MATCH_CATEGORY', payload: categoryId });
+    });
     toast({ title: "Categoría del Partido Actualizada" });
   };
 
@@ -476,17 +521,19 @@ export function MiniScoreboard() {
   const filteredAwayTeams = useMemo(() => filteredTeamsForSearch(awayTeamSearchTerm), [awayTeamSearchTerm, state.teams, state.selectedMatchCategory]);
 
   const handleSelectTeam = (teamType: 'home' | 'away', teamData: TeamData) => {
-    if (teamType === 'home') {
-      dispatch({ type: 'SET_HOME_TEAM_NAME', payload: teamData.name });
-      dispatch({ type: 'SET_HOME_TEAM_SUB_NAME', payload: teamData.subName });
-      setIsHomeTeamSearchOpen(false);
-      setHomeTeamSearchTerm('');
-    } else {
-      dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: teamData.name });
-      dispatch({ type: 'SET_AWAY_TEAM_SUB_NAME', payload: teamData.subName });
-      setIsAwayTeamSearchOpen(false);
-      setAwayTeamSearchTerm('');
-    }
+    flushSync(() => {
+      if (teamType === 'home') {
+        dispatch({ type: 'SET_HOME_TEAM_NAME', payload: teamData.name });
+        dispatch({ type: 'SET_HOME_TEAM_SUB_NAME', payload: teamData.subName });
+        setIsHomeTeamSearchOpen(false);
+        setHomeTeamSearchTerm('');
+      } else {
+        dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: teamData.name });
+        dispatch({ type: 'SET_AWAY_TEAM_SUB_NAME', payload: teamData.subName });
+        setIsAwayTeamSearchOpen(false);
+        setAwayTeamSearchTerm('');
+      }
+    });
     toast({ title: `Equipo ${teamType === 'home' ? 'Local' : 'Visitante'} Establecido`, description: `Equipo seleccionado: ${teamData.name}${teamData.subName ? ` - ${teamData.subName}` : ''}` });
   };
 
@@ -517,28 +564,32 @@ export function MiniScoreboard() {
 
 
   const handleTeamNameInputBlur = (teamType: 'home' | 'away', currentLocalName: string) => {
-    if (teamType === 'home') {
-      if (currentLocalName.trim() !== state.homeTeamName) { 
-        dispatch({ type: 'SET_HOME_TEAM_NAME', payload: currentLocalName.trim() || 'Local' });
-        dispatch({ type: 'SET_HOME_TEAM_SUB_NAME', payload: undefined }); 
+    flushSync(() => {
+      if (teamType === 'home') {
+        if (currentLocalName.trim() !== state.homeTeamName) { 
+          dispatch({ type: 'SET_HOME_TEAM_NAME', payload: currentLocalName.trim() || 'Local' });
+          dispatch({ type: 'SET_HOME_TEAM_SUB_NAME', payload: undefined }); 
+        }
+      } else {
+        if (currentLocalName.trim() !== state.awayTeamName) {
+          dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: currentLocalName.trim() || 'Visitante' });
+          dispatch({ type: 'SET_AWAY_TEAM_SUB_NAME', payload: undefined }); 
+        }
       }
-    } else {
-      if (currentLocalName.trim() !== state.awayTeamName) {
-        dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: currentLocalName.trim() || 'Visitante' });
-        dispatch({ type: 'SET_AWAY_TEAM_SUB_NAME', payload: undefined }); 
-      }
-    }
+    });
   };
 
   const handleTeamNameInputKeyDown = (teamType: 'home' | 'away', currentLocalName: string, event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
-      if (teamType === 'home') {
-        dispatch({ type: 'SET_HOME_TEAM_NAME', payload: currentLocalName.trim() || 'Local' });
-        dispatch({ type: 'SET_HOME_TEAM_SUB_NAME', payload: undefined });
-      } else {
-        dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: currentLocalName.trim() || 'Visitante' });
-        dispatch({ type: 'SET_AWAY_TEAM_SUB_NAME', payload: undefined });
-      }
+      flushSync(() => {
+        if (teamType === 'home') {
+          dispatch({ type: 'SET_HOME_TEAM_NAME', payload: currentLocalName.trim() || 'Local' });
+          dispatch({ type: 'SET_HOME_TEAM_SUB_NAME', payload: undefined });
+        } else {
+          dispatch({ type: 'SET_AWAY_TEAM_NAME', payload: currentLocalName.trim() || 'Visitante' });
+          dispatch({ type: 'SET_AWAY_TEAM_SUB_NAME', payload: undefined });
+        }
+      });
       (event.target as HTMLInputElement).blur();
     }
   };

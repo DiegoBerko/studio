@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useGameState } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { TimerOff } from 'lucide-react';
@@ -28,7 +29,9 @@ export function TimeControlCard() {
   };
 
   const performStartTimeout = () => {
-    dispatch({ type: 'START_TIMEOUT' }); 
+    flushSync(() => {
+      dispatch({ type: 'START_TIMEOUT' }); 
+    });
     const autoStart = state.autoStartTimeouts;
     const timeoutDurationSec = state.defaultTimeoutDuration / 100;
     toast({ 
@@ -89,4 +92,3 @@ export function TimeControlCard() {
     </>
   );
 }
-
