@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -32,7 +31,9 @@ export default function ControlsPage() {
   
   const channelRef = useRef<BroadcastChannel | null>(null);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  
   const [isGoalManagementOpen, setIsGoalManagementOpen] = useState(false);
+  const [editingTeamForGoals, setEditingTeamForGoals] = useState<Team | null>(null);
 
 
   useEffect(() => {
@@ -212,6 +213,7 @@ export default function ControlsPage() {
   }, [state.homePenalties, state.awayPenalties]);
 
   const handleScoreClick = (team: Team) => {
+    setEditingTeamForGoals(team);
     setIsGoalManagementOpen(true);
   };
 
@@ -312,7 +314,13 @@ export default function ControlsPage() {
       {isGoalManagementOpen && (
         <GoalManagementDialog 
             isOpen={isGoalManagementOpen} 
-            onOpenChange={setIsGoalManagementOpen} 
+            onOpenChange={(isOpen) => {
+              setIsGoalManagementOpen(isOpen);
+              if (!isOpen) {
+                setEditingTeamForGoals(null);
+              }
+            }}
+            team={editingTeamForGoals}
         />
       )}
     </div>

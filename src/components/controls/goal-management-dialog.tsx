@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useGameState, formatTime, getActualPeriodText, type Team, type GoalLog, type PlayerData } from "@/contexts/game-state-context";
+import { useGameState, getActualPeriodText, type Team, type GoalLog, type PlayerData } from "@/contexts/game-state-context";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -11,29 +11,31 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Trash2, PlusCircle, Save, X, ChevronsUpDown, Check, Goal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface GoalManagementDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  team: Team | null;
 }
 
-export function GoalManagementDialog({ isOpen, onOpenChange }: GoalManagementDialogProps) {
+export function GoalManagementDialog({ isOpen, onOpenChange, team }: GoalManagementDialogProps) {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
 
   const [localGoals, setLocalGoals] = useState<GoalLog[]>([]);
+  
+  const teamName = team === 'home' ? state.homeTeamName : state.awayTeamName;
 
   useEffect(() => {
     if (isOpen) {
-      // Deep copy to prevent direct mutation
       setLocalGoals(JSON.parse(JSON.stringify(state.goals)));
     }
   }, [isOpen, state.goals]);
 
-  const handleAddGoal = (team: Team) => {
+  const handleAddGoal = () => {
+    if (!team) return;
     const newGoal: GoalLog = {
       id: crypto.randomUUID(),
       team,
@@ -49,16 +51,8 @@ export function GoalManagementDialog({ isOpen, onOpenChange }: GoalManagementDia
     setLocalGoals(prev => prev.filter(g => g.id !== goalId));
   };
 
-  const handleUpdateScorer = (goalId: string, player: PlayerData | { number: string; name?: string }) => {
-    setLocalGoals(prev => prev.map(g => {
-      if (g.id === goalId) {
-        return {
-          ...g,
-          scorer: { playerNumber: player.number, playerName: player.name },
-        };
-      }
-      return g;
-    }));
+  const handleUpdateGoal = (goalId: string, updates: Partial<GoalLog>) => {
+    setLocalGoals(prev => prev.map(g => (g.id === goalId ? { ...g, ...updates } : g)));
   };
 
   const handleSave = () => {
@@ -67,45 +61,43 @@ export function GoalManagementDialog({ isOpen, onOpenChange }: GoalManagementDia
     onOpenChange(false);
   };
 
-  const sortedGoals = useMemo(() => {
-    return [...localGoals].sort((a, b) => b.timestamp - a.timestamp); // Most recent first
-  }, [localGoals]);
+  const displayedGoals = useMemo(() => {
+    if (!team) return [];
+    return localGoals.filter(g => g.team === team).sort((a, b) => b.timestamp - a.timestamp);
+  }, [localGoals, team]);
+
+  if (!team) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Gestión de Goles</DialogTitle>
+          <DialogTitle className="text-2xl">Gestión de Goles: {teamName}</DialogTitle>
           <DialogDescription>
-            Añade, edita o elimina goles del partido. El marcador se actualizará automáticamente.
+            Añade, edita o elimina goles para este equipo. El marcador se actualizará al guardar.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="flex-grow pr-4 -mr-4 my-4 border-y">
           <div className="py-4 space-y-3">
-            {sortedGoals.length > 0 ? sortedGoals.map(goal => (
+            {displayedGoals.length > 0 ? displayedGoals.map(goal => (
               <GoalItem
                 key={goal.id}
                 goal={goal}
                 onDelete={handleDeleteGoal}
-                onUpdateScorer={handleUpdateScorer}
+                onUpdateGoal={handleUpdateGoal}
               />
             )) : (
               <div className="text-center py-10 text-muted-foreground">
                 <Goal className="mx-auto h-12 w-12 mb-4" />
-                <p>No se han registrado goles.</p>
+                <p>No se han registrado goles para {teamName}.</p>
               </div>
             )}
           </div>
         </ScrollArea>
         <DialogFooter className="justify-between sm:justify-between border-t pt-4">
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleAddGoal('home')}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Añadir Gol Local
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleAddGoal('away')}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Añadir Gol Visitante
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={handleAddGoal}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Gol para {teamName}
+          </Button>
           <div className="flex gap-2">
             <DialogClose asChild>
               <Button type="button" variant="outline"><X className="mr-2 h-4 w-4"/>Cancelar</Button>
@@ -118,11 +110,46 @@ export function GoalManagementDialog({ isOpen, onOpenChange }: GoalManagementDia
   );
 }
 
-
-function GoalItem({ goal, onDelete, onUpdateScorer }: { goal: GoalLog; onDelete: (id: string) => void; onUpdateScorer: (id: string, player: PlayerData | { number: string; name?: string }) => void; }) {
+function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (id: string) => void; onUpdateGoal: (id: string, updates: Partial<GoalLog>) => void; }) {
   const { state } = useGameState();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  
+  const { minutes, seconds } = useMemo(() => {
+    const totalSeconds = Math.floor(goal.gameTime / 100);
+    return {
+        minutes: Math.floor(totalSeconds / 60),
+        seconds: totalSeconds % 60,
+    };
+  }, [goal.gameTime]);
+
+  const [minInput, setMinInput] = useState(String(minutes).padStart(2, '0'));
+  const [secInput, setSecInput] = useState(String(seconds).padStart(2, '0'));
+  const [periodInput, setPeriodInput] = useState(goal.periodText);
+
+  const [scorerNumberInput, setScorerNumberInput] = useState(goal.scorer?.playerNumber || "");
+
+  useEffect(() => {
+    const totalSeconds = Math.floor(goal.gameTime / 100);
+    setMinInput(String(Math.floor(totalSeconds / 60)).padStart(2, '0'));
+    setSecInput(String(totalSeconds % 60).padStart(2, '0'));
+    setPeriodInput(goal.periodText);
+    setScorerNumberInput(goal.scorer?.playerNumber || "");
+  }, [goal]);
+
+  const handleTimeBlur = () => {
+    const mins = parseInt(minInput, 10) || 0;
+    const secs = parseInt(secInput, 10) || 0;
+    const newGameTime = (mins * 60 + secs) * 100;
+    if (newGameTime !== goal.gameTime) {
+      onUpdateGoal(goal.id, { gameTime: newGameTime });
+    }
+  };
+
+  const handlePeriodBlur = () => {
+    if (periodInput.trim() !== goal.periodText) {
+      onUpdateGoal(goal.id, { periodText: periodInput.trim() });
+    }
+  };
 
   const teamData = useMemo(() => {
     const teamName = goal.team === 'home' ? state.homeTeamName : state.awayTeamName;
@@ -135,36 +162,41 @@ function GoalItem({ goal, onDelete, onUpdateScorer }: { goal: GoalLog; onDelete:
     return teamData.players.filter(p => p.number && p.number.trim() !== '').sort((a, b) => parseInt(a.number, 10) - parseInt(b.number, 10));
   }, [teamData]);
 
-  const handlePlayerSelect = (player: PlayerData) => {
-    onUpdateScorer(goal.id, player);
-    setIsPopoverOpen(false);
-  };
-  
-  const handleManualNumberInput = (number: string) => {
+  const handleScorerUpdate = (number: string) => {
     if (/^\d*$/.test(number)) {
+      setScorerNumberInput(number);
       const matchedPlayer = teamPlayers.find(p => p.number === number);
-      onUpdateScorer(goal.id, matchedPlayer || { number });
-    }
-  };
-  
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      setIsPopoverOpen(false);
+      onUpdateGoal(goal.id, { scorer: { playerNumber: number, playerName: matchedPlayer?.name }});
     }
   };
 
   return (
     <Card className="bg-muted/30">
-      <CardContent className="p-3 flex items-center justify-between gap-4">
-        <div className="flex-grow flex items-center gap-4">
-          <Badge variant={goal.team === 'home' ? 'default' : 'secondary'} className="w-20 justify-center">
-            {goal.team === 'home' ? state.homeTeamName : state.awayTeamName}
-          </Badge>
-          <div className="text-sm">
-            <p className="font-semibold text-card-foreground">{goal.periodText} - {formatTime(goal.gameTime)}</p>
-            <p className="text-xs text-muted-foreground">{new Date(goal.timestamp).toLocaleTimeString()}</p>
-          </div>
+      <CardContent className="p-3 flex items-center justify-between flex-wrap gap-x-4 gap-y-2">
+        <div className="flex items-center gap-2">
+          <Input
+            value={minInput}
+            onChange={(e) => { if (/^\d{0,2}$/.test(e.target.value)) setMinInput(e.target.value); }}
+            onBlur={handleTimeBlur}
+            className="w-12 h-8 text-center"
+            aria-label="Minutos del gol"
+          />
+          <span>:</span>
+          <Input
+            value={secInput}
+            onChange={(e) => { if (/^\d{0,2}$/.test(e.target.value)) setSecInput(e.target.value); }}
+            onBlur={handleTimeBlur}
+            className="w-12 h-8 text-center"
+            aria-label="Segundos del gol"
+          />
+          <Input
+            value={periodInput}
+            onChange={(e) => setPeriodInput(e.target.value.toUpperCase())}
+            onBlur={handlePeriodBlur}
+            className="w-20 h-8 text-center"
+            aria-label="Período del gol"
+            placeholder="Período"
+          />
         </div>
         <div className="flex items-center gap-2">
           <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen} modal={true}>
@@ -180,21 +212,21 @@ function GoalItem({ goal, onDelete, onUpdateScorer }: { goal: GoalLog; onDelete:
             <PopoverContent className="w-[--radix-popover-trigger-width] p-0" onCloseAutoFocus={e => e.preventDefault()}>
               <Command shouldFilter={false}>
                 <CommandInput 
-                    placeholder="Buscar o ingresar Nº..." 
-                    value={searchTerm} 
-                    onValueChange={(value) => {
-                      setSearchTerm(value);
-                      handleManualNumberInput(value);
-                    }}
-                    onKeyDown={handleKeyDown}
+                  placeholder="Buscar o ingresar Nº..." 
+                  value={scorerNumberInput} 
+                  onValueChange={handleScorerUpdate}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setIsPopoverOpen(false); } }}
                 />
                 <CommandList>
                   <CommandEmpty>No se encontró jugador.</CommandEmpty>
                   <CommandGroup>
                     {teamPlayers
-                      .filter(p => p.number.includes(searchTerm) || p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                      .filter(p => p.number.includes(scorerNumberInput) || p.name.toLowerCase().includes(scorerNumberInput.toLowerCase()))
                       .map(player => (
-                      <CommandItem key={player.id} onSelect={() => handlePlayerSelect(player)}>
+                      <CommandItem key={player.id} onSelect={() => {
+                        handleScorerUpdate(player.number);
+                        setIsPopoverOpen(false);
+                      }}>
                         <Check className={cn("mr-2 h-4 w-4", goal.scorer?.playerNumber === player.number ? "opacity-100" : "opacity-0")} />
                         #{player.number} - {player.name}
                       </CommandItem>
