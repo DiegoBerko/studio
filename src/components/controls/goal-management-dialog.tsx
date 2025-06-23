@@ -138,7 +138,6 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
         const periodText = getPeriodText(i, state.numberOfRegularPeriods);
         options.push({ value: periodText, label: periodText });
     }
-    // Handle edge case where a goal has an unusual period text (but NOT 'WARM-UP')
     if (goal.periodText && goal.periodText !== 'WARM-UP' && !options.some(opt => opt.value === goal.periodText)) {
         options.push({ value: goal.periodText, label: goal.periodText });
     }
@@ -179,20 +178,16 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
     return teamData.players.filter(p => p.number && p.number.trim() !== '').sort((a, b) => parseInt(a.number, 10) - parseInt(b.number, 10));
   }, [teamData]);
 
-  const handlePlayerSelect = (player: PlayerData) => {
-    onUpdateGoal(goal.id, { scorer: { playerNumber: player.number, playerName: player.name }});
+  const handlePlayerSelect = (player: { number: string; name?: string }) => {
+    let finalPlayerName = player.name;
+    if (!finalPlayerName) {
+      const matchedPlayer = teamPlayers.find(p => p.number === player.number);
+      finalPlayerName = matchedPlayer?.name;
+    }
+    onUpdateGoal(goal.id, { scorer: { playerNumber: player.number, playerName: finalPlayerName }});
     setIsPopoverOpen(false);
   };
   
-  const handleManualScorerInput = () => {
-    const trimmedNumber = scorerSearchValue.trim();
-    if (/^\d*$/.test(trimmedNumber)) {
-        const matchedPlayer = teamPlayers.find(p => p.number === trimmedNumber);
-        onUpdateGoal(goal.id, { scorer: { playerNumber: trimmedNumber, playerName: matchedPlayer?.name }});
-    }
-    setIsPopoverOpen(false);
-  };
-
   const filteredPlayers = useMemo(() => {
     if (!teamPlayers) return [];
     const searchTermLower = scorerSearchValue.toLowerCase();
@@ -213,13 +208,11 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
     <Card className="bg-muted/30">
       <CardContent className="p-3 flex items-center justify-between flex-wrap gap-x-4 gap-y-2">
         <div className="flex items-center gap-4 flex-grow-[2] min-w-[240px]">
-          {/* Timestamp Display */}
           <div className="flex flex-col text-xs text-muted-foreground w-20 text-center">
             <span>{displayTimestamp.time}</span>
             <span className="opacity-80">{displayTimestamp.date}</span>
           </div>
 
-          {/* Game Time & Period Editor */}
           <div className="flex items-center gap-2">
             <Input
               value={minInput}
@@ -244,7 +237,6 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
                   <SelectValue placeholder="Período" />
               </SelectTrigger>
               <SelectContent>
-                  {/* If the current period is an unusual one (but not warm-up), show it as a disabled item */}
                   {goal.periodText && goal.periodText !== 'WARM-UP' && !periodOptions.some(o => o.value === goal.periodText) && (
                       <SelectItem value={goal.periodText} disabled>{goal.periodText}</SelectItem>
                   )}
@@ -256,7 +248,6 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
           </div>
         </div>
         
-        {/* Scorer & Actions */}
         <div className="flex items-center gap-2 flex-grow-[1] min-w-[200px] justify-end">
           <Popover modal={true} open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
             <PopoverTrigger asChild>
@@ -274,20 +265,19 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
                   placeholder="Buscar o ingresar Nº..." 
                   value={scorerSearchValue} 
                   onValueChange={setScorerSearchValue}
-                  onKeyDown={(e) => { 
-                    if (e.key === 'Enter') { 
-                      e.preventDefault(); 
-                      handleManualScorerInput(); 
-                    } 
-                  }}
                 />
                 <CommandList>
-                  <CommandEmpty>
-                    No se encontró jugador.
-                    {scorerSearchValue.trim() && /^\d+$/.test(scorerSearchValue.trim()) && (
-                        <p className="text-xs text-muted-foreground p-2">Enter para usar: #{scorerSearchValue.trim()}</p>
-                    )}
-                  </CommandEmpty>
+                  <CommandEmpty>No se encontró jugador.</CommandEmpty>
+                  {scorerSearchValue.trim() && /^\d+$/.test(scorerSearchValue.trim()) && !filteredPlayers.some(p => p.number === scorerSearchValue.trim()) && (
+                    <CommandItem
+                      key="manual-entry"
+                      value={scorerSearchValue.trim()}
+                      onSelect={() => handlePlayerSelect({ number: scorerSearchValue.trim() })}
+                    >
+                      <Check className="mr-2 h-4 w-4 opacity-0" />
+                      Usar número: #{scorerSearchValue.trim()}
+                    </CommandItem>
+                  )}
                   <CommandGroup>
                     {filteredPlayers.map(player => (
                       <CommandItem key={player.id} value={player.number} onSelect={() => handlePlayerSelect(player)}>
