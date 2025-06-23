@@ -117,19 +117,22 @@ export function GoalManagementDialog({ isOpen, onOpenChange, team }: GoalManagem
 
 function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (id: string) => void; onUpdateGoal: (id: string, updates: Partial<GoalLog>) => void; }) {
   const { state } = useGameState();
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const [scorerSearchValue, setScorerSearchValue] = useState("");
 
+  // Time editing state
   const { minutes, seconds } = useMemo(() => {
     const totalSeconds = Math.floor(goal.gameTime / 100);
     return {
-        minutes: Math.floor(totalSeconds / 60),
-        seconds: totalSeconds % 60,
+      minutes: Math.floor(totalSeconds / 60),
+      seconds: totalSeconds % 60,
     };
   }, [goal.gameTime]);
-
   const [minInput, setMinInput] = useState(String(minutes).padStart(2, '0'));
   const [secInput, setSecInput] = useState(String(seconds).padStart(2, '0'));
+  
+  // Scorer editing state
+  const [localScorerNumber, setLocalScorerNumber] = useState(goal.scorer?.playerNumber || '');
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+
 
   const periodOptions = useMemo(() => {
     const options: { value: string, label: string }[] = [];
@@ -152,11 +155,8 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
   }, [goal.gameTime]);
 
   useEffect(() => {
-    if (isPopoverOpen) {
-      setScorerSearchValue("");
-    }
-  }, [isPopoverOpen]);
-
+    setLocalScorerNumber(goal.scorer?.playerNumber || '');
+  }, [goal.scorer]);
 
   const handleTimeBlur = () => {
     const mins = parseInt(minInput, 10) || 0;
@@ -178,22 +178,32 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
     return teamData.players.filter(p => p.number && p.number.trim() !== '').sort((a, b) => parseInt(a.number, 10) - parseInt(b.number, 10));
   }, [teamData]);
 
-  const handlePlayerSelect = (player: { number: string; name?: string }) => {
-    let finalPlayerName = player.name;
-    if (!finalPlayerName) {
-      const matchedPlayer = teamPlayers.find(p => p.number === player.number);
-      finalPlayerName = matchedPlayer?.name;
+  const matchedPlayer = useMemo(() => {
+    if (!teamPlayers || !localScorerNumber) return null;
+    return teamPlayers.find(p => p.number === localScorerNumber);
+  }, [teamPlayers, localScorerNumber]);
+
+
+  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (/^\d*$/.test(value)) {
+        setLocalScorerNumber(value);
     }
-    onUpdateGoal(goal.id, { scorer: { playerNumber: player.number, playerName: finalPlayerName }});
-    setIsPopoverOpen(false);
+  };
+
+  const handleNumberSave = () => {
+    const newNumber = localScorerNumber.trim();
+    if (newNumber === (goal.scorer?.playerNumber || '')) return;
+
+    const matched = teamPlayers.find(p => p.number === newNumber);
+    onUpdateGoal(goal.id, { scorer: { playerNumber: newNumber, playerName: matched?.name } });
   };
   
-  const filteredPlayers = useMemo(() => {
-    if (!teamPlayers) return [];
-    const searchTermLower = scorerSearchValue.toLowerCase();
-    if (!searchTermLower) return teamPlayers;
-    return teamPlayers.filter(p => p.number.includes(searchTermLower) || p.name.toLowerCase().includes(searchTermLower));
-  }, [teamPlayers, scorerSearchValue]);
+  const handlePlayerSelect = (player: PlayerData) => {
+    setLocalScorerNumber(player.number);
+    onUpdateGoal(goal.id, { scorer: { playerNumber: player.number, playerName: player.name }});
+    setIsSelectorOpen(false);
+  };
 
   const displayTimestamp = useMemo(() => {
     const date = new Date(goal.timestamp);
@@ -248,69 +258,57 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
           </div>
         </div>
         
-        <div className="flex items-center gap-2 flex-grow-[1] min-w-[200px] justify-end">
-          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" className="w-[200px] justify-between">
-                <span className="truncate">
-                  {goal.scorer?.playerNumber ? `#${goal.scorer.playerNumber}` : "Asignar..."}
-                  {goal.scorer?.playerName && <span className="text-muted-foreground ml-2">{goal.scorer.playerName}</span>}
-                </span>
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent 
-              className="w-[--radix-popover-trigger-width] p-0"
-              onCloseAutoFocus={(e) => e.preventDefault()}
-            >
-              <Command shouldFilter={false}>
-                <CommandInput 
-                  placeholder="Buscar o ingresar Nº..." 
-                  value={scorerSearchValue} 
-                  onValueChange={setScorerSearchValue}
-                  onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                          e.preventDefault();
-                          const trimmedSearch = scorerSearchValue.trim().toUpperCase();
-                          const exactMatch = filteredPlayers.find(p => p.number === trimmedSearch);
-                          if (exactMatch) {
-                              handlePlayerSelect(exactMatch);
-                          } else if (trimmedSearch && /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
-                              handlePlayerSelect({ number: trimmedSearch });
-                          }
-                          setIsPopoverOpen(false);
-                      }
-                  }}
-                />
-                <CommandList>
-                  <CommandEmpty>
-                    No se encontró jugador.
-                    {scorerSearchValue.trim() && /^\d+[A-Za-z]*$/.test(scorerSearchValue.trim()) && (
-                      <CommandItem
-                        key="manual-entry"
-                        value={scorerSearchValue.trim()}
-                        onSelect={() => handlePlayerSelect({ number: scorerSearchValue.trim() })}
-                      >
-                       <Check className="mr-2 h-4 w-4 opacity-0" />
-                        Usar número: #{scorerSearchValue.trim()}
-                      </CommandItem>
+        <div className="flex items-center gap-4 flex-grow-[1] min-w-[200px] justify-end">
+            <div className="flex flex-col items-center">
+                <div className="flex items-center gap-1">
+                    <Input
+                        value={localScorerNumber}
+                        onChange={handleNumberChange}
+                        onBlur={handleNumberSave}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
+                        placeholder="Nº"
+                        className="w-16 h-8 text-center"
+                        aria-label="Número del goleador"
+                    />
+                    {teamPlayers.length > 0 && (
+                        <Popover open={isSelectorOpen} onOpenChange={setIsSelectorOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <ChevronsUpDown className="h-4 w-4" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[200px] p-0">
+                                <Command>
+                                    <CommandInput placeholder="Buscar jugador..." />
+                                    <CommandList>
+                                        <CommandEmpty>No se encontraron jugadores.</CommandEmpty>
+                                        <CommandGroup>
+                                            {teamPlayers.map(player => (
+                                                <CommandItem
+                                                    key={player.id}
+                                                    value={`${player.number} ${player.name}`}
+                                                    onSelect={() => handlePlayerSelect(player)}
+                                                >
+                                                    <Check className={cn("mr-2 h-4 w-4", localScorerNumber === player.number ? "opacity-100" : "opacity-0")} />
+                                                    #{player.number} - {player.name}
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
                     )}
-                  </CommandEmpty>
-                  <CommandGroup>
-                    {filteredPlayers.map(player => (
-                      <CommandItem key={player.id} value={player.number} onSelect={() => handlePlayerSelect(player)}>
-                        <Check className={cn("mr-2 h-4 w-4", goal.scorer?.playerNumber === player.number ? "opacity-100" : "opacity-0")} />
-                        #{player.number} - {player.name}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-          <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => onDelete(goal.id)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
+                </div>
+                 {matchedPlayer && (
+                    <span className="text-xs text-muted-foreground mt-1 text-center truncate w-32" title={matchedPlayer.name}>
+                        {matchedPlayer.name}
+                    </span>
+                 )}
+            </div>
+            <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => onDelete(goal.id)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
         </div>
       </CardContent>
     </Card>
