@@ -113,7 +113,7 @@ export function GoalManagementDialog({ isOpen, onOpenChange, team }: GoalManagem
 function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (id: string) => void; onUpdateGoal: (id: string, updates: Partial<GoalLog>) => void; }) {
   const { state } = useGameState();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  
+
   const { minutes, seconds } = useMemo(() => {
     const totalSeconds = Math.floor(goal.gameTime / 100);
     return {
@@ -125,16 +125,21 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
   const [minInput, setMinInput] = useState(String(minutes).padStart(2, '0'));
   const [secInput, setSecInput] = useState(String(seconds).padStart(2, '0'));
   const [periodInput, setPeriodInput] = useState(goal.periodText);
-
-  const [scorerNumberInput, setScorerNumberInput] = useState(goal.scorer?.playerNumber || "");
+  const [scorerSearchValue, setScorerSearchValue] = useState(goal.scorer?.playerNumber || "");
 
   useEffect(() => {
     const totalSeconds = Math.floor(goal.gameTime / 100);
     setMinInput(String(Math.floor(totalSeconds / 60)).padStart(2, '0'));
     setSecInput(String(totalSeconds % 60).padStart(2, '0'));
     setPeriodInput(goal.periodText);
-    setScorerNumberInput(goal.scorer?.playerNumber || "");
+    setScorerSearchValue(goal.scorer?.playerNumber || "");
   }, [goal]);
+
+  useEffect(() => {
+    if (isPopoverOpen) {
+        setScorerSearchValue(goal.scorer?.playerNumber || "");
+    }
+  }, [isPopoverOpen, goal.scorer?.playerNumber]);
 
   const handleTimeBlur = () => {
     const mins = parseInt(minInput, 10) || 0;
@@ -162,13 +167,28 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
     return teamData.players.filter(p => p.number && p.number.trim() !== '').sort((a, b) => parseInt(a.number, 10) - parseInt(b.number, 10));
   }, [teamData]);
 
-  const handleScorerUpdate = (number: string) => {
-    if (/^\d*$/.test(number)) {
-      setScorerNumberInput(number);
-      const matchedPlayer = teamPlayers.find(p => p.number === number);
-      onUpdateGoal(goal.id, { scorer: { playerNumber: number, playerName: matchedPlayer?.name }});
+  const handlePlayerSelect = (player: PlayerData) => {
+    onUpdateGoal(goal.id, { scorer: { playerNumber: player.number, playerName: player.name }});
+    setIsPopoverOpen(false);
+  };
+  
+  const handleManualScorerInput = () => {
+    const trimmedNumber = scorerSearchValue.trim();
+    if (/^\d*$/.test(trimmedNumber)) {
+        const matchedPlayer = teamPlayers.find(p => p.number === trimmedNumber);
+        onUpdateGoal(goal.id, { scorer: { playerNumber: trimmedNumber, playerName: matchedPlayer?.name }});
+        setIsPopoverOpen(false);
+    } else {
+        setIsPopoverOpen(false);
     }
   };
+
+  const filteredPlayers = useMemo(() => {
+    if (!teamPlayers) return [];
+    const searchTermLower = scorerSearchValue.toLowerCase();
+    if (!searchTermLower) return teamPlayers;
+    return teamPlayers.filter(p => p.number.includes(searchTermLower) || p.name.toLowerCase().includes(searchTermLower));
+  }, [teamPlayers, scorerSearchValue]);
 
   return (
     <Card className="bg-muted/30">
@@ -213,20 +233,20 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
               <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Buscar o ingresar Nº..." 
-                  value={scorerNumberInput} 
-                  onValueChange={handleScorerUpdate}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setIsPopoverOpen(false); } }}
+                  value={scorerSearchValue} 
+                  onValueChange={setScorerSearchValue}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleManualScorerInput(); } }}
                 />
                 <CommandList>
-                  <CommandEmpty>No se encontró jugador.</CommandEmpty>
+                  <CommandEmpty>
+                    No se encontró jugador.
+                    {scorerSearchValue.trim() && /^\d+$/.test(scorerSearchValue.trim()) && (
+                        <p className="text-xs text-muted-foreground p-2">Enter para usar: #{scorerSearchValue.trim()}</p>
+                    )}
+                  </CommandEmpty>
                   <CommandGroup>
-                    {teamPlayers
-                      .filter(p => p.number.includes(scorerNumberInput) || p.name.toLowerCase().includes(scorerNumberInput.toLowerCase()))
-                      .map(player => (
-                      <CommandItem key={player.id} onSelect={() => {
-                        handleScorerUpdate(player.number);
-                        setIsPopoverOpen(false);
-                      }}>
+                    {filteredPlayers.map(player => (
+                      <CommandItem key={player.id} onSelect={() => handlePlayerSelect(player)}>
                         <Check className={cn("mr-2 h-4 w-4", goal.scorer?.playerNumber === player.number ? "opacity-100" : "opacity-0")} />
                         #{player.number} - {player.name}
                       </CommandItem>
