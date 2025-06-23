@@ -1744,42 +1744,48 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(false);
       } else {
         // localStorage is empty or invalid, load from files or fallbacks
-        const formatTimingsProfiles = await fetchConfig(
-          '/defaults/format-timings.custom.json',
-          '/defaults/default-format-timings.json',
-          initialGlobalState.formatAndTimingsProfiles,
-          (data) => Array.isArray(data) && data.length > 0 && data.every(p => p.id && p.name)
-        );
-        const soundDisplayConfig = await fetchConfig(
-          '/defaults/sound-display.custom.json',
-          '/defaults/default-sound-display.json',
-          {
-            playSoundAtPeriodEnd: initialGlobalState.playSoundAtPeriodEnd,
-            customHornSoundDataUrl: initialGlobalState.customHornSoundDataUrl,
-            enableTeamSelectionInMiniScoreboard: initialGlobalState.enableTeamSelectionInMiniScoreboard,
-            enablePlayerSelectionForPenalties: initialGlobalState.enablePlayerSelectionForPenalties,
-            showAliasInPenaltyPlayerSelector: initialGlobalState.showAliasInPenaltyPlayerSelector,
-            showAliasInControlsPenaltyList: initialGlobalState.showAliasInControlsPenaltyList,
-            showAliasInScoreboardPenalties: initialGlobalState.showAliasInScoreboardPenalties,
-            scoreboardLayoutProfiles: initialGlobalState.scoreboardLayoutProfiles,
-          }
-        );
-        const categoriesConfig = await fetchConfig(
-          '/defaults/categories.custom.json',
-          '/defaults/default-categories.json',
-          initialGlobalState.availableCategories,
-          (data) => Array.isArray(data)
-        );
-
-        const teamsConfig = await fetchConfig(
-          '/defaults/teams.custom.json',
-          '/defaults/default-teams.json',
-          initialGlobalState.teams,
-          (data) => Array.isArray(data)
-        );
+        const [
+          loadedFormatTimingsProfiles,
+          soundDisplayConfig,
+          categoriesConfig,
+          teamsConfig
+        ] = await Promise.all([
+          fetchConfig(
+            '/defaults/format-timings.custom.json',
+            '/defaults/default-format-timings.json',
+            initialGlobalState.formatAndTimingsProfiles,
+            (data) => Array.isArray(data) && data.length > 0 && data.every(p => p.id && p.name)
+          ),
+          fetchConfig(
+            '/defaults/sound-display.custom.json',
+            '/defaults/default-sound-display.json',
+            {
+              playSoundAtPeriodEnd: initialGlobalState.playSoundAtPeriodEnd,
+              customHornSoundDataUrl: initialGlobalState.customHornSoundDataUrl,
+              enableTeamSelectionInMiniScoreboard: initialGlobalState.enableTeamSelectionInMiniScoreboard,
+              enablePlayerSelectionForPenalties: initialGlobalState.enablePlayerSelectionForPenalties,
+              showAliasInPenaltyPlayerSelector: initialGlobalState.showAliasInPenaltyPlayerSelector,
+              showAliasInControlsPenaltyList: initialGlobalState.showAliasInControlsPenaltyList,
+              showAliasInScoreboardPenalties: initialGlobalState.showAliasInScoreboardPenalties,
+              scoreboardLayoutProfiles: initialGlobalState.scoreboardLayoutProfiles,
+            }
+          ),
+          fetchConfig(
+            '/defaults/categories.custom.json',
+            '/defaults/default-categories.json',
+            initialGlobalState.availableCategories,
+            (data) => Array.isArray(data)
+          ),
+          fetchConfig(
+            '/defaults/teams.custom.json',
+            '/defaults/default-teams.json',
+            initialGlobalState.teams,
+            (data) => Array.isArray(data)
+          )
+        ]);
 
         const initialPayloadForHydration: Partial<GameState> = {
-            formatAndTimingsProfiles,
+            formatAndTimingsProfiles: loadedFormatTimingsProfiles,
             ...soundDisplayConfig,
             availableCategories: categoriesConfig,
             teams: teamsConfig.map((t: TeamData) => ({...t, subName: t.subName || undefined})),
