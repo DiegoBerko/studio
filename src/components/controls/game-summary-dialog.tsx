@@ -18,6 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from '@/components/ui/separator';
 import { Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface GameSummaryDialogProps {
   isOpen: boolean;
@@ -52,7 +53,8 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
         summary += "Sin goles.\n";
       } else {
         teamSummary.goals.forEach(goal => {
-          summary += `- [${new Date(goal.timestamp).toLocaleTimeString()}] Gol en ${goal.periodText} (${formatTime(goal.gameTime)}) - Marcador: ${goal.scoreAfterGoal.home}-${goal.scoreAfterGoal.away}\n`;
+          const scorerInfo = goal.scorer ? ` (Gol: #${goal.scorer.playerNumber}${goal.scorer.playerName ? ` - ${goal.scorer.playerName}` : ''})` : '';
+          summary += `- [${new Date(goal.timestamp).toLocaleTimeString()}] Gol en ${goal.periodText} (${formatTime(goal.gameTime)}) - Marcador: ${goal.scoreAfterGoal.home}-${goal.scoreAfterGoal.away}${scorerInfo}\n`;
         });
       }
       summary += "\n";
@@ -116,12 +118,14 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
               <h3 className="text-xl font-bold text-accent mb-3 truncate">{homeTeamName}</h3>
               <SummarySection title="Goles">
                 {gameSummary.home.goals.length > 0 ? (
-                  <ul className="space-y-1.5 text-sm">
+                  <ul className="space-y-2 text-sm">
                     {gameSummary.home.goals.map(goal => (
-                      <li key={goal.id}>
-                        <span className="font-mono text-muted-foreground text-xs mr-2">[{new Date(goal.timestamp).toLocaleTimeString()}]</span>
-                        <span className="font-semibold">{goal.periodText} ({formatTime(goal.gameTime)})</span>
-                        <span className="ml-2">» {goal.scoreAfterGoal.home}-{goal.scoreAfterGoal.away}</span>
+                      <li key={goal.id} className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="font-mono text-muted-foreground text-xs shrink-0">[{new Date(goal.timestamp).toLocaleTimeString()}]</span>
+                        <span className="font-semibold">{goal.periodText} ({formatTime(goal.gameTime)}) » {goal.scoreAfterGoal.home}-{goal.scoreAfterGoal.away}</span>
+                        {goal.scorer && (
+                          <span className="text-primary-foreground/80 font-medium">(Gol: #{goal.scorer.playerNumber}{goal.scorer.playerName ? ` - ${goal.scorer.playerName}` : ''})</span>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -129,21 +133,24 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
               </SummarySection>
               <SummarySection title="Penalidades">
                  {gameSummary.home.penalties.length > 0 ? (
-                    <ul className="space-y-2 text-sm">
+                    <ul className="space-y-3 text-sm">
                         {gameSummary.home.penalties.map(p => (
                             <li key={p.id}>
-                                <div className="font-semibold">
-                                    <span className="font-mono text-muted-foreground text-xs mr-2">[{new Date(p.addTimestamp).toLocaleTimeString()}]</span>
+                              <div className="flex flex-wrap items-baseline gap-x-2">
+                                <span className="font-mono text-muted-foreground text-xs shrink-0">[{new Date(p.addTimestamp).toLocaleTimeString()}]</span>
+                                <span className="font-semibold">
                                     #{p.playerNumber} {p.playerName && `(${p.playerName})`} - {p.initialDuration/60}'
+                                </span>
+                                <span className="text-muted-foreground text-xs">
+                                    ({p.addPeriodText} {formatTime(p.addGameTime)})
+                                </span>
+                              </div>
+                              {p.endReason && (
+                                <div className="pl-4 text-xs text-muted-foreground flex items-baseline">
+                                   <span className="font-semibold text-primary-foreground/70 mr-2">↳</span>
+                                   <span>Finalizada: {p.endPeriodText} ({formatTime(p.endGameTime || 0)}) - {p.endReason === 'completed' ? 'Cumplida' : 'Borrada'}</span>
                                 </div>
-                                <div className="pl-4 text-muted-foreground text-xs">
-                                    <span>Agregada: {p.addPeriodText} ({formatTime(p.addGameTime)})</span>
-                                    {p.endReason && (
-                                        <span className="ml-3">
-                                            Finalizada: {p.endPeriodText} ({formatTime(p.endGameTime || 0)}) - {p.endReason === 'completed' ? 'Cumplida' : 'Borrada'}
-                                        </span>
-                                    )}
-                                </div>
+                              )}
                             </li>
                         ))}
                     </ul>
@@ -158,12 +165,14 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
               <h3 className="text-xl font-bold text-accent mb-3 truncate">{awayTeamName}</h3>
                <SummarySection title="Goles">
                 {gameSummary.away.goals.length > 0 ? (
-                  <ul className="space-y-1.5 text-sm">
+                  <ul className="space-y-2 text-sm">
                     {gameSummary.away.goals.map(goal => (
-                      <li key={goal.id}>
-                        <span className="font-mono text-muted-foreground text-xs mr-2">[{new Date(goal.timestamp).toLocaleTimeString()}]</span>
-                        <span className="font-semibold">{goal.periodText} ({formatTime(goal.gameTime)})</span>
-                         <span className="ml-2">» {goal.scoreAfterGoal.home}-{goal.scoreAfterGoal.away}</span>
+                      <li key={goal.id} className="flex flex-wrap items-baseline gap-x-2">
+                        <span className="font-mono text-muted-foreground text-xs shrink-0">[{new Date(goal.timestamp).toLocaleTimeString()}]</span>
+                        <span className="font-semibold">{goal.periodText} ({formatTime(goal.gameTime)}) » {goal.scoreAfterGoal.home}-{goal.scoreAfterGoal.away}</span>
+                         {goal.scorer && (
+                          <span className="text-primary-foreground/80 font-medium">(Gol: #{goal.scorer.playerNumber}{goal.scorer.playerName ? ` - ${goal.scorer.playerName}` : ''})</span>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -171,21 +180,24 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
               </SummarySection>
               <SummarySection title="Penalidades">
                  {gameSummary.away.penalties.length > 0 ? (
-                    <ul className="space-y-2 text-sm">
+                   <ul className="space-y-3 text-sm">
                         {gameSummary.away.penalties.map(p => (
                             <li key={p.id}>
-                                <div className="font-semibold">
-                                    <span className="font-mono text-muted-foreground text-xs mr-2">[{new Date(p.addTimestamp).toLocaleTimeString()}]</span>
+                              <div className="flex flex-wrap items-baseline gap-x-2">
+                                <span className="font-mono text-muted-foreground text-xs shrink-0">[{new Date(p.addTimestamp).toLocaleTimeString()}]</span>
+                                <span className="font-semibold">
                                     #{p.playerNumber} {p.playerName && `(${p.playerName})`} - {p.initialDuration/60}'
+                                </span>
+                                <span className="text-muted-foreground text-xs">
+                                    ({p.addPeriodText} {formatTime(p.addGameTime)})
+                                </span>
+                              </div>
+                              {p.endReason && (
+                                <div className="pl-4 text-xs text-muted-foreground flex items-baseline">
+                                   <span className="font-semibold text-primary-foreground/70 mr-2">↳</span>
+                                   <span>Finalizada: {p.endPeriodText} ({formatTime(p.endGameTime || 0)}) - {p.endReason === 'completed' ? 'Cumplida' : 'Borrada'}</span>
                                 </div>
-                                <div className="pl-4 text-muted-foreground text-xs">
-                                    <span>Agregada: {p.addPeriodText} ({formatTime(p.addGameTime)})</span>
-                                    {p.endReason && (
-                                        <span className="ml-3">
-                                            Finalizada: {p.endPeriodText} ({formatTime(p.endGameTime || 0)}) - {p.endReason === 'completed' ? 'Cumplida' : 'Borrada'}
-                                        </span>
-                                    )}
-                                </div>
+                              )}
                             </li>
                         ))}
                     </ul>

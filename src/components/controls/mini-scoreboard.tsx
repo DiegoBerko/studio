@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { useGameState, formatTime, getActualPeriodText, getPeriodText, centisecondsToDisplayMinutes, getCategoryNameById, type TeamData } from '@/contexts/game-state-context';
-import type { Team } from '@/types';
+import type { Team, PlayerData } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { EditTeamPlayersDialog } from './edit-team-players-dialog';
+import { GoalScorerDialog } from './goal-scorer-dialog';
 
 
 type EditingSegment = 'minutes' | 'seconds' | 'tenths';
@@ -66,6 +67,9 @@ export function MiniScoreboard() {
 
   const [isHomePlayersDialogOpen, setIsHomePlayersDialogOpen] = useState(false);
   const [isAwayPlayersDialogOpen, setIsAwayPlayersDialogOpen] = useState(false);
+  
+  const [isGoalDialogVisible, setIsGoalDialogVisible] = useState(false);
+  const [goalTeam, setGoalTeam] = useState<'home' | 'away' | null>(null);
 
   useEffect(() => {
     setLocalHomeTeamName(state.homeTeamName);
@@ -96,12 +100,32 @@ export function MiniScoreboard() {
     }
   }, [editingSegment]);
 
-  const handleScoreAdjust = (team: Team, delta: number) => {
+  const handleDecrementScore = (team: Team) => {
     flushSync(() => {
-      dispatch({ type: 'ADJUST_SCORE', payload: { team, delta } });
+        dispatch({ type: 'ADJUST_SCORE', payload: { team, delta: -1 } });
     });
     const teamName = team === 'home' ? state.homeTeamName : state.awayTeamName;
-    toast({ title: `Puntuación de ${teamName} Actualizada`, description: `Puntuación ${delta > 0 ? 'aumentada' : 'disminuida'} en ${Math.abs(delta)}.` });
+    toast({ title: `Puntuación de ${teamName} Actualizada`, description: `Puntuación disminuida en 1.` });
+  };
+  
+  const handleScoreGoal = (team: Team) => {
+      setGoalTeam(team);
+      setIsGoalDialogVisible(true);
+  };
+  
+  const handleAssignGoal = (scorer?: { playerNumber: string; playerName?: string }) => {
+      if (goalTeam) {
+          flushSync(() => {
+              dispatch({ type: 'ADJUST_SCORE', payload: { team: goalTeam, delta: 1, scorer } });
+          });
+          const teamName = goalTeam === 'home' ? state.homeTeamName : state.awayTeamName;
+          toast({
+              title: `Gol de ${teamName}!`,
+              description: scorer ? `Gol asignado a #${scorer.playerNumber}.` : 'Gol no asignado a jugador.',
+          });
+      }
+      setIsGoalDialogVisible(false);
+      setGoalTeam(null);
   };
 
   const handleTimeAdjust = (deltaSeconds: number) => {
@@ -705,7 +729,7 @@ export function MiniScoreboard() {
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-accent"
-                onClick={() => handleScoreAdjust('home', -1)}
+                onClick={() => handleDecrementScore('home')}
                 aria-label={`Disminuir Puntuación ${state.homeTeamName}`}
               >
                 <Minus className="h-5 w-5" />
@@ -715,7 +739,7 @@ export function MiniScoreboard() {
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-accent"
-                onClick={() => handleScoreAdjust('home', 1)}
+                onClick={() => handleScoreGoal('home')}
                 aria-label={`Aumentar Puntuación ${state.homeTeamName}`}
               >
                 <Plus className="h-5 w-5" />
@@ -993,7 +1017,7 @@ export function MiniScoreboard() {
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-accent"
-                onClick={() => handleScoreAdjust('away', -1)}
+                onClick={() => handleDecrementScore('away')}
                 aria-label={`Disminuir Puntuación ${state.awayTeamName}`}
               >
                 <Minus className="h-5 w-5" />
@@ -1003,7 +1027,7 @@ export function MiniScoreboard() {
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-accent"
-                onClick={() => handleScoreAdjust('away', 1)}
+                onClick={() => handleScoreGoal('away')}
                 aria-label={`Aumentar Puntuación ${state.awayTeamName}`}
               >
                 <Plus className="h-5 w-5" />
@@ -1020,6 +1044,15 @@ export function MiniScoreboard() {
           </div>
         </CardContent>
       </Card>
+      
+      {isGoalDialogVisible && goalTeam && (
+          <GoalScorerDialog
+              isOpen={isGoalDialogVisible}
+              onOpenChange={setIsGoalDialogVisible}
+              team={goalTeam}
+              onGoalAssigned={handleAssignGoal}
+          />
+      )}
 
       {pendingConfirmation && (
         <AlertDialog open={true} onOpenChange={(isOpen) => !isOpen && cancelConfirmation()}>
@@ -1042,5 +1075,3 @@ export function MiniScoreboard() {
     </div>
   );
 }
-
-    

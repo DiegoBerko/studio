@@ -147,7 +147,7 @@ export type GameAction =
   | { type: 'SET_PERIOD'; payload: number }
   | { type: 'RESET_PERIOD_CLOCK' }
   | { type: 'SET_SCORE'; payload: { team: Team; score: number } }
-  | { type: 'ADJUST_SCORE'; payload: { team: Team; delta: number } }
+  | { type: 'ADJUST_SCORE'; payload: { team: Team; delta: number; scorer?: { playerNumber: string; playerName?: string } } }
   | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id' | '_status'> } }
   | { type: 'REMOVE_PENALTY'; payload: { team: Team; penaltyId: string } }
   | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } }
@@ -544,43 +544,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       hydratedBase.awayPenalties = sortPenaltiesByStatus(
         updatePenaltyStatusesOnly(rawAwayPenaltiesFromStorage as Penalty[], hydratedBase.maxConcurrentPenalties)
       );
-
-      let initialHydratedTimeCs: number;
-      const hydratedPeriod = hydratedBase.currentPeriod ?? initialGlobalState.currentPeriod;
       
-      if (hydratedBase.periodDisplayOverride === 'Warm-up' || (hydratedPeriod === 0 && hydratedBase.periodDisplayOverride === null) ) {
-        initialHydratedTimeCs = hydratedBase.defaultWarmUpDuration;
-        hydratedBase.periodDisplayOverride = 'Warm-up';
-        hydratedBase.currentPeriod = 0;
-      } else if (hydratedBase.periodDisplayOverride === 'Break') {
-        initialHydratedTimeCs = hydratedBase.defaultBreakDuration;
-      } else if (hydratedBase.periodDisplayOverride === 'Pre-OT Break') {
-         initialHydratedTimeCs = hydratedBase.defaultPreOTBreakDuration;
-      } else if (hydratedBase.periodDisplayOverride === 'Time Out') {
-         initialHydratedTimeCs = hydratedBase.defaultTimeoutDuration;
-      } else if (hydratedBase.periodDisplayOverride === 'End of Game') {
-        initialHydratedTimeCs = 0; 
-      } else if (hydratedPeriod > hydratedBase.numberOfRegularPeriods) {
-        initialHydratedTimeCs = hydratedBase.defaultOTPeriodDuration;
-        hydratedBase.periodDisplayOverride = null;
-      } else {
-        initialHydratedTimeCs = hydratedBase.defaultPeriodDuration;
-        hydratedBase.periodDisplayOverride = null;
-      }
-
-      if(action.payload?.currentTime === undefined || action.payload.currentTime === null || action.payload.currentTime < 0 || action.payload.currentTime > initialHydratedTimeCs ) {
-          hydratedBase.currentTime = initialHydratedTimeCs;
-      } else {
-          hydratedBase.currentTime = action.payload.currentTime;
-      }
-
-      if (!hydratedBase.enableTeamSelectionInMiniScoreboard) {
-        hydratedBase.enablePlayerSelectionForPenalties = false;
-        hydratedBase.showAliasInPenaltyPlayerSelector = false;
-        hydratedBase.showAliasInControlsPenaltyList = false;
-        hydratedBase.showAliasInScoreboardPenalties = false;
-      }
-
       const { _lastActionOriginator, _lastUpdatedTimestamp, playHornTrigger: hydratedHornTrigger, _initialConfigLoadComplete, ...restOfHydrated } = hydratedBase;
       newStateWithoutMeta = restOfHydrated;
       return { ...newStateWithoutMeta, playHornTrigger: state.playHornTrigger, _lastActionOriginator: undefined, _lastUpdatedTimestamp: action.payload?._lastUpdatedTimestamp, _initialConfigLoadComplete: true };
@@ -763,7 +727,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     case 'ADJUST_SCORE': {
-      const { team, delta } = action.payload;
+      const { team, delta, scorer } = action.payload;
       const currentScore = state[`${team}Score`];
       const newScore = Math.max(0, currentScore + delta);
       newStateWithoutMeta = { ...state, [`${team}Score`]: newScore };
@@ -778,6 +742,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             home: team === 'home' ? newScore : state.homeScore,
             away: team === 'away' ? newScore : state.awayScore,
           },
+          scorer,
         };
         const newGameSummary = { ...state.gameSummary };
         newGameSummary[team].goals.push(newGoalLog);
