@@ -1492,7 +1492,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
     case 'RESET_GAME_STATE': {
       const activeProfileId = state.selectedFormatAndTimingsProfileId;
-      const activeProfile = state.formatAndTimingsProfiles.find(p => p.id === activeProfileId) || state.formatAndTimingsProfiles[0] || defaultInitialProfile;
+      const activeProfile = state.formatAndTimingsProfiles.find(p => p.id === activeProfileId) || state.formatAndTimingsProfiles[0] || createDefaultFormatAndTimingsProfile();
       
       const initialWarmUpDurationCs = activeProfile.defaultWarmUpDuration;
       const autoStartWarmUp = activeProfile.autoStartWarmUp;
@@ -1862,7 +1862,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         clearInterval(timerId);
       }
     };
-  }, [state]);
+  }, [state.isClockRunning, state.currentTime, state.homePenalties, state.awayPenalties, isPageVisible, isLoading, state._initialConfigLoadComplete]);
 
 
   return (
