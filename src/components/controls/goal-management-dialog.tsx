@@ -116,7 +116,7 @@ export function GoalManagementDialog({ isOpen, onOpenChange, team }: GoalManagem
 }
 
 function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (id: string) => void; onUpdateGoal: (id: string, updates: Partial<GoalLog>) => void; }) {
-  const { state } from "@/contexts/game-state-context";
+  const { state } = useGameState();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [scorerSearchValue, setScorerSearchValue] = useState("");
 
