@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useGameState, getActualPeriodText, type Team, type GoalLog, type PlayerData } from "@/contexts/game-state-context";
+import { useGameState, getPeriodText, type Team, type GoalLog, type PlayerData } from "@/contexts/game-state-context";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -13,6 +13,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Card, CardContent } from "@/components/ui/card";
 import { Trash2, PlusCircle, Save, X, ChevronsUpDown, Check, Goal } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 interface GoalManagementDialogProps {
   isOpen: boolean;
@@ -72,9 +74,6 @@ export function GoalManagementDialog({ isOpen, onOpenChange, team }: GoalManagem
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent 
         className="max-w-4xl h-[90vh] flex flex-col"
-        onInteractOutside={(e) => {
-            e.preventDefault();
-        }}
       >
         <DialogHeader>
           <DialogTitle className="text-2xl">Gestión de Goles: {teamName}</DialogTitle>
@@ -118,6 +117,7 @@ export function GoalManagementDialog({ isOpen, onOpenChange, team }: GoalManagem
 function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (id: string) => void; onUpdateGoal: (id: string, updates: Partial<GoalLog>) => void; }) {
   const { state } = useGameState();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [scorerSearchValue, setScorerSearchValue] = useState("");
 
   const { minutes, seconds } = useMemo(() => {
     const totalSeconds = Math.floor(goal.gameTime / 100);
@@ -129,22 +129,34 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
 
   const [minInput, setMinInput] = useState(String(minutes).padStart(2, '0'));
   const [secInput, setSecInput] = useState(String(seconds).padStart(2, '0'));
-  const [periodInput, setPeriodInput] = useState(goal.periodText);
-  const [scorerSearchValue, setScorerSearchValue] = useState(goal.scorer?.playerNumber || "");
+
+  const periodOptions = useMemo(() => {
+    const options = [{ value: "WARM-UP", label: "Warm-up" }];
+    const totalPeriods = state.numberOfRegularPeriods + state.numberOfOvertimePeriods;
+    for (let i = 1; i <= totalPeriods; i++) {
+        const periodText = getPeriodText(i, state.numberOfRegularPeriods);
+        options.push({ value: periodText, label: periodText });
+    }
+    // Ensure the current goal's period is in the list, even if it's unusual (e.g. manually typed before)
+    if (!options.some(opt => opt.value === goal.periodText)) {
+        options.push({ value: goal.periodText, label: goal.periodText });
+    }
+    return options;
+  }, [state.numberOfRegularPeriods, state.numberOfOvertimePeriods, goal.periodText]);
+
 
   useEffect(() => {
     const totalSeconds = Math.floor(goal.gameTime / 100);
     setMinInput(String(Math.floor(totalSeconds / 60)).padStart(2, '0'));
     setSecInput(String(totalSeconds % 60).padStart(2, '0'));
-    setPeriodInput(goal.periodText);
-    setScorerSearchValue(goal.scorer?.playerNumber || "");
-  }, [goal]);
+  }, [goal.gameTime]);
 
   useEffect(() => {
     if (isPopoverOpen) {
-        setScorerSearchValue(goal.scorer?.playerNumber || "");
+      setScorerSearchValue("");
     }
-  }, [isPopoverOpen, goal.scorer?.playerNumber]);
+  }, [isPopoverOpen]);
+
 
   const handleTimeBlur = () => {
     const mins = parseInt(minInput, 10) || 0;
@@ -152,12 +164,6 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
     const newGameTime = (mins * 60 + secs) * 100;
     if (newGameTime !== goal.gameTime) {
       onUpdateGoal(goal.id, { gameTime: newGameTime });
-    }
-  };
-
-  const handlePeriodBlur = () => {
-    if (periodInput.trim() !== goal.periodText) {
-      onUpdateGoal(goal.id, { periodText: periodInput.trim() });
     }
   };
 
@@ -214,14 +220,16 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
             className="w-12 h-8 text-center"
             aria-label="Segundos del gol"
           />
-          <Input
-            value={periodInput}
-            onChange={(e) => setPeriodInput(e.target.value.toUpperCase())}
-            onBlur={handlePeriodBlur}
-            className="w-20 h-8 text-center"
-            aria-label="Período del gol"
-            placeholder="Período"
-          />
+          <Select value={goal.periodText} onValueChange={(newPeriod) => onUpdateGoal(goal.id, { periodText: newPeriod })}>
+            <SelectTrigger className="w-24 h-8 text-center justify-center">
+                <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+                {periodOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-2">
           <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
@@ -234,7 +242,7 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" onCloseAutoFocus={e => e.preventDefault()}>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
               <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Buscar o ingresar Nº..." 
