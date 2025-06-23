@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -33,12 +34,15 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { EditTeamPlayersDialog } from './edit-team-players-dialog';
-import { GoalScorerDialog } from './goal-scorer-dialog';
 
 
 type EditingSegment = 'minutes' | 'seconds' | 'tenths';
 
-export function MiniScoreboard() {
+interface MiniScoreboardProps {
+  onScoreClick: (team: Team) => void;
+}
+
+export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
 
@@ -68,9 +72,6 @@ export function MiniScoreboard() {
   const [isHomePlayersDialogOpen, setIsHomePlayersDialogOpen] = useState(false);
   const [isAwayPlayersDialogOpen, setIsAwayPlayersDialogOpen] = useState(false);
   
-  const [isGoalDialogVisible, setIsGoalDialogVisible] = useState(false);
-  const [goalTeam, setGoalTeam] = useState<'home' | 'away' | null>(null);
-
   useEffect(() => {
     setLocalHomeTeamName(state.homeTeamName);
     setLocalHomeTeamSubName(state.homeTeamSubName);
@@ -99,34 +100,6 @@ export function MiniScoreboard() {
       inputRef.current.select();
     }
   }, [editingSegment]);
-
-  const handleDecrementScore = (team: Team) => {
-    flushSync(() => {
-        dispatch({ type: 'ADJUST_SCORE', payload: { team, delta: -1 } });
-    });
-    const teamName = team === 'home' ? state.homeTeamName : state.awayTeamName;
-    toast({ title: `Puntuación de ${teamName} Actualizada`, description: `Puntuación disminuida en 1.` });
-  };
-  
-  const handleScoreGoal = (team: Team) => {
-      setGoalTeam(team);
-      setIsGoalDialogVisible(true);
-  };
-  
-  const handleAssignGoal = (scorer?: { playerNumber: string; playerName?: string }) => {
-      if (goalTeam) {
-          flushSync(() => {
-              dispatch({ type: 'ADJUST_SCORE', payload: { team: goalTeam, delta: 1, scorer } });
-          });
-          const teamName = goalTeam === 'home' ? state.homeTeamName : state.awayTeamName;
-          toast({
-              title: `Gol de ${teamName}!`,
-              description: scorer ? `Gol asignado a #${scorer.playerNumber}.` : 'Gol no asignado a jugador.',
-          });
-      }
-      setIsGoalDialogVisible(false);
-      setGoalTeam(null);
-  };
 
   const handleTimeAdjust = (deltaSeconds: number) => {
     if (state.periodDisplayOverride === "End of Game") return;
@@ -725,24 +698,8 @@ export function MiniScoreboard() {
             </div>
             <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0 && state.homeTeamName.trim() ? 'Local' : state.homeTeamName.trim() || 'Local'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-accent"
-                onClick={() => handleDecrementScore('home')}
-                aria-label={`Disminuir Puntuación ${state.homeTeamName}`}
-              >
-                <Minus className="h-5 w-5" />
-              </Button>
-              <p className="text-4xl font-bold text-accent w-12 text-center tabular-nums">{state.homeScore}</p>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-accent"
-                onClick={() => handleScoreGoal('home')}
-                aria-label={`Aumentar Puntuación ${state.homeTeamName}`}
-              >
-                <Plus className="h-5 w-5" />
+              <Button variant="link" className="p-0 h-auto text-4xl font-bold text-accent w-24 text-center tabular-nums hover:no-underline hover:text-accent/80" onClick={() => onScoreClick('home')}>
+                {state.homeScore}
               </Button>
             </div>
             {matchedHomeTeamId && isHomePlayersDialogOpen && (
@@ -1013,24 +970,8 @@ export function MiniScoreboard() {
             </div>
             <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0 && state.awayTeamName.trim() ? 'Visitante' : state.awayTeamName.trim() || 'Visitante'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-accent"
-                onClick={() => handleDecrementScore('away')}
-                aria-label={`Disminuir Puntuación ${state.awayTeamName}`}
-              >
-                <Minus className="h-5 w-5" />
-              </Button>
-              <p className="text-4xl font-bold text-accent w-12 text-center tabular-nums">{state.awayScore}</p>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-accent"
-                onClick={() => handleScoreGoal('away')}
-                aria-label={`Aumentar Puntuación ${state.awayTeamName}`}
-              >
-                <Plus className="h-5 w-5" />
+              <Button variant="link" className="p-0 h-auto text-4xl font-bold text-accent w-24 text-center tabular-nums hover:no-underline hover:text-accent/80" onClick={() => onScoreClick('away')}>
+                {state.awayScore}
               </Button>
             </div>
              {matchedAwayTeamId && isAwayPlayersDialogOpen && (
@@ -1045,15 +986,6 @@ export function MiniScoreboard() {
         </CardContent>
       </Card>
       
-      {isGoalDialogVisible && goalTeam && (
-          <GoalScorerDialog
-              isOpen={isGoalDialogVisible}
-              onOpenChange={setIsGoalDialogVisible}
-              team={goalTeam}
-              onGoalAssigned={handleAssignGoal}
-          />
-      )}
-
       {pendingConfirmation && (
         <AlertDialog open={true} onOpenChange={(isOpen) => !isOpen && cancelConfirmation()}>
           <AlertDialogContent>

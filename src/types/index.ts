@@ -3,6 +3,7 @@
 
 
 
+
 export interface Penalty {
   id: string;
   playerNumber: string;
@@ -90,13 +91,13 @@ export interface ScoreboardLayoutProfile extends ScoreboardLayoutSettings {
   name: string;
 }
 
-// --- Game Summary Types ---
+// --- Game Event Types ---
 export interface GoalLog {
   id: string;
+  team: Team;
   timestamp: number; // Machine time (Date.now())
   gameTime: number; // Game time in centiseconds
   periodText: string;
-  scoreAfterGoal: { home: number; away: number };
   scorer?: {
     playerNumber: string;
     playerName?: string;
@@ -132,6 +133,7 @@ export interface GameSummary {
   };
 }
 
+
 // Combined ConfigFields - Represents the *active/effective* settings from the selected profile
 export interface ConfigFields extends FormatAndTimingsProfileData {
   // Sound & Display settings
@@ -153,6 +155,8 @@ export interface ConfigFields extends FormatAndTimingsProfileData {
   availableCategories: CategoryData[];
   selectedMatchCategory: string;
 
+  // Game Events
+  goals: GoalLog[];
   // Game Summary
   gameSummary: GameSummary;
 }

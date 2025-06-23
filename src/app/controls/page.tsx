@@ -7,8 +7,8 @@ import { flushSync } from 'react-dom';
 import { MiniScoreboard } from '@/components/controls/mini-scoreboard';
 import { TimeControlCard } from '@/components/controls/time-control-card';
 import { PenaltyControlCard } from '@/components/controls/penalty-control-card';
-import { GameSummaryDialog } from '@/components/controls/game-summary-dialog';
-import { useGameState } from '@/contexts/game-state-context';
+import { GoalManagementDialog } from '@/components/controls/goal-management-dialog';
+import { useGameState, type Team } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +32,7 @@ export default function ControlsPage() {
   
   const channelRef = useRef<BroadcastChannel | null>(null);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
-  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [isGoalManagementOpen, setIsGoalManagementOpen] = useState(false);
 
 
   useEffect(() => {
@@ -211,6 +211,10 @@ export default function ControlsPage() {
            state.awayPenalties.some(p => p._status === 'pending_puck');
   }, [state.homePenalties, state.awayPenalties]);
 
+  const handleScoreClick = (team: Team) => {
+    setIsGoalManagementOpen(true);
+  };
+
   if (pageDisplayState === 'Checking' || !instanceId) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-10rem)] text-center p-4">
@@ -246,11 +250,9 @@ export default function ControlsPage() {
     );
   }
 
-  const isGameStarted = state.currentPeriod > 0 || state.periodDisplayOverride !== 'Warm-up';
-
   return (
     <div className="w-full max-w-5xl mx-auto space-y-8">
-      <MiniScoreboard />
+      <MiniScoreboard onScoreClick={handleScoreClick} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <TimeControlCard />
@@ -276,14 +278,6 @@ export default function ControlsPage() {
       </div>
       <div className="mt-12 pt-8 border-t border-border">
          <div className="flex flex-col sm:flex-row gap-4 items-start">
-            <Button
-              variant="outline"
-              onClick={() => setIsSummaryOpen(true)}
-              className="w-full sm:w-auto"
-              disabled={!isGameStarted}
-            >
-              <FileText className="mr-2 h-4 w-4" /> Ver Resumen del Partido
-            </Button>
             <AlertDialog open={showResetConfirmation} onOpenChange={setShowResetConfirmation}>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" className="w-full sm:w-auto">
@@ -294,7 +288,7 @@ export default function ControlsPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Confirmar Nuevo Partido</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Esto restablecerá todas las puntuaciones, el reloj, el período, las penalidades y el resumen del partido a sus valores iniciales. Las configuraciones guardadas (duraciones, etc.) no se verán afectadas. ¿Estás seguro?
+                    Esto restablecerá todas las puntuaciones, el reloj, el período, las penalidades y el registro de eventos del partido a sus valores iniciales. Las configuraciones guardadas (duraciones, etc.) no se verán afectadas. ¿Estás seguro?
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -315,10 +309,10 @@ export default function ControlsPage() {
           ID de esta instancia de Controles (Primaria): ...{instanceId ? instanceId.slice(-6) : 'N/A'}
       </p>
 
-      {isSummaryOpen && (
-        <GameSummaryDialog 
-            isOpen={isSummaryOpen} 
-            onOpenChange={setIsSummaryOpen} 
+      {isGoalManagementOpen && (
+        <GoalManagementDialog 
+            isOpen={isGoalManagementOpen} 
+            onOpenChange={setIsGoalManagementOpen} 
         />
       )}
     </div>

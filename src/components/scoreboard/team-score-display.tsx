@@ -1,10 +1,12 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { User } from 'lucide-react';
 import type { ScoreboardLayoutSettings } from '@/types';
+import { Button } from '../ui/button';
 
 interface TeamScoreDisplayProps {
   teamActualName: string;
@@ -14,6 +16,7 @@ interface TeamScoreDisplayProps {
   configuredPlayersPerTeam?: number;
   layout: ScoreboardLayoutSettings;
   className?: string;
+  onScoreClick?: () => void;
 }
 
 const LONG_NAME_THRESHOLD = 8; 
@@ -28,7 +31,8 @@ export function TeamScoreDisplay({
   playersOnIce = 0,
   configuredPlayersPerTeam = 0,
   layout,
-  className
+  className,
+  onScoreClick
 }: TeamScoreDisplayProps) {
   const [flash, setFlash] = useState(false);
   const [prevScore, setPrevScore] = useState(score);
@@ -159,18 +163,20 @@ export function TeamScoreDisplay({
       >
         ({teamDisplayName})
       </p>
-      <div
-        className={cn(
-            "font-bold font-headline text-accent tabular-nums tracking-tighter",
-            flash && "animate-score-flash"
-          )}
-        style={{
-          fontSize: `${layout.scoreSize}rem`,
-          marginTop: `${layout.scoreLabelGap}rem`
-        }}
-      >
+       <Button 
+          variant="link" 
+          onClick={onScoreClick} 
+          className={cn(
+              "font-bold font-headline text-accent tabular-nums tracking-tighter p-0 h-auto hover:no-underline hover:text-accent/80",
+              flash && "animate-score-flash"
+            )}
+          style={{
+            fontSize: `${layout.scoreSize}rem`,
+            marginTop: `${layout.scoreLabelGap}rem`
+          }}
+        >
         {score}
-      </div>
+      </Button>
     </div>
   );
 }

@@ -146,8 +146,7 @@ export type GameAction =
   | { type: 'ADJUST_TIME'; payload: number }
   | { type: 'SET_PERIOD'; payload: number }
   | { type: 'RESET_PERIOD_CLOCK' }
-  | { type: 'SET_SCORE'; payload: { team: Team; score: number } }
-  | { type: 'ADJUST_SCORE'; payload: { team: Team; delta: number; scorer?: { playerNumber: string; playerName?: string } } }
+  | { type: 'MANAGE_GOALS'; payload: GoalLog[] }
   | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id' | '_status'> } }
   | { type: 'REMOVE_PENALTY'; payload: { team: Team; penaltyId: string } }
   | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } }
@@ -262,6 +261,8 @@ const initialGlobalState: GameState = {
   // Categories
   availableCategories: IN_CODE_INITIAL_AVAILABLE_CATEGORIES, 
   selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY,
+  // Game Events
+  goals: [],
   // Game Summary
   gameSummary: IN_CODE_INITIAL_GAME_SUMMARY,
   // Game Runtime State
@@ -721,33 +722,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
       break;
     }
-    case 'SET_SCORE': {
-      const { team, score } = action.payload;
-      newStateWithoutMeta = { ...state, [`${team}Score`]: Math.max(0, score) };
-      break;
-    }
-    case 'ADJUST_SCORE': {
-      const { team, delta, scorer } = action.payload;
-      const currentScore = state[`${team}Score`];
-      const newScore = Math.max(0, currentScore + delta);
-      newStateWithoutMeta = { ...state, [`${team}Score`]: newScore };
-
-      if (delta > 0) {
-        const newGoalLog: GoalLog = {
-          id: crypto.randomUUID(),
-          timestamp: Date.now(),
-          gameTime: state.currentTime,
-          periodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
-          scoreAfterGoal: {
-            home: team === 'home' ? newScore : state.homeScore,
-            away: team === 'away' ? newScore : state.awayScore,
-          },
-          scorer,
-        };
-        const newGameSummary = { ...state.gameSummary };
-        newGameSummary[team].goals.push(newGoalLog);
-        newStateWithoutMeta.gameSummary = newGameSummary;
-      }
+    case 'MANAGE_GOALS': {
+      const newGoals = action.payload;
+      const newHomeScore = newGoals.filter(g => g.team === 'home').length;
+      const newAwayScore = newGoals.filter(g => g.team === 'away').length;
+      newStateWithoutMeta = {
+        ...state,
+        goals: newGoals,
+        homeScore: newHomeScore,
+        awayScore: newAwayScore,
+      };
       break;
     }
     case 'ADD_PENALTY': {
@@ -1142,9 +1126,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
               newStateWithoutMeta.currentTime = newStateWithoutMeta.defaultPeriodDuration;
           }
       }
-       newStateWithoutMeta.isClockRunning = false;
-       newStateWithoutMeta.clockStartTimeMs = null;
-       newStateWithoutMeta.remainingTimeAtStartCs = null;
+      newStateWithoutMeta.isClockRunning = false;
+      newStateWithoutMeta.clockStartTimeMs = null;
+      newStateWithoutMeta.remainingTimeAtStartCs = null;
       break;
     }
     case 'LOAD_FORMAT_AND_TIMINGS_PROFILES': {
@@ -1547,6 +1531,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         preTimeoutState: null,
         clockStartTimeMs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? Date.now() : null,
         remainingTimeAtStartCs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? initialWarmUpDurationCs : null,
+        goals: [],
         gameSummary: IN_CODE_INITIAL_GAME_SUMMARY,
       };
       newPlayHornTrigger = state.playHornTrigger;
@@ -1712,123 +1697,70 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     
-
-    const fetchConfig = async (customPath: string, defaultPath: string, fallback: any, validator?: (data: any) => boolean) => {
-      try {
-        const customRes = await fetch(customPath);
-        if (customRes.ok) {
-          const customData = await customRes.json();
-          if (customData && (!validator || validator(customData))) {
-            console.log(`Loaded custom config from ${customPath}`);
-            return customData;
-          } else {
-             console.warn(`Custom config ${customPath} is invalid. Trying default.`);
-          }
-        } else {
-          console.log(`Custom config ${customPath} not found (status: ${customRes.status}). Trying default.`);
-        }
-      } catch (error) {
-        console.warn(`Error fetching custom config ${customPath}:`, error, ". Trying default.");
-      }
-
-      try {
-        const defaultRes = await fetch(defaultPath);
-        if (defaultRes.ok) {
-          const defaultData = await defaultRes.json();
-           if (defaultData && (!validator || validator(defaultData))) {
-            console.log(`Loaded default config from ${defaultPath}`);
-            return defaultData;
-          } else {
-             console.warn(`Default config ${defaultPath} is invalid. Using in-code fallback.`);
-          }
-        } else {
-          console.warn(`Default config ${defaultPath} not found (status: ${defaultRes.status}). Using in-code fallback.`);
-        }
-      } catch (error) {
-        console.warn(`Error fetching default config ${defaultPath}:`, error, ". Using in-code fallback.");
-      }
-      console.log(`Using in-code fallback for ${defaultPath.replace('default-','').replace('.json','')} config.`);
-      return fallback;
-    };
-    
     const loadInitialState = async () => {
-      let loadedStateFromLocalStorage: Partial<GameState> | null = null;
-      let loadedFromLocalStorageSuccess = false;
-
-      try {
-        const rawStoredState = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (rawStoredState) {
-          const parsedState = JSON.parse(rawStoredState) as Partial<GameState>;
-          if (parsedState && parsedState._lastUpdatedTimestamp) { // Check for a meaningful field
-            loadedStateFromLocalStorage = parsedState;
-            loadedFromLocalStorageSuccess = true;
-            console.log("Successfully parsed state from localStorage.");
-          } else {
-             console.warn("localStorage state seems incomplete or very old. Will proceed to load defaults from files.");
-          }
-        } else {
-          console.log("localStorage is empty. Will load defaults from files.");
-        }
-      } catch (error) {
-        console.error("Error reading state from localStorage:", error, ". Will load defaults from files.");
-      }
-
-      if (loadedFromLocalStorageSuccess && loadedStateFromLocalStorage) {
-        dispatch({ type: 'HYDRATE_FROM_STORAGE', payload: loadedStateFromLocalStorage });
-        setIsLoading(false);
-      } else {
-        // localStorage is empty or invalid, load from files or fallbacks
-        const [
-          loadedFormatTimingsProfiles,
-          soundDisplayConfig,
-          categoriesConfig,
-          teamsConfig
-        ] = await Promise.all([
-          fetchConfig(
-            '/defaults/format-timings.custom.json',
-            '/defaults/default-format-timings.json',
-            initialGlobalState.formatAndTimingsProfiles,
-            (data) => Array.isArray(data) && data.length > 0 && data.every(p => p.id && p.name)
-          ),
-          fetchConfig(
-            '/defaults/sound-display.custom.json',
-            '/defaults/default-sound-display.json',
-            {
-              playSoundAtPeriodEnd: initialGlobalState.playSoundAtPeriodEnd,
-              customHornSoundDataUrl: initialGlobalState.customHornSoundDataUrl,
-              enableTeamSelectionInMiniScoreboard: initialGlobalState.enableTeamSelectionInMiniScoreboard,
-              enablePlayerSelectionForPenalties: initialGlobalState.enablePlayerSelectionForPenalties,
-              showAliasInPenaltyPlayerSelector: initialGlobalState.showAliasInPenaltyPlayerSelector,
-              showAliasInControlsPenaltyList: initialGlobalState.showAliasInControlsPenaltyList,
-              showAliasInScoreboardPenalties: initialGlobalState.showAliasInScoreboardPenalties,
-              scoreboardLayoutProfiles: initialGlobalState.scoreboardLayoutProfiles,
+        let loadedStateFromLocalStorage: Partial<GameState> | null = null;
+        try {
+            const rawStoredState = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (rawStoredState) {
+                const parsedState = JSON.parse(rawStoredState) as Partial<GameState>;
+                if (parsedState && parsedState._lastUpdatedTimestamp) {
+                    loadedStateFromLocalStorage = parsedState;
+                }
             }
-          ),
-          fetchConfig(
-            '/defaults/categories.custom.json',
-            '/defaults/default-categories.json',
-            initialGlobalState.availableCategories,
-            (data) => Array.isArray(data)
-          ),
-          fetchConfig(
-            '/defaults/teams.custom.json',
-            '/defaults/default-teams.json',
-            initialGlobalState.teams,
-            (data) => Array.isArray(data)
-          )
-        ]);
+        } catch (error) {
+            console.error("Error reading state from localStorage:", error);
+        }
 
-        const initialPayloadForHydration: Partial<GameState> = {
-            formatAndTimingsProfiles: loadedFormatTimingsProfiles,
-            ...soundDisplayConfig,
-            availableCategories: categoriesConfig,
-            teams: teamsConfig.map((t: TeamData) => ({...t, subName: t.subName || undefined})),
-            _initialConfigLoadComplete: true,
-        };
-        dispatch({ type: 'HYDRATE_FROM_STORAGE', payload: initialPayloadForHydration });
-        setIsLoading(false);
-      }
+        if (loadedStateFromLocalStorage) {
+            dispatch({ type: 'HYDRATE_FROM_STORAGE', payload: loadedStateFromLocalStorage });
+            setIsLoading(false);
+        } else {
+            const fetchConfig = async (customPath: string, defaultPath: string, fallback: any, validator?: (data: any) => boolean) => {
+                try {
+                    const customRes = await fetch(customPath);
+                    if (customRes.ok) {
+                        const customData = await customRes.json();
+                        if (customData && (!validator || validator(customData))) return customData;
+                    }
+                } catch (error) {
+                    console.warn(`Error fetching custom config ${customPath}:`, error);
+                }
+                try {
+                    const defaultRes = await fetch(defaultPath);
+                    if (defaultRes.ok) {
+                        const defaultData = await defaultRes.json();
+                        if (defaultData && (!validator || validator(defaultData))) return defaultData;
+                    }
+                } catch (error) {
+                    console.warn(`Error fetching default config ${defaultPath}:`, error);
+                }
+                return fallback;
+            };
+
+            const [
+                loadedFormatTimingsProfiles,
+                soundDisplayConfig,
+                categoriesConfig,
+                teamsConfig
+            ] = await Promise.all([
+                fetchConfig('/defaults/format-timings.custom.json', '/defaults/default-format-timings.json', initialGlobalState.formatAndTimingsProfiles, data => Array.isArray(data) && data.length > 0),
+                fetchConfig('/defaults/sound-display.custom.json', '/defaults/default-sound-display.json', { playSoundAtPeriodEnd: initialGlobalState.playSoundAtPeriodEnd, customHornSoundDataUrl: initialGlobalState.customHornSoundDataUrl, enableTeamSelectionInMiniScoreboard: initialGlobalState.enableTeamSelectionInMiniScoreboard, enablePlayerSelectionForPenalties: initialGlobalState.enablePlayerSelectionForPenalties, showAliasInPenaltyPlayerSelector: initialGlobalState.showAliasInPenaltyPlayerSelector, showAliasInControlsPenaltyList: initialGlobalState.showAliasInControlsPenaltyList, showAliasInScoreboardPenalties: initialGlobalState.showAliasInScoreboardPenalties, scoreboardLayoutProfiles: initialGlobalState.scoreboardLayoutProfiles }),
+                fetchConfig('/defaults/categories.custom.json', '/defaults/default-categories.json', initialGlobalState.availableCategories, data => Array.isArray(data)),
+                fetchConfig('/defaults/teams.custom.json', '/defaults/default-teams.json', initialGlobalState.teams, data => Array.isArray(data))
+            ]);
+
+            const initialPayloadForHydration: Partial<GameState> = {
+                formatAndTimingsProfiles: loadedFormatTimingsProfiles,
+                ...soundDisplayConfig,
+                availableCategories: categoriesConfig,
+                teams: teamsConfig.map((t: TeamData) => ({ ...t, subName: t.subName || undefined })),
+                _initialConfigLoadComplete: true,
+            };
+            dispatch({ type: 'HYDRATE_FROM_STORAGE', payload: initialPayloadForHydration });
+            setIsLoading(false);
+        }
     };
+
 
     loadInitialState();
 
