@@ -70,7 +70,12 @@ export function GoalManagementDialog({ isOpen, onOpenChange, team }: GoalManagem
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+      <DialogContent 
+        className="max-w-4xl h-[90vh] flex flex-col"
+        onInteractOutside={(e) => {
+            e.preventDefault();
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="text-2xl">Gestión de Goles: {teamName}</DialogTitle>
           <DialogDescription>
@@ -219,7 +224,7 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
           />
         </div>
         <div className="flex items-center gap-2">
-          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen} modal={true}>
+          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" role="combobox" className="w-[200px] justify-between">
                 <span className="truncate">
