@@ -762,8 +762,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         addGameTime: state.currentTime,
         addPeriodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
       };
-      const newGameSummary = { ...state.gameSummary };
-      newGameSummary[action.payload.team].penalties.push(newPenaltyLog);
+      
+      const newGameSummary = { 
+        ...state.gameSummary,
+        [action.payload.team]: {
+          ...state.gameSummary[action.payload.team],
+          penalties: [...state.gameSummary[action.payload.team].penalties, newPenaltyLog]
+        }
+      };
 
       newStateWithoutMeta = { 
         ...state, 
@@ -778,11 +784,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
       penalties = sortPenaltiesByStatus(penalties);
 
-      let newGameSummary = { ...state.gameSummary };
+      let newGameSummary = state.gameSummary;
       if (penaltyToRemove) {
         const timeServed = penaltyToRemove.initialDuration - penaltyToRemove.remainingTime;
-        newGameSummary[action.payload.team].penalties = newGameSummary[action.payload.team].penalties.map(p => {
-          if (p.id === action.payload.penaltyId) {
+        const newTeamLogs = state.gameSummary[action.payload.team].penalties.map(p => {
+          if (p.id === action.payload.penaltyId && !p.endReason) {
             return {
               ...p,
               endTimestamp: Date.now(),
@@ -794,6 +800,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           }
           return p;
         });
+
+        newGameSummary = {
+          ...state.gameSummary,
+          [action.payload.team]: {
+            ...state.gameSummary[action.payload.team],
+            penalties: newTeamLogs
+          }
+        }
       }
 
       newStateWithoutMeta = { 
@@ -849,7 +863,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       let newCalculatedTimeCs = state.currentTime;
       let homePenaltiesResult = [...state.homePenalties];
       let awayPenaltiesResult = [...state.awayPenalties];
-      let newGameSummary = state.gameSummary;
+      let newGameSummary: GameSummary = JSON.parse(JSON.stringify(state.gameSummary));
 
       if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartCs !== null) {
         const elapsedMs = Date.now() - state.clockStartTimeMs;
@@ -870,19 +884,17 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
                   const newRemaining = Math.max(0, p.remainingTime - secondsDecremented);
                   if (p.remainingTime > 0 && newRemaining <= 0) {
                     // Penalty just finished, log it
-                    newGameSummary[team].penalties = newGameSummary[team].penalties.map(log => {
-                      if (log.id === p.id && !log.endReason) {
-                        return {
-                          ...log,
-                          endTimestamp: Date.now(),
-                          endGameTime: state.currentTime,
-                          endPeriodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
-                          endReason: 'completed',
-                          timeServed: log.initialDuration,
-                        };
-                      }
-                      return log;
-                    });
+                    const logIndex = newGameSummary[team].penalties.findIndex(log => log.id === p.id && !log.endReason);
+                    if (logIndex > -1) {
+                      newGameSummary[team].penalties[logIndex] = {
+                        ...newGameSummary[team].penalties[logIndex],
+                        endTimestamp: Date.now(),
+                        endGameTime: state.currentTime,
+                        endPeriodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
+                        endReason: 'completed',
+                        timeServed: newGameSummary[team].penalties[logIndex].initialDuration,
+                      };
+                    }
                   }
                   return { ...p, remainingTime: newRemaining };
                 }
