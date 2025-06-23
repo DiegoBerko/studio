@@ -7,6 +7,7 @@ import { MiniScoreboard } from '@/components/controls/mini-scoreboard';
 import { TimeControlCard } from '@/components/controls/time-control-card';
 import { PenaltyControlCard } from '@/components/controls/penalty-control-card';
 import { GoalManagementDialog } from '@/components/controls/goal-management-dialog';
+import { GameSummaryDialog } from '@/components/controls/game-summary-dialog';
 import { useGameState, type Team } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -34,6 +35,7 @@ export default function ControlsPage() {
   
   const [isGoalManagementOpen, setIsGoalManagementOpen] = useState(false);
   const [editingTeamForGoals, setEditingTeamForGoals] = useState<Team | null>(null);
+  const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
 
 
   useEffect(() => {
@@ -301,6 +303,9 @@ export default function ControlsPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsSummaryDialogOpen(true)}>
+              <FileText className="mr-2 h-4 w-4" /> Ver Resumen del Partido
+            </Button>
         </div>
          <p className="text-xs text-muted-foreground mt-2">
           La acción "Iniciar Nuevo Partido" restablecerá los marcadores, el reloj, el período actual, las penalidades y el registro de eventos del partido.
@@ -321,6 +326,13 @@ export default function ControlsPage() {
               }
             }}
             team={editingTeamForGoals}
+        />
+      )}
+
+      {isSummaryDialogOpen && (
+        <GameSummaryDialog 
+          isOpen={isSummaryDialogOpen}
+          onOpenChange={setIsSummaryDialogOpen}
         />
       )}
     </div>
