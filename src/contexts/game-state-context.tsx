@@ -525,13 +525,17 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         selectedFormatAndTimingsProfileId: hydratedSelectedFormatProfileId,
         scoreboardLayout: layoutSettings,
         scoreboardLayoutProfiles: hydratedLayoutProfiles,
-        selectedScoreboardLayoutProfileId: hydratedSelectedLayoutProfileId,
         availableCategories: hydratedCategories, 
         teams: (action.payload?.teams || state.teams).map(t => ({...t, subName: t.subName || undefined })), 
         playHornTrigger: state.playHornTrigger, 
         _initialConfigLoadComplete: true, 
       };
       
+      // Post-hydration fix:
+      if (!hydratedBase.gameSummary) {
+          hydratedBase.gameSummary = IN_CODE_INITIAL_GAME_SUMMARY;
+      }
+
       if (!hydratedBase.availableCategories.find(c => c.id === hydratedBase.selectedMatchCategory) && hydratedBase.availableCategories.length > 0) {
         hydratedBase.selectedMatchCategory = hydratedBase.availableCategories[0].id;
       } else if (hydratedBase.availableCategories.length === 0) {
