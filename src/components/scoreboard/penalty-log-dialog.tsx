@@ -41,9 +41,10 @@ export function PenaltyLogDialog({ isOpen, onOpenChange, team, teamName }: Penal
   const { state } = useGameState();
 
   const penaltyLogs = useMemo(() => {
-    if (!state.gameSummary?.[team]?.penalties) return [];
+    const logs = state.gameSummary?.[team]?.penalties;
+    if (!logs) return [];
     // Sort by most recent first
-    return [...state.gameSummary[team].penalties].sort((a, b) => b.addTimestamp - a.addTimestamp);
+    return [...logs].sort((a, b) => b.addTimestamp - a.addTimestamp);
   }, [state.gameSummary, team]);
 
   return (
