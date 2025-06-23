@@ -132,6 +132,7 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
   // Scorer editing state
   const [localScorerNumber, setLocalScorerNumber] = useState(goal.scorer?.playerNumber || '');
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [scorerSearchTerm, setScorerSearchTerm] = useState('');
 
 
   const periodOptions = useMemo(() => {
@@ -177,6 +178,16 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
     if (!teamData) return [];
     return teamData.players.filter(p => p.number && p.number.trim() !== '').sort((a, b) => parseInt(a.number, 10) - parseInt(b.number, 10));
   }, [teamData]);
+
+  const filteredPlayers = useMemo(() => {
+    if (!teamPlayers) return [];
+    if (!scorerSearchTerm.trim()) return teamPlayers;
+    const searchTermLower = scorerSearchTerm.toLowerCase();
+    return teamPlayers.filter(p => 
+        p.number.toLowerCase().includes(searchTermLower) || 
+        p.name.toLowerCase().includes(searchTermLower)
+    );
+  }, [teamPlayers, scorerSearchTerm]);
 
   const matchedPlayer = useMemo(() => {
     if (!teamPlayers || !localScorerNumber) return null;
@@ -258,53 +269,56 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
           </div>
         </div>
         
-        <div className="flex items-center gap-4 flex-grow-[1] min-w-[200px] justify-end">
-            <div className="flex flex-col items-center">
-                <div className="flex items-center gap-1">
-                    <Input
-                        value={localScorerNumber}
-                        onChange={handleNumberChange}
-                        onBlur={handleNumberSave}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
-                        placeholder="Nº"
-                        className="w-16 h-8 text-center"
-                        aria-label="Número del goleador"
-                    />
-                    {teamPlayers.length > 0 && (
-                        <Popover open={isSelectorOpen} onOpenChange={setIsSelectorOpen}>
-                            <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <ChevronsUpDown className="h-4 w-4" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[200px] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Buscar jugador..." />
-                                    <CommandList>
-                                        <CommandEmpty>No se encontraron jugadores.</CommandEmpty>
-                                        <CommandGroup>
-                                            {teamPlayers.map(player => (
-                                                <CommandItem
-                                                    key={player.id}
-                                                    value={`${player.number} ${player.name}`}
-                                                    onSelect={() => handlePlayerSelect(player)}
-                                                >
-                                                    <Check className={cn("mr-2 h-4 w-4", localScorerNumber === player.number ? "opacity-100" : "opacity-0")} />
-                                                    #{player.number} - {player.name}
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
-                    )}
-                </div>
-                 {matchedPlayer && (
-                    <span className="text-xs text-muted-foreground mt-1 text-center truncate w-32" title={matchedPlayer.name}>
-                        {matchedPlayer.name}
-                    </span>
-                 )}
+        <div className="flex items-center gap-2 flex-grow-[1] min-w-[280px] justify-end">
+            <span className="text-sm text-muted-foreground w-28 text-right truncate" title={matchedPlayer?.name}>
+                {matchedPlayer?.name || ''}
+            </span>
+            <div className="flex items-center gap-1">
+                <Input
+                    value={localScorerNumber}
+                    onChange={handleNumberChange}
+                    onBlur={handleNumberSave}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
+                    placeholder="Nº"
+                    className="w-16 h-8 text-center"
+                    aria-label="Número del goleador"
+                />
+                {teamPlayers.length > 0 && (
+                    <Popover open={isSelectorOpen} onOpenChange={setIsSelectorOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <ChevronsUpDown className="h-4 w-4" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-0" align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+                             <Command shouldFilter={false}>
+                                <CommandInput 
+                                    placeholder="Buscar jugador..."
+                                    value={scorerSearchTerm}
+                                    onValueChange={setScorerSearchTerm}
+                                />
+                                <CommandList>
+                                    <CommandEmpty>No se encontraron jugadores.</CommandEmpty>
+                                    <CommandGroup>
+                                        {filteredPlayers.map(player => (
+                                            <CommandItem
+                                                key={player.id}
+                                                value={`${player.number} ${player.name}`}
+                                                onSelect={() => {
+                                                    handlePlayerSelect(player);
+                                                    setScorerSearchTerm('');
+                                                }}
+                                            >
+                                                <Check className={cn("mr-2 h-4 w-4", localScorerNumber === player.number ? "opacity-100" : "opacity-0")} />
+                                                #{player.number} - {player.name}
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
+                        </PopoverContent>
+                    </Popover>
+                )}
             </div>
             <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => onDelete(goal.id)}>
               <Trash2 className="h-4 w-4" />
