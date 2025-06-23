@@ -528,10 +528,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         hydratedBase.selectedMatchCategory = ''; 
       }
 
-      hydratedBase.isClockRunning = false;
-      hydratedBase.clockStartTimeMs = null;
-      hydratedBase.remainingTimeAtStartCs = null;
-
       const rawHomePenaltiesFromStorage = action.payload?.homePenalties || [];
       const rawAwayPenaltiesFromStorage = action.payload?.awayPenalties || [];
 
