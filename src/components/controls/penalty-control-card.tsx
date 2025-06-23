@@ -70,32 +70,27 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   const filteredPlayers = useMemo(() => {
     if (!matchedTeam || !teamHasPlayers) return [];
 
-    let playersToFilter = [...matchedTeam.players];
+    // Filter to only include players with a number
+    let playersToFilter = matchedTeam.players.filter(p => p.number && p.number.trim() !== '');
 
+    // Sort players by number
     playersToFilter.sort((a, b) => {
-      const numAEmpty = !a.number;
-      const numBEmpty = !b.number;
-
-      if (numAEmpty && !numBEmpty) return 1; // a (empty) comes after b (numbered)
-      if (!numAEmpty && numBEmpty) return -1; // a (numbered) comes before b (empty)
-      if (numAEmpty && numBEmpty) return a.name.localeCompare(b.name); // both empty, sort by name
-
       const numA = parseInt(a.number, 10);
       const numB = parseInt(b.number, 10);
-      if (isNaN(numA) && isNaN(numB)) return a.number.localeCompare(b.number);
-      if (isNaN(numA)) return 1;
-      if (isNaN(numB)) return -1;
+      if (isNaN(numA) || isNaN(numB)) {
+        return a.number.localeCompare(b.number); // Fallback for non-numeric or mixed numbers
+      }
       return numA - numB;
     });
     
     const searchTermLower = playerSearchTerm.toLowerCase();
     if (!searchTermLower.trim()) return playersToFilter;
 
+    // Filter based on search term
     return playersToFilter.filter(
       (player: PlayerData) =>
-        (player.number && player.number.toLowerCase().includes(searchTermLower)) ||
-        (state.showAliasInPenaltyPlayerSelector && player.name.toLowerCase().includes(searchTermLower)) ||
-        ((!player.number || player.number.toLowerCase() === "s/n") && "s/n".includes(searchTermLower))
+        (player.number.toLowerCase().includes(searchTermLower)) ||
+        (state.showAliasInPenaltyPlayerSelector && player.name.toLowerCase().includes(searchTermLower))
     );
   }, [matchedTeam, teamHasPlayers, playerSearchTerm, state.showAliasInPenaltyPlayerSelector]);
 
@@ -239,7 +234,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
           <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
             <Command shouldFilter={false}> {/* We do custom filtering in `filteredPlayers` */}
               <CommandInput
-                placeholder="Buscar Nº, Nombre, o S/N..."
+                placeholder="Buscar Nº o Nombre..."
                 value={playerSearchTerm}
                 onValueChange={setPlayerSearchTerm}
                 autoComplete="off"
@@ -249,7 +244,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                         const trimmedSearch = playerSearchTerm.trim().toUpperCase();
                         if (filteredPlayers.length > 0) {
                             const playerToSelect = filteredPlayers[0];
-                            setPlayerNumberForPenalty(playerToSelect.number); // This can be ''
+                            setPlayerNumberForPenalty(playerToSelect.number); // This will always be a number
                             setSelectedPlayerName(playerToSelect.name);
                         } else if (trimmedSearch && (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch))) {
                            // Allow entering a number not in list
@@ -272,9 +267,9 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                   {filteredPlayers.map((player: PlayerData) => (
                     <CommandItem
                       key={player.id}
-                      value={`${player.number || 'S/N'} - ${state.showAliasInPenaltyPlayerSelector ? player.name : ''}`}
+                      value={`${player.number} - ${state.showAliasInPenaltyPlayerSelector ? player.name : ''}`}
                       onSelect={() => {
-                        setPlayerNumberForPenalty(player.number); // Can be empty string
+                        setPlayerNumberForPenalty(player.number);
                         setSelectedPlayerName(player.name);
                         justSelectedPlayerRef.current = true;
                         setIsPlayerPopoverOpen(false);
@@ -283,14 +278,12 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4 shrink-0",
-                           // Check if this player is effectively selected
-                          (playerNumberForPenalty === player.number && selectedPlayerName === player.name) || 
-                          (playerNumberForPenalty === '' && !player.number && selectedPlayerName === player.name)
+                          (playerNumberForPenalty === player.number && selectedPlayerName === player.name)
                            ? "opacity-100" : "opacity-0"
                         )}
                       />
                       <span className="text-xs text-muted-foreground mr-0.5">#</span>
-                      <span className="font-semibold text-sm mr-1">{player.number || 'S/N'}</span>
+                      <span className="font-semibold text-sm mr-1">{player.number}</span>
                       {state.showAliasInPenaltyPlayerSelector && player.name && (
                          <span className="text-xs text-muted-foreground truncate">{player.name}</span>
                       )}
