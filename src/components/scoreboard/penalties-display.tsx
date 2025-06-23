@@ -1,29 +1,22 @@
 
 "use client";
 
-import type { Penalty, Team } from '@/types';
-import { useState } from 'react';
+import type { Penalty } from '@/types';
 import { useGameState } from '@/contexts/game-state-context';
 import { PenaltyCard } from './penalty-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Info } from 'lucide-react';
-import { PenaltyLogDialog } from './penalty-log-dialog';
 
 interface PenaltiesDisplayProps {
   teamDisplayType: "Local" | "Visitante";
   teamName: string;
   penalties: Penalty[];
-  team: Team;
 }
 
-export function PenaltiesDisplay({ teamDisplayType, teamName, penalties, team }: PenaltiesDisplayProps) {
+export function PenaltiesDisplay({ teamDisplayType, teamName, penalties }: PenaltiesDisplayProps) {
   const { state } = useGameState();
   const { scoreboardLayout } = state;
-  const [isLogOpen, setIsLogOpen] = useState(false);
 
   return (
-    <>
       <Card className="bg-card shadow-lg flex-1 min-w-[300px]">
         <CardHeader className="flex flex-row justify-between items-center">
           <CardTitle 
@@ -32,15 +25,6 @@ export function PenaltiesDisplay({ teamDisplayType, teamName, penalties, team }:
           >
             Penalidades
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-primary-foreground"
-            onClick={() => setIsLogOpen(true)}
-            aria-label="Ver registro de penalidades"
-          >
-            <Info className="h-5 w-5" />
-          </Button>
         </CardHeader>
         <CardContent className="space-y-3 lg:space-y-4">
           {penalties.length === 0 ? (
@@ -65,14 +49,5 @@ export function PenaltiesDisplay({ teamDisplayType, teamName, penalties, team }:
           )}
         </CardContent>
       </Card>
-      {isLogOpen && (
-        <PenaltyLogDialog 
-          isOpen={isLogOpen}
-          onOpenChange={setIsLogOpen}
-          team={team}
-          teamName={teamName}
-        />
-      )}
-    </>
   );
 }

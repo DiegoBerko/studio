@@ -22,11 +22,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Trash2, UserPlus, Clock, Plus, Minus, Hourglass, ChevronsUpDown, Check } from 'lucide-react';
-import { ControlCardWrapper } from './control-card-wrapper';
+import { Trash2, UserPlus, Clock, Plus, Minus, Hourglass, ChevronsUpDown, Check, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { PenaltyLogDialog } from '../scoreboard/penalty-log-dialog';
 
 interface PenaltyControlCardProps {
   team: Team;
@@ -48,6 +48,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   const [isPlayerPopoverOpen, setIsPlayerPopoverOpen] = useState(false);
   const [playerSearchTerm, setPlayerSearchTerm] = useState('');
   const justSelectedPlayerRef = useRef(false);
+  const [isLogOpen, setIsLogOpen] = useState(false);
 
 
   const penalties = team === 'home' ? state.homePenalties : state.awayPenalties;
@@ -314,7 +315,21 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
 
 
   return (
-    <ControlCardWrapper title={`Penalidades ${teamName}${teamSubName ? ` (${teamSubName})` : ''}`}>
+    <>
+    <Card className="bg-card shadow-md">
+       <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-xl text-primary-foreground">{`Penalidades ${teamName}${teamSubName ? ` (${teamSubName})` : ''}`}</CardTitle>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-primary-foreground"
+            onClick={() => setIsLogOpen(true)}
+            aria-label="Ver registro de penalidades"
+          >
+            <Info className="h-5 w-5" />
+          </Button>
+        </CardHeader>
+        <CardContent>
       <form onSubmit={handleAddPenalty} className="space-y-4 mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
           <div className="sm:col-span-1">
@@ -438,6 +453,16 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
           </div>
         )}
       </div>
-    </ControlCardWrapper>
+      </CardContent>
+    </Card>
+      {isLogOpen && (
+        <PenaltyLogDialog 
+          isOpen={isLogOpen}
+          onOpenChange={setIsLogOpen}
+          team={team}
+          teamName={teamName}
+        />
+      )}
+    </>
   );
 }
