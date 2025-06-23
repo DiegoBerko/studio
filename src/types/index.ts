@@ -1,6 +1,7 @@
 
 
 
+
 export interface Penalty {
   id: string;
   playerNumber: string;
@@ -88,6 +89,43 @@ export interface ScoreboardLayoutProfile extends ScoreboardLayoutSettings {
   name: string;
 }
 
+// --- Game Summary Types ---
+export interface GoalLog {
+  id: string;
+  timestamp: number; // Machine time (Date.now())
+  gameTime: number; // Game time in centiseconds
+  periodText: string;
+  scoreAfterGoal: { home: number; away: number };
+}
+
+export interface PenaltyLog {
+  id: string; // Matches the penalty's original ID
+  team: Team;
+  playerNumber: string;
+  playerName?: string;
+  initialDuration: number;
+  // Penalty Add Event
+  addTimestamp: number;
+  addGameTime: number;
+  addPeriodText: string;
+  // Penalty End Event
+  endTimestamp?: number;
+  endGameTime?: number;
+  endPeriodText?: string;
+  endReason?: 'completed' | 'deleted';
+  timeServed?: number;
+}
+
+export interface GameSummary {
+  home: {
+    goals: GoalLog[];
+    penalties: PenaltyLog[];
+  };
+  away: {
+    goals: GoalLog[];
+    penalties: PenaltyLog[];
+  };
+}
 
 // Combined ConfigFields - Represents the *active/effective* settings from the selected profile
 export interface ConfigFields extends FormatAndTimingsProfileData {
@@ -109,4 +147,7 @@ export interface ConfigFields extends FormatAndTimingsProfileData {
   // Categories settings
   availableCategories: CategoryData[];
   selectedMatchCategory: string;
+
+  // Game Summary
+  gameSummary: GameSummary;
 }

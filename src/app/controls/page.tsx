@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -6,11 +7,12 @@ import { flushSync } from 'react-dom';
 import { MiniScoreboard } from '@/components/controls/mini-scoreboard';
 import { TimeControlCard } from '@/components/controls/time-control-card';
 import { PenaltyControlCard } from '@/components/controls/penalty-control-card';
+import { GameSummaryDialog } from '@/components/controls/game-summary-dialog';
 import { useGameState } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { RefreshCw, AlertTriangle, PlayCircle } from 'lucide-react';
+import { RefreshCw, AlertTriangle, PlayCircle, FileText } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const CONTROLS_LOCK_KEY = 'icevision-controls-lock-id';
@@ -30,6 +32,8 @@ export default function ControlsPage() {
   
   const channelRef = useRef<BroadcastChannel | null>(null);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+
 
   useEffect(() => {
     setInstanceId(crypto.randomUUID());
@@ -242,6 +246,8 @@ export default function ControlsPage() {
     );
   }
 
+  const isGameStarted = state.currentPeriod > 0 || state.periodDisplayOverride !== 'Warm-up';
+
   return (
     <div className="w-full max-w-5xl mx-auto space-y-8">
       <MiniScoreboard />
@@ -269,35 +275,52 @@ export default function ControlsPage() {
         <PenaltyControlCard team="away" teamName={state.awayTeamName} />
       </div>
       <div className="mt-12 pt-8 border-t border-border">
-        <AlertDialog open={showResetConfirmation} onOpenChange={setShowResetConfirmation}>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" className="w-full sm:w-auto">
-              <RefreshCw className="mr-2 h-4 w-4" /> Iniciar Nuevo Partido
+         <div className="flex flex-col sm:flex-row gap-4 items-start">
+            <Button
+              variant="outline"
+              onClick={() => setIsSummaryOpen(true)}
+              className="w-full sm:w-auto"
+              disabled={!isGameStarted}
+            >
+              <FileText className="mr-2 h-4 w-4" /> Ver Resumen del Partido
             </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar Nuevo Partido</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esto restablecerá todas las puntuaciones, el reloj, el período y las penalidades a sus valores iniciales. Las configuraciones guardadas (duraciones, etc.) no se verán afectadas. ¿Estás seguro?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleResetGame}>
-                Confirmar Nuevo Partido
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+            <AlertDialog open={showResetConfirmation} onOpenChange={setShowResetConfirmation}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="w-full sm:w-auto">
+                  <RefreshCw className="mr-2 h-4 w-4" /> Iniciar Nuevo Partido
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirmar Nuevo Partido</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esto restablecerá todas las puntuaciones, el reloj, el período, las penalidades y el resumen del partido a sus valores iniciales. Las configuraciones guardadas (duraciones, etc.) no se verán afectadas. ¿Estás seguro?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleResetGame}>
+                    Confirmar Nuevo Partido
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+        </div>
          <p className="text-xs text-muted-foreground mt-2">
-          Esta acción restablecerá los marcadores, el reloj, el período actual y las penalidades.
+          La acción "Iniciar Nuevo Partido" restablecerá los marcadores, el reloj, el período actual, las penalidades y el registro de eventos del partido.
           Las configuraciones de duración de períodos, descansos, timeouts y penalidades se mantendrán.
         </p>
       </div>
        <p className="text-xs text-muted-foreground mt-6 text-center">
           ID de esta instancia de Controles (Primaria): ...{instanceId ? instanceId.slice(-6) : 'N/A'}
       </p>
+
+      {isSummaryOpen && (
+        <GameSummaryDialog 
+            isOpen={isSummaryOpen} 
+            onOpenChange={setIsSummaryOpen} 
+        />
+      )}
     </div>
   );
 }

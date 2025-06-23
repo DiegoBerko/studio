@@ -1,9 +1,10 @@
 
+
 "use client";
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
-import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings, ScoreboardLayoutProfile } from '@/types';
+import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings, ScoreboardLayoutProfile, GameSummary, GoalLog, PenaltyLog } from '@/types';
 
 // --- Constantes para la sincronización local ---
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
@@ -72,6 +73,10 @@ const IN_CODE_INITIAL_CATEGORIES_RAW = ['A', 'B', 'C', 'Menores', 'Damas'];
 const IN_CODE_INITIAL_AVAILABLE_CATEGORIES: CategoryData[] = IN_CODE_INITIAL_CATEGORIES_RAW.map(name => ({ id: name, name: name }));
 const IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY = IN_CODE_INITIAL_AVAILABLE_CATEGORIES[0]?.id || '';
 
+const IN_CODE_INITIAL_GAME_SUMMARY: GameSummary = {
+  home: { goals: [], penalties: [] },
+  away: { goals: [], penalties: [] },
+};
 
 const createDefaultFormatAndTimingsProfile = (id?: string, name?: string): FormatAndTimingsProfile => ({
   id: id || crypto.randomUUID(),
@@ -256,7 +261,9 @@ const initialGlobalState: GameState = {
   selectedScoreboardLayoutProfileId: defaultInitialLayoutProfile.id,
   // Categories
   availableCategories: IN_CODE_INITIAL_AVAILABLE_CATEGORIES, 
-  selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY, 
+  selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY,
+  // Game Summary
+  gameSummary: IN_CODE_INITIAL_GAME_SUMMARY,
   // Game Runtime State
   preTimeoutState: null,
   clockStartTimeMs: null,
@@ -567,15 +574,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           hydratedBase.currentTime = action.payload.currentTime;
       }
 
-      if(hydratedBase.currentTime <=0 && hydratedBase.periodDisplayOverride !== 'Time Out' && !(hydratedBase.periodDisplayOverride === null && hydratedBase.currentPeriod === 0)) {
-        hydratedBase.isClockRunning = false;
-      } else if (hydratedBase.periodDisplayOverride === 'Time Out' && hydratedBase.currentTime <= 0) {
-        hydratedBase.isClockRunning = false;
-      } else if (hydratedBase.periodDisplayOverride === 'End of Game') {
-        hydratedBase.isClockRunning = false;
-        hydratedBase.currentTime = 0;
-      }
-
       if (!hydratedBase.enableTeamSelectionInMiniScoreboard) {
         hydratedBase.enablePlayerSelectionForPenalties = false;
         hydratedBase.showAliasInPenaltyPlayerSelector = false;
@@ -759,33 +757,99 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
       break;
     }
-    case 'SET_SCORE':
-      newStateWithoutMeta = { ...state, [`${action.payload.team}Score`]: Math.max(0, action.payload.score) };
+    case 'SET_SCORE': {
+      const { team, score } = action.payload;
+      newStateWithoutMeta = { ...state, [`${team}Score`]: Math.max(0, score) };
       break;
+    }
     case 'ADJUST_SCORE': {
-      const currentScore = state[`${action.payload.team}Score`];
-      newStateWithoutMeta = { ...state, [`${action.payload.team}Score`]: Math.max(0, currentScore + action.payload.delta) };
+      const { team, delta } = action.payload;
+      const currentScore = state[`${team}Score`];
+      const newScore = Math.max(0, currentScore + delta);
+      newStateWithoutMeta = { ...state, [`${team}Score`]: newScore };
+
+      if (delta > 0) {
+        const newGoalLog: GoalLog = {
+          id: crypto.randomUUID(),
+          timestamp: Date.now(),
+          gameTime: state.currentTime,
+          periodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
+          scoreAfterGoal: {
+            home: team === 'home' ? newScore : state.homeScore,
+            away: team === 'away' ? newScore : state.awayScore,
+          },
+        };
+        const newGameSummary = { ...state.gameSummary };
+        newGameSummary[team].goals.push(newGoalLog);
+        newStateWithoutMeta.gameSummary = newGameSummary;
+      }
       break;
     }
     case 'ADD_PENALTY': {
+      const newPenaltyId = crypto.randomUUID();
       const newPenalty: Penalty = {
         ...action.payload.penalty,
         initialDuration: action.payload.penalty.initialDuration,
         remainingTime: action.payload.penalty.remainingTime,
-        id: (typeof window !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString() + Math.random().toString(36).slice(2)),
+        id: newPenaltyId,
         _status: 'pending_puck', 
       };
       let penalties = [...state[`${action.payload.team}Penalties`], newPenalty];
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
       penalties = sortPenaltiesByStatus(penalties);
-      newStateWithoutMeta = { ...state, [`${action.payload.team}Penalties`]: penalties };
+      
+      const teamDetails = state.teams.find(t => t.name === state[`${action.payload.team}TeamName`]);
+      const playerDetails = teamDetails?.players.find(p => p.number === newPenalty.playerNumber);
+
+      const newPenaltyLog: PenaltyLog = {
+        id: newPenaltyId,
+        team: action.payload.team,
+        playerNumber: newPenalty.playerNumber,
+        playerName: playerDetails?.name,
+        initialDuration: newPenalty.initialDuration,
+        addTimestamp: Date.now(),
+        addGameTime: state.currentTime,
+        addPeriodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
+      };
+      const newGameSummary = { ...state.gameSummary };
+      newGameSummary[action.payload.team].penalties.push(newPenaltyLog);
+
+      newStateWithoutMeta = { 
+        ...state, 
+        [`${action.payload.team}Penalties`]: penalties,
+        gameSummary: newGameSummary,
+      };
       break;
     }
     case 'REMOVE_PENALTY': {
+      const penaltyToRemove = state[`${action.payload.team}Penalties`].find(p => p.id === action.payload.penaltyId);
       let penalties = state[`${action.payload.team}Penalties`].filter(p => p.id !== action.payload.penaltyId);
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
       penalties = sortPenaltiesByStatus(penalties);
-      newStateWithoutMeta = { ...state, [`${action.payload.team}Penalties`]: penalties };
+
+      let newGameSummary = { ...state.gameSummary };
+      if (penaltyToRemove) {
+        const timeServed = penaltyToRemove.initialDuration - penaltyToRemove.remainingTime;
+        newGameSummary[action.payload.team].penalties = newGameSummary[action.payload.team].penalties.map(p => {
+          if (p.id === action.payload.penaltyId) {
+            return {
+              ...p,
+              endTimestamp: Date.now(),
+              endGameTime: state.currentTime,
+              endPeriodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
+              endReason: 'deleted',
+              timeServed,
+            };
+          }
+          return p;
+        });
+      }
+
+      newStateWithoutMeta = { 
+        ...state, 
+        [`${action.payload.team}Penalties`]: penalties,
+        gameSummary: newGameSummary,
+      };
       break;
     }
     case 'ADJUST_PENALTY_TIME': {
@@ -832,54 +896,60 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
     case 'TICK': {
       let newCalculatedTimeCs = state.currentTime;
-      let homePenaltiesResult = state.homePenalties;
-      let awayPenaltiesResult = state.awayPenalties;
+      let homePenaltiesResult = [...state.homePenalties];
+      let awayPenaltiesResult = [...state.awayPenalties];
+      let newGameSummary = state.gameSummary;
 
       if (state.isClockRunning && state.clockStartTimeMs && state.remainingTimeAtStartCs !== null) {
         const elapsedMs = Date.now() - state.clockStartTimeMs;
         const elapsedCs = Math.floor(elapsedMs / 10);
         newCalculatedTimeCs = Math.max(0, state.remainingTimeAtStartCs - elapsedCs);
 
-        
-        const gameClockWasTickingForPenalties =
-          state.periodDisplayOverride === null &&
-          state.currentPeriod > 0;
+        const gameClockWasTickingForPenalties = state.periodDisplayOverride === null && state.currentPeriod > 0;
 
         if (gameClockWasTickingForPenalties) {
           const oldSecondBoundary = Math.floor(state.currentTime / CENTISECONDS_PER_SECOND);
           const newSecondBoundary = Math.floor(newCalculatedTimeCs / CENTISECONDS_PER_SECOND);
-
-          if (newSecondBoundary < oldSecondBoundary) { 
-            const decrementRunningPenalties = (penalties: Penalty[]): Penalty[] => {
+          const secondsDecremented = oldSecondBoundary - newSecondBoundary;
+          
+          if (secondsDecremented > 0) { 
+            const decrementRunningPenalties = (penalties: Penalty[], team: Team): Penalty[] => {
               return penalties.map(p => {
                 if (p._status === 'running' && p.remainingTime > 0) {
-                  return { ...p, remainingTime: Math.max(0, p.remainingTime - 1) };
+                  const newRemaining = Math.max(0, p.remainingTime - secondsDecremented);
+                  if (p.remainingTime > 0 && newRemaining <= 0) {
+                    // Penalty just finished, log it
+                    newGameSummary[team].penalties = newGameSummary[team].penalties.map(log => {
+                      if (log.id === p.id && !log.endReason) {
+                        return {
+                          ...log,
+                          endTimestamp: Date.now(),
+                          endGameTime: state.currentTime,
+                          endPeriodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
+                          endReason: 'completed',
+                          timeServed: log.initialDuration,
+                        };
+                      }
+                      return log;
+                    });
+                  }
+                  return { ...p, remainingTime: newRemaining };
                 }
                 return p;
               });
             };
-            homePenaltiesResult = decrementRunningPenalties(state.homePenalties);
-            awayPenaltiesResult = decrementRunningPenalties(state.awayPenalties);
-          } else {
-            homePenaltiesResult = state.homePenalties;
-            awayPenaltiesResult = state.awayPenalties;
+            homePenaltiesResult = decrementRunningPenalties(homePenaltiesResult, 'home');
+            awayPenaltiesResult = decrementRunningPenalties(awayPenaltiesResult, 'away');
           }
-        } else {
-          homePenaltiesResult = state.homePenalties;
-          awayPenaltiesResult = state.awayPenalties;
         }
       } else if (state.isClockRunning && state.currentTime <= 0) {
          newCalculatedTimeCs = 0;
-         homePenaltiesResult = state.homePenalties;
-         awayPenaltiesResult = state.awayPenalties;
       }
-
       
       homePenaltiesResult = updatePenaltyStatusesOnly(homePenaltiesResult, state.maxConcurrentPenalties);
       homePenaltiesResult = sortPenaltiesByStatus(homePenaltiesResult);
       awayPenaltiesResult = updatePenaltyStatusesOnly(awayPenaltiesResult, state.maxConcurrentPenalties);
       awayPenaltiesResult = sortPenaltiesByStatus(awayPenaltiesResult);
-
 
       if (state.isClockRunning && newCalculatedTimeCs <= 0) {
         const stateBeforeTransition: GameState = {
@@ -890,17 +960,18 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           remainingTimeAtStartCs: null,
           homePenalties: homePenaltiesResult,
           awayPenalties: awayPenaltiesResult,
+          gameSummary: newGameSummary,
         };
         const transitionResult = handleAutoTransition(stateBeforeTransition);
         newStateWithoutMeta = transitionResult; 
         newPlayHornTrigger = transitionResult.playHornTrigger;
-
       } else {
         newStateWithoutMeta = {
           ...state,
           currentTime: newCalculatedTimeCs,
           homePenalties: homePenaltiesResult,
           awayPenalties: awayPenaltiesResult,
+          gameSummary: newGameSummary,
         };
         if (state.isClockRunning && newCalculatedTimeCs <= 0) { 
             newStateWithoutMeta.isClockRunning = false;
@@ -1479,6 +1550,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         showAliasInScoreboardPenalties: IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
         availableCategories: IN_CODE_INITIAL_AVAILABLE_CATEGORIES,
         selectedMatchCategory: IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY,
+        gameSummary: IN_CODE_INITIAL_GAME_SUMMARY,
       };
       const newMaxPen = tempState.maxConcurrentPenalties;
       tempState.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, newMaxPen));
@@ -1510,6 +1582,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         preTimeoutState: null,
         clockStartTimeMs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? Date.now() : null,
         remainingTimeAtStartCs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? initialWarmUpDurationCs : null,
+        gameSummary: IN_CODE_INITIAL_GAME_SUMMARY,
       };
       newPlayHornTrigger = state.playHornTrigger;
       break;
