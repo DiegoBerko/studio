@@ -25,9 +25,9 @@ export function PenaltiesDisplay({ teamDisplayType, teamName, penalties, team }:
   return (
     <>
       <Card className="bg-card shadow-lg flex-1 min-w-[300px]">
-        <CardHeader className="flex flex-row justify-between items-start">
+        <CardHeader className="flex flex-row justify-between items-center">
           <CardTitle 
-            className="text-primary-foreground truncate"
+            className="text-primary-foreground"
             style={{ fontSize: `${scoreboardLayout.penaltiesTitleSize}rem` }}
           >
             Penalidades
