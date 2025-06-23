@@ -138,7 +138,7 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
         const periodText = getPeriodText(i, state.numberOfRegularPeriods);
         options.push({ value: periodText, label: periodText });
     }
-    if (goal.periodText && goal.periodText !== 'WARM-UP' && !options.some(opt => opt.value === goal.periodText)) {
+    if (goal.periodText && goal.periodText.toUpperCase() !== 'WARM-UP' && !options.some(opt => opt.value === goal.periodText)) {
         options.push({ value: goal.periodText, label: goal.periodText });
     }
     return options;
@@ -230,14 +230,14 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
               aria-label="Segundos del gol"
             />
             <Select 
-                value={goal.periodText === 'WARM-UP' ? '' : (goal.periodText || '')} 
+                value={(goal.periodText && goal.periodText.toUpperCase() !== 'WARM-UP') ? goal.periodText : ''}
                 onValueChange={(newPeriod) => onUpdateGoal(goal.id, { periodText: newPeriod })}
             >
               <SelectTrigger className="w-24 h-8 text-center justify-center">
                   <SelectValue placeholder="Período" />
               </SelectTrigger>
               <SelectContent>
-                  {goal.periodText && goal.periodText !== 'WARM-UP' && !periodOptions.some(o => o.value === goal.periodText) && (
+                  {goal.periodText && goal.periodText.toUpperCase() !== 'WARM-UP' && !periodOptions.some(o => o.value === goal.periodText) && (
                       <SelectItem value={goal.periodText} disabled>{goal.periodText}</SelectItem>
                   )}
                   {periodOptions.map(opt => (
@@ -249,7 +249,7 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
         </div>
         
         <div className="flex items-center gap-2 flex-grow-[1] min-w-[200px] justify-end">
-          <Popover modal={true} open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
             <PopoverTrigger asChild>
               <Button variant="outline" role="combobox" className="w-[200px] justify-between">
                 <span className="truncate">
@@ -259,25 +259,43 @@ function GoalItem({ goal, onDelete, onUpdateGoal }: { goal: GoalLog; onDelete: (
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+            <PopoverContent 
+              className="w-[--radix-popover-trigger-width] p-0"
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
               <Command shouldFilter={false}>
                 <CommandInput 
                   placeholder="Buscar o ingresar Nº..." 
                   value={scorerSearchValue} 
                   onValueChange={setScorerSearchValue}
+                  onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const trimmedSearch = scorerSearchValue.trim().toUpperCase();
+                          const exactMatch = filteredPlayers.find(p => p.number === trimmedSearch);
+                          if (exactMatch) {
+                              handlePlayerSelect(exactMatch);
+                          } else if (trimmedSearch && /^\d+[A-Za-z]*$/.test(trimmedSearch)) {
+                              handlePlayerSelect({ number: trimmedSearch });
+                          }
+                          setIsPopoverOpen(false);
+                      }
+                  }}
                 />
                 <CommandList>
-                  <CommandEmpty>No se encontró jugador.</CommandEmpty>
-                  {scorerSearchValue.trim() && /^\d+$/.test(scorerSearchValue.trim()) && !filteredPlayers.some(p => p.number === scorerSearchValue.trim()) && (
-                    <CommandItem
-                      key="manual-entry"
-                      value={scorerSearchValue.trim()}
-                      onSelect={() => handlePlayerSelect({ number: scorerSearchValue.trim() })}
-                    >
-                      <Check className="mr-2 h-4 w-4 opacity-0" />
-                      Usar número: #{scorerSearchValue.trim()}
-                    </CommandItem>
-                  )}
+                  <CommandEmpty>
+                    No se encontró jugador.
+                    {scorerSearchValue.trim() && /^\d+[A-Za-z]*$/.test(scorerSearchValue.trim()) && (
+                      <CommandItem
+                        key="manual-entry"
+                        value={scorerSearchValue.trim()}
+                        onSelect={() => handlePlayerSelect({ number: scorerSearchValue.trim() })}
+                      >
+                       <Check className="mr-2 h-4 w-4 opacity-0" />
+                        Usar número: #{scorerSearchValue.trim()}
+                      </CommandItem>
+                    )}
+                  </CommandEmpty>
                   <CommandGroup>
                     {filteredPlayers.map(player => (
                       <CommandItem key={player.id} value={player.number} onSelect={() => handlePlayerSelect(player)}>
