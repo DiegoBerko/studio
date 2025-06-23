@@ -120,7 +120,7 @@ export function GoalScorerDialog({
   const renderPlayerInput = () => {
     if (teamHasPlayers && matchedTeam) {
       return (
-        <Popover open={isPlayerPopoverOpen} onOpenChange={setIsPlayerPopoverOpen}>
+        <Popover open={isPlayerPopoverOpen} onOpenChange={setIsPlayerPopoverOpen} modal={true}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={isPlayerPopoverOpen} className="w-full justify-between">
               {playerNumber ? (
@@ -133,7 +133,7 @@ export function GoalScorerDialog({
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent 
+          <PopoverContent
             className="w-[--radix-popover-trigger-width] p-0"
             onCloseAutoFocus={(e) => e.preventDefault()}
           >
