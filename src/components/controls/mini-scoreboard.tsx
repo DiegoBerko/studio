@@ -708,6 +708,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
                 onOpenChange={setIsHomePlayersDialogOpen}
                 teamId={matchedHomeTeamId}
                 teamName={localHomeTeamName}
+                teamType="home"
               />
             )}
           </div>
@@ -980,6 +981,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
                 onOpenChange={setIsAwayPlayersDialogOpen}
                 teamId={matchedAwayTeamId}
                 teamName={localAwayTeamName}
+                teamType="away"
               />
             )}
           </div>

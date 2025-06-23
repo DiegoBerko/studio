@@ -4,6 +4,7 @@
 
 
 
+
 export interface Penalty {
   id: string;
   playerNumber: string;
@@ -130,6 +131,10 @@ export interface GameSummary {
   away: {
     goals: GoalLog[];
     penalties: PenaltyLog[];
+  };
+  attendance: {
+    home: string[]; // Array of player IDs who attended
+    away: string[]; // Array of player IDs who attended
   };
 }
 

@@ -76,6 +76,7 @@ const IN_CODE_INITIAL_SELECTED_MATCH_CATEGORY = IN_CODE_INITIAL_AVAILABLE_CATEGO
 const IN_CODE_INITIAL_GAME_SUMMARY: GameSummary = {
   home: { goals: [], penalties: [] },
   away: { goals: [], penalties: [] },
+  attendance: { home: [], away: [] },
 };
 
 const createDefaultFormatAndTimingsProfile = (id?: string, name?: string): FormatAndTimingsProfile => ({
@@ -209,7 +210,8 @@ export type GameAction =
   | { type: 'ADD_PLAYER_TO_TEAM'; payload: { teamId: string; player: Omit<PlayerData, 'id'> } }
   | { type: 'UPDATE_PLAYER_IN_TEAM'; payload: { teamId: string; playerId: string; updates: Partial<Pick<PlayerData, 'name' | 'number'>> } }
   | { type: 'REMOVE_PLAYER_FROM_TEAM'; payload: { teamId: string; playerId: string } }
-  | { type: 'LOAD_TEAMS_FROM_FILE'; payload: TeamData[] };
+  | { type: 'LOAD_TEAMS_FROM_FILE'; payload: TeamData[] }
+  | { type: 'SET_TEAM_ATTENDANCE'; payload: { team: Team; playerIds: string[] } };
 
 
 const defaultInitialProfile = createDefaultFormatAndTimingsProfile();
@@ -1642,6 +1644,20 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }));
       newStateWithoutMeta = { ...state, teams: validTeams };
       break;
+    case 'SET_TEAM_ATTENDANCE': {
+      const { team, playerIds } = action.payload;
+      newStateWithoutMeta = {
+        ...state,
+        gameSummary: {
+          ...state.gameSummary,
+          attendance: {
+            ...state.gameSummary.attendance,
+            [team]: playerIds,
+          },
+        },
+      };
+      break;
+    }
     default:
       const exhaustiveCheck: never = action; 
       newStateWithoutMeta = state;
