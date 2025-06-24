@@ -29,6 +29,7 @@ const getEndReasonText = (reason?: PenaltyLog['endReason']): string => {
     switch (reason) {
         case 'completed': return 'Cumplida';
         case 'deleted': return 'Eliminada';
+        case 'goal_on_pp': return 'Gol en Contra';
         default: return 'Cerrada';
     }
 };

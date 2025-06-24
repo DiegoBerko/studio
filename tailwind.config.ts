@@ -91,12 +91,17 @@ export default {
         'score-flash': {
           '0%, 100%': { color: 'hsl(var(--accent))' },
           '50%': { color: 'hsl(var(--foreground))' },
-        }
+        },
+        'flashing-border': {
+          '0%, 100%': { borderColor: 'hsl(var(--destructive))' },
+          '50%': { borderColor: 'hsl(var(--border))' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'score-flash': 'score-flash 0.5s ease-in-out',
+        'flashing-border': 'flashing-border 1.5s ease-in-out infinite',
       },
     },
   },

@@ -22,18 +22,27 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Trash2, UserPlus, Clock, Plus, Minus, Hourglass, ChevronsUpDown, Check, Info } from 'lucide-react';
+import { Trash2, UserPlus, Hourglass, ChevronsUpDown, Check, Info, Goal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { PenaltyLogDialog } from '../scoreboard/penalty-log-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 interface PenaltyControlCardProps {
   team: Team;
   teamName: string;
 }
-
-const ADJUST_TIME_DELTA_SECONDS = 1;
 
 export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) {
   const { state, dispatch } = useGameState();
@@ -53,6 +62,9 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   // New state for editing penalty time
   const [editingPenaltyId, setEditingPenaltyId] = useState<string | null>(null);
   const [editTimeValue, setEditTimeValue] = useState('');
+  
+  const [pendingConfirmation, setPendingConfirmation] = useState<{ type: 'goal' | 'delete'; penalty: Penalty } | null>(null);
+
 
   const penalties = team === 'home' ? state.homePenalties : state.awayPenalties;
   const teamSubName = team === 'home' ? state.homeTeamSubName : state.awayTeamSubName;
@@ -120,23 +132,6 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     setPlayerNumberForPenalty('');
     setSelectedPlayerName(null);
     setPlayerSearchTerm('');
-  };
-
-  const handleRemovePenalty = (penaltyId: string) => {
-    flushSync(() => {
-      dispatch({ type: 'REMOVE_PENALTY', payload: { team, penaltyId } });
-    });
-    toast({ title: "Penalidad Removida", description: `Penalidad para ${teamName} removida.` });
-  };
-
-  const handleAdjustPenaltyTime = (penaltyId: string, deltaSeconds: number) => {
-    flushSync(() => {
-      dispatch({ type: 'ADJUST_PENALTY_TIME', payload: { team, penaltyId, delta: deltaSeconds } });
-    });
-    const penalty = penalties.find(p => p.id === penaltyId);
-    if (penalty) {
-        toast({ title: "Tiempo de Penalidad Ajustado", description: `Tiempo para Jugador ${penalty.playerNumber} (${teamName}) ajustado en ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s.` });
-    }
   };
   
   const handleSetPenaltyTime = (penaltyId: string) => {
@@ -215,6 +210,23 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     setDraggedPenaltyId(null);
     setDragOverPenaltyId(null);
   };
+  
+  const handleConfirmAction = () => {
+    if (!pendingConfirmation) return;
+
+    flushSync(() => {
+        if (pendingConfirmation.type === 'goal') {
+            dispatch({ type: 'END_PENALTY_FOR_GOAL', payload: { team, penaltyId: pendingConfirmation.penalty.id } });
+            toast({ title: "Penalidad Finalizada por Gol", description: `La penalidad para el jugador #${pendingConfirmation.penalty.playerNumber} se finalizó.` });
+        } else if (pendingConfirmation.type === 'delete') {
+            dispatch({ type: 'REMOVE_PENALTY', payload: { team, penaltyId: pendingConfirmation.penalty.id } });
+            toast({ title: "Penalidad Eliminada", description: `La penalidad para el jugador #${pendingConfirmation.penalty.playerNumber} ha sido eliminada.` });
+        }
+    });
+
+    setPendingConfirmation(null);
+  };
+
 
   const getStatusText = (status?: Penalty['_status']) => {
     if (status === 'pending_player' || status === 'pending_concurrent') return 'Esperando Slot';
@@ -397,6 +409,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
               );
               const displayPenaltyNumber = p.playerNumber || 'S/N';
               const isEditingThisPenalty = editingPenaltyId === p.id;
+              const isEndingSoon = p._status === 'running' && p.remainingTime > 0 && p.remainingTime < 10;
 
               return (
                 <Card
@@ -409,12 +422,13 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                   onDrop={(e) => handleDrop(e, p.id)}
                   onDragEnd={handleDragEnd}
                   className={cn(
-                    "p-3 bg-muted/30 transition-all",
+                    "p-3 bg-muted/30 transition-all border",
                     !isEditingThisPenalty && "cursor-move",
                     draggedPenaltyId === p.id && "opacity-50 scale-95 shadow-lg",
                     dragOverPenaltyId === p.id && draggedPenaltyId !== p.id && "border-2 border-primary ring-2 ring-primary",
                     isWaitingSlot && "opacity-60 bg-muted/10",
-                    isPendingPuck && "opacity-40 bg-yellow-500/5 border-yellow-500/30"
+                    isPendingPuck && "opacity-40 bg-yellow-500/5 border-yellow-500/30",
+                    isEndingSoon && "animate-flashing-border border-2"
                   )}
                 >
                   <div className="flex justify-between items-center w-full gap-2">
@@ -455,27 +469,23 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                           {formatTime(p.remainingTime * 100)}
                         </div>
                       )}
-                      <Button
-                        variant="ghost"
+                      
+                       <Button
+                        variant="outline"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => handleAdjustPenaltyTime(p.id, ADJUST_TIME_DELTA_SECONDS)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                        onClick={() => setPendingConfirmation({ type: 'goal', penalty: p })}
+                        aria-label="Finalizar por gol"
+                       >
+                         <Goal className="h-4 w-4 text-green-500" />
+                       </Button>
+
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleAdjustPenaltyTime(p.id, -ADJUST_TIME_DELTA_SECONDS)}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleRemovePenalty(p.id)}
+                        className="h-7 w-7 text-destructive/80 hover:text-destructive"
+                        onClick={() => setPendingConfirmation({ type: 'delete', penalty: p })}
+                        aria-label="Eliminar penalidad"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -506,6 +516,29 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
           teamName={teamName}
         />
       )}
+      {pendingConfirmation && (
+            <AlertDialog open={!!pendingConfirmation} onOpenChange={() => setPendingConfirmation(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar Acción</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {pendingConfirmation.type === 'goal'
+                                ? `¿Estás seguro de que quieres finalizar la penalidad del jugador #${pendingConfirmation.penalty.playerNumber} por un gol en contra? Esto la eliminará de la lista activa.`
+                                : `¿Estás seguro de que quieres eliminar permanentemente la penalidad del jugador #${pendingConfirmation.penalty.playerNumber}? Esta acción no se puede deshacer.`}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setPendingConfirmation(null)}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction 
+                            onClick={handleConfirmAction} 
+                            className={pendingConfirmation.type === 'delete' ? 'bg-destructive hover:bg-destructive/90' : ''}
+                        >
+                            Confirmar
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        )}
     </>
   );
 }

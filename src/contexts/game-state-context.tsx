@@ -152,6 +152,7 @@ export type GameAction =
   | { type: 'DELETE_GOAL'; payload: { goalId: string } }
   | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id' | '_status'> } }
   | { type: 'REMOVE_PENALTY'; payload: { team: Team; penaltyId: string } }
+  | { type: 'END_PENALTY_FOR_GOAL'; payload: { team: Team; penaltyId: string } }
   | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } }
   | { type: 'SET_PENALTY_TIME'; payload: { team: Team; penaltyId: string; time: number } }
   | { type: 'REORDER_PENALTIES'; payload: { team: Team; startIndex: number; endIndex: number } }
@@ -822,7 +823,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       let newGameSummary = state.gameSummary;
       if (penaltyToRemove) {
         const timeServed = penaltyToRemove.initialDuration - penaltyToRemove.remainingTime;
-        const newTeamLogs = state.gameSummary[action.payload.team].penalties.map(p => {
+        const newTeamLogs = newGameSummary[action.payload.team].penalties.map(p => {
           if (p.id === action.payload.penaltyId && !p.endReason) {
             return {
               ...p,
@@ -837,9 +838,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         });
 
         newGameSummary = {
-          ...state.gameSummary,
+          ...newGameSummary,
           [action.payload.team]: {
-            ...state.gameSummary[action.payload.team],
+            ...newGameSummary[action.payload.team],
             penalties: newTeamLogs
           }
         }
@@ -848,6 +849,48 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newStateWithoutMeta = { 
         ...state, 
         [`${action.payload.team}Penalties`]: penalties,
+        gameSummary: newGameSummary,
+      };
+      break;
+    }
+    case 'END_PENALTY_FOR_GOAL': {
+      const { team, penaltyId } = action.payload;
+      const penaltyToEnd = state[`${team}Penalties`].find(p => p.id === penaltyId);
+      if (!penaltyToEnd) {
+        newStateWithoutMeta = state;
+        break;
+      }
+
+      let penalties = state[`${team}Penalties`].filter(p => p.id !== penaltyId);
+      penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
+      penalties = sortPenaltiesByStatus(penalties);
+
+      const timeServed = penaltyToEnd.initialDuration - penaltyToEnd.remainingTime;
+      const newTeamLogs = state.gameSummary[team].penalties.map(p => {
+        if (p.id === penaltyId && !p.endReason) {
+          return {
+            ...p,
+            endTimestamp: Date.now(),
+            endGameTime: state.currentTime,
+            endPeriodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
+            endReason: 'goal_on_pp',
+            timeServed,
+          };
+        }
+        return p;
+      });
+
+      const newGameSummary = {
+        ...state.gameSummary,
+        [team]: {
+          ...state.gameSummary[team],
+          penalties: newTeamLogs,
+        },
+      };
+
+      newStateWithoutMeta = {
+        ...state,
+        [`${team}Penalties`]: penalties,
         gameSummary: newGameSummary,
       };
       break;

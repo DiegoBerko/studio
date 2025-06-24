@@ -5,6 +5,7 @@
 
 
 
+
 export interface Penalty {
   id: string;
   playerNumber: string;
@@ -119,7 +120,7 @@ export interface PenaltyLog {
   endTimestamp?: number;
   endGameTime?: number;
   endPeriodText?: string;
-  endReason?: 'completed' | 'deleted';
+  endReason?: 'completed' | 'deleted' | 'goal_on_pp';
   timeServed?: number;
 }
 
