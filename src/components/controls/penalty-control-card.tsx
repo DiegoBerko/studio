@@ -396,14 +396,14 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
           <div className="flex items-center gap-2">
             {!isDeleteSelectionMode && (
               <Button
-                variant="outline"
-                size="sm"
-                className="h-8"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-destructive"
                 onClick={handleToggleSelectionMode}
                 disabled={penalties.length === 0}
+                aria-label="Seleccionar penalidades para eliminar"
               >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar Penalidad...
+                <Trash2 className="h-5 w-5" />
               </Button>
             )}
             <Button
