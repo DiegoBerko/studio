@@ -164,12 +164,9 @@ export const LayoutSettingsCard = forwardRef<LayoutSettingsCardRef, LayoutSettin
     }
   }));
 
-  useEffect(() => {
-     if (initialValues) {
-        dispatch({ type: 'UPDATE_LAYOUT_SETTINGS', payload: initialValues });
-     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialValues]);
+  // This useEffect was removed to prevent overwriting live state with profile state on re-entry.
+  // The live state (from localStorage) is now the source of truth for the controls upon page load.
+  // The state is only reset to the profile's values when a profile is explicitly selected or changes are discarded.
 
   return (
     <ControlCardWrapper title="Diseño del Scoreboard (Vista Previa en Vivo)">

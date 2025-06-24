@@ -13,6 +13,7 @@ import { TeamsManagementTab } from '@/components/config/teams-management-tab';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Undo2, Upload, Download, RotateCcw, Plus, Edit3, Trash2, XCircle } from 'lucide-react';
 import { useGameState, type ConfigFields, type FormatAndTimingsProfile, type FormatAndTimingsProfileData, createDefaultFormatAndTimingsProfile, type CategoryData, type ScoreboardLayoutProfile, createDefaultScoreboardLayoutProfile } from '@/contexts/game-state-context';
@@ -175,7 +176,7 @@ export default function ConfigPage() {
     
     setIsSoundDirty(false);
     setIsTeamSettingsDirty(false);
-    // isLayoutDirty will update via memoization
+    // isLayoutDirty will update via memoization, becoming false after save
     
     toast({ title: "Sonido y Display Guardados", description: "Los cambios en Sonido y Display han sido guardados en la configuración activa." });
   };
@@ -637,7 +638,17 @@ export default function ConfigPage() {
             <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty}/>
             <Separator />
             <div className={cn(sectionCardClassName, "mb-6")}>
-                <Label className="text-lg font-medium mb-2 block">Perfil de Diseño del Scoreboard</Label>
+                <div className="flex justify-between items-center mb-2 flex-wrap gap-y-2">
+                    <Label className="text-lg font-medium mb-0 block">Perfil de Diseño del Scoreboard</Label>
+                    {isLayoutDirty && (
+                        <div className="flex items-center gap-2">
+                            <Badge variant="destructive">Con Cambios sin Guardar</Badge>
+                            <Button size="sm" onClick={() => { if (layoutSettingsRef.current) layoutSettingsRef.current.handleSave(); }}>
+                                <Save className="mr-2 h-4 w-4" /> Guardar en Perfil
+                            </Button>
+                        </div>
+                    )}
+                </div>
                 <div className="flex items-center gap-2">
                     <Select value={selectedLayoutProfile.id || ""} onValueChange={handleSelectLayoutProfile}>
                         <SelectTrigger className="flex-grow text-base">
