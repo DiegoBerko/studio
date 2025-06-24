@@ -4,7 +4,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { MiniScoreboard } from '@/components/controls/mini-scoreboard';
-import { TimeControlCard } from '@/components/controls/time-control-card';
 import { PenaltyControlCard } from '@/components/controls/penalty-control-card';
 import { GoalManagementDialog } from '@/components/controls/goal-management-dialog';
 import { GameSummaryDialog } from '@/components/controls/game-summary-dialog';
@@ -257,10 +256,6 @@ export default function ControlsPage() {
   return (
     <div className="w-full max-w-5xl mx-auto space-y-8">
       <MiniScoreboard onScoreClick={handleScoreClick} />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <TimeControlCard />
-      </div>
 
       {hasPendingPuckPenalties && (
         <div className="my-6 flex justify-center">

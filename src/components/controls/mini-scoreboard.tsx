@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight, User, ListFilter, Search, ClipboardList, ChevronsUpDown, Check } from 'lucide-react';
+import { Plus, Minus, Play, Pause, ChevronLeft, ChevronRight, ChevronsRight, User, ListFilter, Search, ClipboardList, ChevronsUpDown, Check, TimerOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import {
@@ -71,6 +71,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
 
   const [isHomePlayersDialogOpen, setIsHomePlayersDialogOpen] = useState(false);
   const [isAwayPlayersDialogOpen, setIsAwayPlayersDialogOpen] = useState(false);
+  const [isTimeoutConfirmOpen, setIsTimeoutConfirmOpen] = useState(false);
   
   useEffect(() => {
     setLocalHomeTeamName(state.homeTeamName);
@@ -591,6 +592,31 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
     }
   };
 
+  const handlePrepareStartTimeout = () => {
+    setIsTimeoutConfirmOpen(true);
+  };
+
+  const performStartTimeout = () => {
+    flushSync(() => {
+      dispatch({ type: 'START_TIMEOUT' }); 
+    });
+    const autoStart = state.autoStartTimeouts;
+    const timeoutDurationSec = state.defaultTimeoutDuration / 100;
+    toast({ 
+        title: "Time Out Iniciado", 
+        description: `Time Out de ${timeoutDurationSec} segundos. Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
+    });
+    setIsTimeoutConfirmOpen(false);
+  };
+
+  const isTimeOutButtonDisabled = 
+    state.periodDisplayOverride === "Break" ||
+    state.periodDisplayOverride === "Pre-OT Break" ||
+    state.periodDisplayOverride === "Time Out";
+
+  const timeoutDurationInSeconds = state.defaultTimeoutDuration / 100;
+  const autoStartBehavior = state.autoStartTimeouts ? "se iniciará automáticamente" : "deberá iniciarse manualmente";
+
 
   return (
     <div className="relative">
@@ -617,6 +643,19 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
                 <span>Sin categorías</span>
             </div>
         )}
+      </div>
+
+      <div className="absolute top-0 right-0 p-2 sm:p-3 md:p-4 z-20">
+        <Button
+          onClick={handlePrepareStartTimeout}
+          variant="outline"
+          className="h-8 text-xs bg-card/80 border-border/50 backdrop-blur-sm"
+          disabled={isTimeOutButtonDisabled}
+          aria-label="Iniciar Time Out"
+        >
+          <TimerOff className="mr-1.5 h-3.5 w-3.5" />
+          Time Out
+        </Button>
       </div>
 
       <Card className="mb-8 bg-card shadow-lg pt-12 sm:pt-10 md:pt-12">
@@ -1001,6 +1040,25 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
               <AlertDialogCancel onClick={cancelConfirmation}>Cancelar</AlertDialogCancel>
               <AlertDialogAction onClick={() => executeConfirmedAction(pendingConfirmation.onConfirm)}>
                 Confirmar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+      {isTimeoutConfirmOpen && (
+        <AlertDialog open={isTimeoutConfirmOpen} onOpenChange={setIsTimeoutConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Inicio de Time Out</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esto guardará el estado actual del reloj del partido, lo pausará e iniciará un Time Out de {timeoutDurationInSeconds} segundos.
+                El reloj del Time Out {autoStartBehavior}. ¿Estás seguro?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setIsTimeoutConfirmOpen(false)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={performStartTimeout}>
+                Confirmar e Iniciar Time Out
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
