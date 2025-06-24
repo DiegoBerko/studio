@@ -22,7 +22,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Trash2, UserPlus, Hourglass, ChevronsUpDown, Check, Info, Goal } from 'lucide-react';
+import { Trash2, UserPlus, Hourglass, ChevronsUpDown, Check, Info, Goal, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 interface PenaltyControlCardProps {
@@ -63,7 +64,10 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   const [editingPenaltyId, setEditingPenaltyId] = useState<string | null>(null);
   const [editTimeValue, setEditTimeValue] = useState('');
   
-  const [pendingConfirmation, setPendingConfirmation] = useState<{ type: 'goal' | 'delete'; penalty: Penalty } | null>(null);
+  const [penaltyForGoalConfirmation, setPenaltyForGoalConfirmation] = useState<Penalty | null>(null);
+  const [isDeleteSelectionMode, setIsDeleteSelectionMode] = useState(false);
+  const [selectedPenaltyIds, setSelectedPenaltyIds] = useState<string[]>([]);
+  const [isMassDeleteConfirmOpen, setIsMassDeleteConfirmOpen] = useState(false);
 
 
   const penalties = team === 'home' ? state.homePenalties : state.awayPenalties;
@@ -167,25 +171,33 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   };
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, penaltyId: string) => {
+    if (isDeleteSelectionMode) {
+      e.preventDefault();
+      return;
+    }
     setDraggedPenaltyId(penaltyId);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", penaltyId);
   };
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, penaltyId: string) => {
+    if (isDeleteSelectionMode) return;
     e.preventDefault();
     setDragOverPenaltyId(penaltyId);
   };
 
   const handleDragLeave = () => {
+    if (isDeleteSelectionMode) return;
     setDragOverPenaltyId(null);
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (isDeleteSelectionMode) return;
     e.preventDefault();
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetPenaltyId: string) => {
+    if (isDeleteSelectionMode) return;
     e.preventDefault();
     if (draggedPenaltyId && draggedPenaltyId !== targetPenaltyId) {
       const currentTeamPenalties = team === 'home' ? state.homePenalties : state.awayPenalties;
@@ -211,20 +223,48 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     setDragOverPenaltyId(null);
   };
   
-  const handleConfirmAction = () => {
-    if (!pendingConfirmation) return;
+  const handleConfirmGoal = () => {
+    if (!penaltyForGoalConfirmation) return;
 
     flushSync(() => {
-        if (pendingConfirmation.type === 'goal') {
-            dispatch({ type: 'END_PENALTY_FOR_GOAL', payload: { team, penaltyId: pendingConfirmation.penalty.id } });
-            toast({ title: "Penalidad Finalizada por Gol", description: `La penalidad para el jugador #${pendingConfirmation.penalty.playerNumber} se finalizó.` });
-        } else if (pendingConfirmation.type === 'delete') {
-            dispatch({ type: 'REMOVE_PENALTY', payload: { team, penaltyId: pendingConfirmation.penalty.id } });
-            toast({ title: "Penalidad Eliminada", description: `La penalidad para el jugador #${pendingConfirmation.penalty.playerNumber} ha sido eliminada.` });
-        }
+        dispatch({ type: 'END_PENALTY_FOR_GOAL', payload: { team, penaltyId: penaltyForGoalConfirmation.id } });
+        toast({ title: "Penalidad Finalizada por Gol", description: `La penalidad para el jugador #${penaltyForGoalConfirmation.playerNumber} se finalizó.` });
     });
 
-    setPendingConfirmation(null);
+    setPenaltyForGoalConfirmation(null);
+  };
+  
+  const handleToggleSelectionMode = () => {
+    setIsDeleteSelectionMode(!isDeleteSelectionMode);
+    setSelectedPenaltyIds([]); // Clear selection when toggling mode
+  };
+  
+  const handleTogglePenaltySelection = (penaltyId: string) => {
+    setSelectedPenaltyIds(prev =>
+      prev.includes(penaltyId)
+        ? prev.filter(id => id !== penaltyId)
+        : [...prev, penaltyId]
+    );
+  };
+
+  const handleConfirmMassDelete = () => {
+    if (selectedPenaltyIds.length === 0) return;
+    
+    selectedPenaltyIds.forEach(penaltyId => {
+      flushSync(() => {
+        dispatch({ type: 'REMOVE_PENALTY', payload: { team, penaltyId } });
+      });
+    });
+
+    toast({
+      title: "Penalidades Eliminadas",
+      description: `${selectedPenaltyIds.length} penalidad(es) eliminada(s).`,
+      variant: "destructive"
+    });
+
+    setIsMassDeleteConfirmOpen(false);
+    setIsDeleteSelectionMode(false);
+    setSelectedPenaltyIds([]);
   };
 
 
@@ -353,46 +393,66 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     <Card className="bg-card shadow-md">
        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-xl text-primary-foreground">{`Penalidades ${teamName}${teamSubName ? ` (${teamSubName})` : ''}`}</CardTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-primary-foreground"
-            onClick={() => setIsLogOpen(true)}
-            aria-label="Ver registro de penalidades"
-          >
-            <Info className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {!isDeleteSelectionMode && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={handleToggleSelectionMode}
+                disabled={penalties.length === 0}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar Penalidad...
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-primary-foreground"
+              onClick={() => setIsLogOpen(true)}
+              aria-label="Ver registro de penalidades"
+            >
+              <Info className="h-5 w-5" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-      <form onSubmit={handleAddPenalty} className="space-y-4 mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
-          <div className="sm:col-span-1">
-            <Label htmlFor={`${team}-playerNumberForPenalty`}>Jugador # (Penalidad)</Label>
-            {renderPlayerNumberInput()}
+      {!isDeleteSelectionMode && (
+        <form onSubmit={handleAddPenalty} className="space-y-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+            <div className="sm:col-span-1">
+              <Label htmlFor={`${team}-playerNumberForPenalty`}>Jugador # (Penalidad)</Label>
+              {renderPlayerNumberInput()}
+            </div>
+            <div className="sm:col-span-1">
+              <Label htmlFor={`${team}-penaltyDuration`}>Duración (segundos)</Label>
+              <Select value={penaltyDurationSeconds} onValueChange={setPenaltyDurationSeconds}>
+                <SelectTrigger id={`${team}-penaltyDuration`}>
+                  <SelectValue placeholder="Seleccionar duración" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="4">0:04 (Prueba)</SelectItem>
+                  <SelectItem value="120">2:00 (Menor)</SelectItem>
+                  <SelectItem value="240">4:00 (Doble Menor)</SelectItem>
+                  <SelectItem value="300">5:00 (Mayor)</SelectItem>
+                  <SelectItem value="600">10:00 (Mala Conducta)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" className="w-full sm:w-auto sm:self-end" aria-label={`Agregar penalidad para ${teamName}`}>
+              <UserPlus className="mr-2 h-4 w-4" /> Agregar
+            </Button>
           </div>
-          <div className="sm:col-span-1">
-            <Label htmlFor={`${team}-penaltyDuration`}>Duración (segundos)</Label>
-            <Select value={penaltyDurationSeconds} onValueChange={setPenaltyDurationSeconds}>
-              <SelectTrigger id={`${team}-penaltyDuration`}>
-                <SelectValue placeholder="Seleccionar duración" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="4">0:04 (Prueba)</SelectItem>
-                <SelectItem value="120">2:00 (Menor)</SelectItem>
-                <SelectItem value="240">4:00 (Doble Menor)</SelectItem>
-                <SelectItem value="300">5:00 (Mayor)</SelectItem>
-                <SelectItem value="600">10:00 (Mala Conducta)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button type="submit" className="w-full sm:w-auto sm:self-end" aria-label={`Agregar penalidad para ${teamName}`}>
-            <UserPlus className="mr-2 h-4 w-4" /> Agregar
-          </Button>
-        </div>
-      </form>
+        </form>
+      )}
 
       <div className="space-y-2">
-        <Label>Penalidades Activas ({penalties.length})</Label>
+        <Label>
+          {isDeleteSelectionMode
+            ? `Selecciona penalidades para eliminar (${selectedPenaltyIds.length} seleccionada/s)`
+            : `Penalidades Activas (${penalties.length})`}
+        </Label>
         {penalties.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sin penalidades activas.</p>
         ) : (
@@ -410,20 +470,24 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
               const displayPenaltyNumber = p.playerNumber || 'S/N';
               const isEditingThisPenalty = editingPenaltyId === p.id;
               const isEndingSoon = p._status === 'running' && p.remainingTime > 0 && p.remainingTime < 10;
+              const isSelectedForDeletion = selectedPenaltyIds.includes(p.id);
 
               return (
                 <Card
                   key={p.id}
-                  draggable={!isEditingThisPenalty}
+                  draggable={!isEditingThisPenalty && !isDeleteSelectionMode}
                   onDragStart={(e) => handleDragStart(e, p.id)}
                   onDragEnter={(e) => handleDragEnter(e, p.id)}
                   onDragLeave={handleDragLeave}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, p.id)}
                   onDragEnd={handleDragEnd}
+                  onClick={() => isDeleteSelectionMode && handleTogglePenaltySelection(p.id)}
                   className={cn(
                     "p-3 bg-muted/30 transition-all border",
-                    !isEditingThisPenalty && "cursor-move",
+                    !isEditingThisPenalty && !isDeleteSelectionMode && "cursor-move",
+                    isDeleteSelectionMode && "cursor-pointer",
+                    isSelectedForDeletion && "ring-2 ring-destructive border-destructive bg-destructive/10",
                     draggedPenaltyId === p.id && "opacity-50 scale-95 shadow-lg",
                     dragOverPenaltyId === p.id && draggedPenaltyId !== p.id && "border-2 border-primary ring-2 ring-primary",
                     isWaitingSlot && "opacity-60 bg-muted/10",
@@ -432,19 +496,29 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                   )}
                 >
                   <div className="flex justify-between items-center w-full gap-2">
-                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-card-foreground truncate">
-                        Jugador {displayPenaltyNumber}
-                        {state.enablePlayerSelectionForPenalties && state.showAliasInControlsPenaltyList && matchedPlayerForPenaltyDisplay && matchedPlayerForPenaltyDisplay.name && (
-                          <span className="ml-1 text-xs text-muted-foreground font-normal">
-                             - {matchedPlayerForPenaltyDisplay.name}
-                          </span>
+                     <div className="flex items-center gap-3">
+                        {isDeleteSelectionMode && (
+                          <Checkbox
+                            checked={isSelectedForDeletion}
+                            onCheckedChange={() => handleTogglePenaltySelection(p.id)}
+                            aria-label={`Seleccionar penalidad del jugador ${p.playerNumber}`}
+                            className="mr-2"
+                          />
                         )}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Total: {formatTime(p.initialDuration * 100)}
-                      </p>
-                    </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-card-foreground truncate">
+                            Jugador {displayPenaltyNumber}
+                            {state.enablePlayerSelectionForPenalties && state.showAliasInControlsPenaltyList && matchedPlayerForPenaltyDisplay && matchedPlayerForPenaltyDisplay.name && (
+                              <span className="ml-1 text-xs text-muted-foreground font-normal">
+                                - {matchedPlayerForPenaltyDisplay.name}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Total: {formatTime(p.initialDuration * 100)}
+                          </p>
+                        </div>
+                     </div>
 
                     <div className="flex items-center gap-1">
                       {isEditingThisPenalty ? (
@@ -461,9 +535,11 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                       ) : (
                         <div
                           className="w-20 h-8 flex items-center justify-center font-mono text-lg cursor-pointer rounded-md hover:bg-white/10"
-                          onClick={() => {
-                            setEditingPenaltyId(p.id);
-                            setEditTimeValue(formatTime(p.remainingTime * 100));
+                          onClick={(e) => {
+                             if(isDeleteSelectionMode) return;
+                             e.stopPropagation();
+                             setEditingPenaltyId(p.id);
+                             setEditTimeValue(formatTime(p.remainingTime * 100));
                           }}
                         >
                           {formatTime(p.remainingTime * 100)}
@@ -474,20 +550,12 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                         variant="outline"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => setPendingConfirmation({ type: 'goal', penalty: p })}
+                        onClick={(e) => { e.stopPropagation(); setPenaltyForGoalConfirmation(p); }}
                         aria-label="Finalizar por gol"
+                        disabled={isDeleteSelectionMode}
                        >
                          <Goal className="h-4 w-4 text-green-500" />
                        </Button>
-
-                      <Button
-                        variant="ghost"
-                        className="h-6 w-6 p-1 text-destructive/80 hover:text-destructive"
-                        onClick={() => setPendingConfirmation({ type: 'delete', penalty: p })}
-                        aria-label="Eliminar penalidad"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
                     </div>
                   </div>
                   {statusText && (
@@ -505,6 +573,20 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
           </div>
         )}
       </div>
+      {isDeleteSelectionMode && (
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="outline" onClick={handleToggleSelectionMode}>
+            <X className="mr-2 h-4 w-4" /> Cancelar
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={selectedPenaltyIds.length === 0}
+            onClick={() => setIsMassDeleteConfirmOpen(true)}
+          >
+            <Trash2 className="mr-2 h-4 w-4" /> Eliminar Seleccionadas ({selectedPenaltyIds.length})
+          </Button>
+        </div>
+      )}
       </CardContent>
     </Card>
       {isLogOpen && (
@@ -515,31 +597,42 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
           teamName={teamName}
         />
       )}
-      {pendingConfirmation && (
-            <AlertDialog open={!!pendingConfirmation} onOpenChange={() => setPendingConfirmation(null)}>
+      {penaltyForGoalConfirmation && (
+            <AlertDialog open={!!penaltyForGoalConfirmation} onOpenChange={() => setPenaltyForGoalConfirmation(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            {pendingConfirmation.type === 'goal' ? 'Confirmar Penalidad Finalizada por Gol' : 'Confirmar Eliminación'}
-                        </AlertDialogTitle>
+                        <AlertDialogTitle>Confirmar Penalidad Finalizada por Gol</AlertDialogTitle>
                         <AlertDialogDescription>
-                            {pendingConfirmation.type === 'goal'
-                                ? `¿Estás seguro de que quieres finalizar la penalidad del jugador #${pendingConfirmation.penalty.playerNumber} por un gol en contra? Esto la eliminará de la lista activa.`
-                                : `¿Estás seguro de que quieres eliminar permanentemente la penalidad del jugador #${pendingConfirmation.penalty.playerNumber}? Esta acción no se puede deshacer.`}
+                          ¿Estás seguro de que quieres finalizar la penalidad del jugador #{penaltyForGoalConfirmation.playerNumber} por un gol en contra? Esto la eliminará de la lista activa.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setPendingConfirmation(null)}>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction 
-                            onClick={handleConfirmAction} 
-                            className={pendingConfirmation.type === 'delete' ? 'bg-destructive hover:bg-destructive/90' : ''}
-                        >
-                            {pendingConfirmation.type === 'goal' ? 'Confirmar Gol en PK' : 'Confirmar'}
+                        <AlertDialogCancel onClick={() => setPenaltyForGoalConfirmation(null)}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmGoal}>
+                          Confirmar Gol en PK
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         )}
+      {isMassDeleteConfirmOpen && (
+        <AlertDialog open={isMassDeleteConfirmOpen} onOpenChange={setIsMassDeleteConfirmOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar Eliminación Múltiple</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        ¿Estás seguro de que quieres eliminar las {selectedPenaltyIds.length} penalidades seleccionadas? Esta acción no se puede deshacer.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setIsMassDeleteConfirmOpen(false)}>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmMassDelete} className="bg-destructive hover:bg-destructive/90">
+                        Eliminar Penalidades
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+      )}
     </>
   );
 }
