@@ -2,6 +2,8 @@
 "use client";
 
 import React, { useMemo } from "react";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { useGameState, formatTime, type Team, type GoalLog, type PenaltyLog } from "@/contexts/game-state-context";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -9,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Goal, Siren, X } from "lucide-react";
+import { Goal, Siren, X, FileText, FileDown } from "lucide-react";
 
 interface GameSummaryDialogProps {
   isOpen: boolean;
@@ -100,7 +102,6 @@ const TeamSummaryColumn = ({ team, teamName, score, goals, penalties }: { team: 
 export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogProps) {
   const { state } = useGameState();
   
-  // Generate goal lists directly from the main goals state
   const homeGoals = useMemo(() => {
     return state.goals.filter(g => g.team === 'home').sort((a, b) => a.timestamp - b.timestamp);
   }, [state.goals]);
@@ -109,7 +110,6 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
     return state.goals.filter(g => g.team === 'away').sort((a, b) => a.timestamp - b.timestamp);
   }, [state.goals]);
   
-  // Use penalty logs from the game summary (which are correctly updated)
   const homePenalties = useMemo(() => {
       return [...state.gameSummary.home.penalties].sort((a,b) => a.addTimestamp - b.addTimestamp);
   }, [state.gameSummary.home.penalties]);
@@ -117,6 +117,87 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
   const awayPenalties = useMemo(() => {
       return [...state.gameSummary.away.penalties].sort((a,b) => a.addTimestamp - b.addTimestamp);
   }, [state.gameSummary.away.penalties]);
+
+
+  const escapeCsvCell = (cellData: any): string => {
+    const stringData = String(cellData ?? '');
+    if (stringData.includes(',') || stringData.includes('"') || stringData.includes('\n')) {
+        return `"${stringData.replace(/"/g, '""')}"`;
+    }
+    return stringData;
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['Equipo', 'Tipo', 'Tiempo de Juego', 'Periodo', 'Jugador #', 'Nombre Jugador', 'Duración', 'Estado/Tiempo Cumplido'];
+    const rows: string[][] = [];
+
+    homeGoals.forEach(g => rows.push([state.homeTeamName, 'Gol', formatTime(g.gameTime), g.periodText, g.scorer?.playerNumber || 'S/N', g.scorer?.playerName || '---', '', '']));
+    awayGoals.forEach(g => rows.push([state.awayTeamName, 'Gol', formatTime(g.gameTime), g.periodText, g.scorer?.playerNumber || 'S/N', g.scorer?.playerName || '---', '', '']));
+    homePenalties.forEach(p => rows.push([state.homeTeamName, 'Penalidad', formatTime(p.addGameTime), p.addPeriodText, p.playerNumber, p.playerName || '---', formatTime(p.initialDuration * 100), p.endReason ? getEndReasonText(p.endReason) : `Activa (${formatTime(p.initialDuration * 100 - (p.timeServed || 0))})` ]));
+    awayPenalties.forEach(p => rows.push([state.awayTeamName, 'Penalidad', formatTime(p.addGameTime), p.addPeriodText, p.playerNumber, p.playerName || '---', formatTime(p.initialDuration * 100), p.endReason ? getEndReasonText(p.endReason) : `Activa (${formatTime(p.initialDuration * 100 - (p.timeServed || 0))})` ]));
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(','), ...rows.map(row => row.map(escapeCsvCell).join(','))].join('\n');
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `resumen_partido_${state.homeTeamName}_vs_${state.awayTeamName}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const teamTitle = `${state.homeTeamName} vs ${state.awayTeamName}`;
+    const date = new Date().toLocaleDateString();
+
+    doc.text(`Resumen del Partido: ${teamTitle}`, 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Fecha: ${date}`, 14, 20);
+
+    const addTeamSection = (doc: jsPDF, teamName: string, goals: GoalLog[], penalties: PenaltyLog[], startY: number) => {
+        doc.setFontSize(14);
+        doc.text(`${teamName} - Goles`, 14, startY);
+        if (goals.length > 0) {
+            autoTable(doc, {
+                startY: startY + 2,
+                head: [['Tiempo', 'Periodo', 'Jugador #', 'Nombre']],
+                body: goals.map(g => [formatTime(g.gameTime), g.periodText, g.scorer?.playerNumber || 'S/N', g.scorer?.playerName || '---']),
+                theme: 'striped',
+                headStyles: { fillColor: [41, 128, 185] },
+            });
+        } else {
+             doc.setFontSize(10);
+             doc.text("Sin goles registrados.", 14, startY + 8);
+        }
+
+        const lastY = (doc as any).lastAutoTable.finalY || (startY + 10);
+        doc.setFontSize(14);
+        doc.text(`${teamName} - Penalidades`, 14, lastY + 10);
+
+        if (penalties.length > 0) {
+            autoTable(doc, {
+                startY: lastY + 12,
+                head: [['Tiempo', 'Periodo', 'Jugador #', 'Nombre', 'Duración', 'Estado']],
+                body: penalties.map(p => [formatTime(p.addGameTime), p.addPeriodText, p.playerNumber, p.playerName || '---', formatTime(p.initialDuration * 100), getEndReasonText(p.endReason)]),
+                theme: 'striped',
+                headStyles: { fillColor: [231, 76, 60] },
+            });
+        } else {
+            doc.setFontSize(10);
+            doc.text("Sin penalidades registradas.", 14, lastY + 18);
+        }
+
+        return (doc as any).lastAutoTable.finalY || (lastY + 20);
+    };
+
+    const homeFinalY = addTeamSection(doc, state.homeTeamName, homeGoals, homePenalties, 30);
+    addTeamSection(doc, state.awayTeamName, awayGoals, awayPenalties, homeFinalY + 15);
+
+    doc.save(`resumen_partido_${state.homeTeamName}_vs_${state.awayTeamName}.pdf`);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -147,7 +228,11 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
             />
           </div>
         </ScrollArea>
-        <DialogFooter>
+        <DialogFooter className="flex-wrap">
+          <div className="flex-grow flex justify-start gap-2">
+            <Button type="button" variant="outline" onClick={handleExportCSV}><FileText className="mr-2 h-4 w-4" />Exportar a CSV</Button>
+            <Button type="button" variant="outline" onClick={handleExportPDF}><FileDown className="mr-2 h-4 w-4" />Exportar a PDF</Button>
+          </div>
           <DialogClose asChild>
             <Button type="button" variant="outline"><X className="mr-2 h-4 w-4" />Cerrar</Button>
           </DialogClose>
