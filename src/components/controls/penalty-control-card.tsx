@@ -483,11 +483,11 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-destructive/80 hover:text-destructive"
+                        className="h-6 w-6 text-destructive/80 hover:text-destructive"
                         onClick={() => setPendingConfirmation({ type: 'delete', penalty: p })}
                         aria-label="Eliminar penalidad"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
@@ -520,7 +520,9 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
             <AlertDialog open={!!pendingConfirmation} onOpenChange={() => setPendingConfirmation(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Confirmar Acción</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            {pendingConfirmation.type === 'goal' ? 'Confirmar Penalidad Finalizada por Gol' : 'Confirmar Eliminación'}
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
                             {pendingConfirmation.type === 'goal'
                                 ? `¿Estás seguro de que quieres finalizar la penalidad del jugador #${pendingConfirmation.penalty.playerNumber} por un gol en contra? Esto la eliminará de la lista activa.`
@@ -533,7 +535,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                             onClick={handleConfirmAction} 
                             className={pendingConfirmation.type === 'delete' ? 'bg-destructive hover:bg-destructive/90' : ''}
                         >
-                            Confirmar
+                            {pendingConfirmation.type === 'goal' ? 'Confirmar Gol en PK' : 'Confirmar'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
