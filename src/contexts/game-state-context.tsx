@@ -147,7 +147,9 @@ export type GameAction =
   | { type: 'ADJUST_TIME'; payload: number }
   | { type: 'SET_PERIOD'; payload: number }
   | { type: 'RESET_PERIOD_CLOCK' }
-  | { type: 'MANAGE_GOALS'; payload: GoalLog[] }
+  | { type: 'ADD_GOAL'; payload: Omit<GoalLog, 'id'> }
+  | { type: 'EDIT_GOAL'; payload: { goalId: string; updates: Partial<GoalLog> } }
+  | { type: 'DELETE_GOAL'; payload: { goalId: string } }
   | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id' | '_status'> } }
   | { type: 'REMOVE_PENALTY'; payload: { team: Team; penaltyId: string } }
   | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } }
@@ -728,8 +730,36 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
       break;
     }
-    case 'MANAGE_GOALS': {
-      const newGoals = action.payload;
+    case 'ADD_GOAL': {
+      const newGoal: GoalLog = {
+        ...action.payload,
+        id: crypto.randomUUID(),
+      };
+      const newGoals = [...state.goals, newGoal];
+      const newHomeScore = newGoals.filter(g => g.team === 'home').length;
+      const newAwayScore = newGoals.filter(g => g.team === 'away').length;
+      newStateWithoutMeta = {
+        ...state,
+        goals: newGoals,
+        homeScore: newHomeScore,
+        awayScore: newAwayScore,
+      };
+      break;
+    }
+    case 'EDIT_GOAL': {
+      const newGoals = state.goals.map(g => g.id === action.payload.goalId ? { ...g, ...action.payload.updates } : g);
+      const newHomeScore = newGoals.filter(g => g.team === 'home').length;
+      const newAwayScore = newGoals.filter(g => g.team === 'away').length;
+      newStateWithoutMeta = {
+        ...state,
+        goals: newGoals,
+        homeScore: newHomeScore,
+        awayScore: newAwayScore,
+      };
+      break;
+    }
+    case 'DELETE_GOAL': {
+      const newGoals = state.goals.filter(g => g.id !== action.payload.goalId);
       const newHomeScore = newGoals.filter(g => g.team === 'home').length;
       const newAwayScore = newGoals.filter(g => g.team === 'away').length;
       newStateWithoutMeta = {
