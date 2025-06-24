@@ -482,12 +482,11 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
 
                       <Button
                         variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 text-destructive/80 hover:text-destructive"
+                        className="h-6 w-6 p-1 text-destructive/80 hover:text-destructive"
                         onClick={() => setPendingConfirmation({ type: 'delete', penalty: p })}
                         aria-label="Eliminar penalidad"
                       >
-                        <Trash2 className="h-2.5 w-2.5" />
+                        <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
