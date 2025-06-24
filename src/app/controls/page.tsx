@@ -232,7 +232,7 @@ export default function ControlsPage() {
 
     const finalScore = `${state.homeScore} - ${state.awayScore}`;
 
-    doc.text(`Resumen del Partido: ${teamTitle}`, 14, 15);
+    doc.text(`Resumen del Partido: ${teamTitle} (Cat. ${categoryName})`, 14, 15);
     doc.setFontSize(10);
     doc.text(`Fecha: ${date.toLocaleDateString()}`, 14, 22);
     doc.setFontSize(12);

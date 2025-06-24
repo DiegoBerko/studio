@@ -4,7 +4,7 @@
 import React, { useMemo } from "react";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { useGameState, formatTime, type Team, type GoalLog, type PenaltyLog } from "@/contexts/game-state-context";
+import { useGameState, formatTime, type Team, type GoalLog, type PenaltyLog, getCategoryNameById } from "@/contexts/game-state-context";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -163,8 +163,9 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
     const teamTitle = `${state.homeTeamName} vs ${state.awayTeamName}`;
     const date = new Date().toLocaleDateString();
     const finalScore = `${state.homeScore} - ${state.awayScore}`;
+    const categoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories) || 'N/A';
 
-    doc.text(`Resumen del Partido: ${teamTitle}`, 14, 15);
+    doc.text(`Resumen del Partido: ${teamTitle} (Cat. ${categoryName})`, 14, 15);
     doc.setFontSize(10);
     doc.text(`Fecha: ${date}`, 14, 22);
     doc.setFontSize(12);
