@@ -1,11 +1,4 @@
 
-
-
-
-
-
-
-
 export interface Penalty {
   id: string;
   playerNumber: string;
@@ -101,6 +94,10 @@ export interface GoalLog {
   gameTime: number; // Game time in centiseconds
   periodText: string;
   scorer?: {
+    playerNumber: string;
+    playerName?: string;
+  };
+  assist?: {
     playerNumber: string;
     playerName?: string;
   };

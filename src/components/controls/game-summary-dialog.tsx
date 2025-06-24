@@ -42,7 +42,8 @@ const TeamSummaryColumn = ({ team, teamName, score, goals, penalties }: { team: 
             <TableHeader>
               <TableRow>
                 <TableHead>Tiempo</TableHead>
-                <TableHead>Jugador</TableHead>
+                <TableHead>Gol</TableHead>
+                <TableHead>Asistencia</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -55,6 +56,14 @@ const TeamSummaryColumn = ({ team, teamName, score, goals, penalties }: { team: 
                   <TableCell>
                      <div className="font-semibold">#{goal.scorer?.playerNumber || 'S/N'}</div>
                      <div className="text-xs text-muted-foreground">{goal.scorer?.playerName || '---'}</div>
+                  </TableCell>
+                  <TableCell>
+                    {goal.assist?.playerNumber ? (
+                      <>
+                        <div className="font-semibold">#{goal.assist.playerNumber}</div>
+                        <div className="text-xs text-muted-foreground">{goal.assist.playerName || '---'}</div>
+                      </>
+                    ) : <span className="text-muted-foreground">---</span>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -129,16 +138,16 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
   };
 
   const handleExportCSV = () => {
-    const headers = ['Equipo', 'Tipo', 'Tiempo de Juego', 'Periodo', 'Jugador #', 'Nombre Jugador', 'Duración', 'Estado/Tiempo Cumplido'];
+    const headers = ['Equipo', 'Tipo', 'Tiempo Juego', 'Periodo', '# Jugador', 'Nombre', '# Jugador 2', 'Nombre 2', 'Duración Pen.', 'Estado Pen.'];
     const rows: string[][] = [];
 
-    homeGoals.forEach(g => rows.push([state.homeTeamName, 'Gol', formatTime(g.gameTime), g.periodText, g.scorer?.playerNumber || 'S/N', g.scorer?.playerName || '---', '', '']));
-    awayGoals.forEach(g => rows.push([state.awayTeamName, 'Gol', formatTime(g.gameTime), g.periodText, g.scorer?.playerNumber || 'S/N', g.scorer?.playerName || '---', '', '']));
-    homePenalties.forEach(p => rows.push([state.homeTeamName, 'Penalidad', formatTime(p.addGameTime), p.addPeriodText, p.playerNumber, p.playerName || '---', formatTime(p.initialDuration * 100), p.endReason ? getEndReasonText(p.endReason) : `Activa (${formatTime(p.initialDuration * 100 - (p.timeServed || 0))})` ]));
-    awayPenalties.forEach(p => rows.push([state.awayTeamName, 'Penalidad', formatTime(p.addGameTime), p.addPeriodText, p.playerNumber, p.playerName || '---', formatTime(p.initialDuration * 100), p.endReason ? getEndReasonText(p.endReason) : `Activa (${formatTime(p.initialDuration * 100 - (p.timeServed || 0))})` ]));
+    homeGoals.forEach(g => rows.push([state.homeTeamName, 'Gol', formatTime(g.gameTime), g.periodText, g.scorer?.playerNumber || 'S/N', g.scorer?.playerName || '---', g.assist?.playerNumber || '', g.assist?.playerName || '', '', '']));
+    awayGoals.forEach(g => rows.push([state.awayTeamName, 'Gol', formatTime(g.gameTime), g.periodText, g.scorer?.playerNumber || 'S/N', g.scorer?.playerName || '---', g.assist?.playerNumber || '', g.assist?.playerName || '', '', '']));
+    homePenalties.forEach(p => rows.push([state.homeTeamName, 'Penalidad', formatTime(p.addGameTime), p.addPeriodText, p.playerNumber, p.playerName || '---', '', '', formatTime(p.initialDuration * 100), getEndReasonText(p.endReason) ]));
+    awayPenalties.forEach(p => rows.push([state.awayTeamName, 'Penalidad', formatTime(p.addGameTime), p.addPeriodText, p.playerNumber, p.playerName || '---', '', '', formatTime(p.initialDuration * 100), getEndReasonText(p.endReason) ]));
 
     const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(','), ...rows.map(row => row.map(escapeCsvCell).join(','))].join('\n');
+      + [headers.map(escapeCsvCell).join(','), ...rows.map(row => row.map(escapeCsvCell).join(','))].join('\n');
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -164,8 +173,13 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
         if (goals.length > 0) {
             autoTable(doc, {
                 startY: startY + 2,
-                head: [['Tiempo', 'Periodo', 'Jugador #', 'Nombre']],
-                body: goals.map(g => [formatTime(g.gameTime), g.periodText, g.scorer?.playerNumber || 'S/N', g.scorer?.playerName || '---']),
+                head: [['Tiempo', 'Periodo', 'Gol', 'Asistencia']],
+                body: goals.map(g => [
+                  formatTime(g.gameTime), 
+                  g.periodText, 
+                  `#${g.scorer?.playerNumber || 'S/N'} ${g.scorer?.playerName || ''}`.trim(),
+                  g.assist ? `#${g.assist.playerNumber} ${g.assist.playerName || ''}`.trim() : '---'
+                ]),
                 theme: 'striped',
                 headStyles: { fillColor: [41, 128, 185] },
             });

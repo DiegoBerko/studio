@@ -8,11 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trash2, PlusCircle, Save, X, ChevronsUpDown, Check, Goal, Edit3, CheckCircle, XCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Trash2, PlusCircle, CheckCircle, XCircle, Goal, Edit3 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
@@ -28,7 +25,7 @@ function AddGoalForm({ team }: { team: Team }) {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
   const [scorerNumber, setScorerNumber] = useState('');
-  const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
+  const [assistNumber, setAssistNumber] = useState('');
 
   const teamData = useMemo(() => {
     const teamName = team === 'home' ? state.homeTeamName : state.awayTeamName;
@@ -36,21 +33,25 @@ function AddGoalForm({ team }: { team: Team }) {
     return state.teams.find(t => t.name === teamName && (t.subName || undefined) === (teamSubName || undefined) && t.category === state.selectedMatchCategory);
   }, [team, state.homeTeamName, state.awayTeamName, state.homeTeamSubName, state.awayTeamSubName, state.selectedMatchCategory, state.teams]);
 
+  const selectedPlayer = useMemo(() => teamData?.players.find(p => p.number === scorerNumber), [teamData, scorerNumber]);
+  const selectedAssistPlayer = useMemo(() => teamData?.players.find(p => p.number === assistNumber), [teamData, assistNumber]);
+
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedScorerNumber = scorerNumber.trim();
+    const trimmedAssistNumber = assistNumber.trim();
+
     if (!trimmedScorerNumber) {
-      toast({ title: "Número Requerido", description: "Debes ingresar el número del jugador que anotó.", variant: "destructive" });
+      toast({ title: "Número del Goleador Requerido", description: "Debes ingresar el número del jugador que anotó.", variant: "destructive" });
       return;
     }
     if (!/^\d+$/.test(trimmedScorerNumber)) {
-      toast({ title: "Número Inválido", description: "El número debe ser numérico.", variant: "destructive" });
+      toast({ title: "Número de Goleador Inválido", description: "El número debe ser numérico.", variant: "destructive" });
       return;
     }
-    
-    dispatch({
-      type: 'ADD_GOAL',
-      payload: {
+
+    const payload: Omit<GoalLog, 'id'> = {
         team,
         timestamp: Date.now(),
         gameTime: state.currentTime,
@@ -59,12 +60,28 @@ function AddGoalForm({ team }: { team: Team }) {
           playerNumber: trimmedScorerNumber,
           playerName: selectedPlayer?.name,
         },
-      },
-    });
+    };
+
+    if (trimmedAssistNumber) {
+        if (!/^\d+$/.test(trimmedAssistNumber)) {
+            toast({ title: "Número de Asistencia Inválido", description: "El número de la asistencia debe ser numérico.", variant: "destructive" });
+            return;
+        }
+        if (trimmedAssistNumber === trimmedScorerNumber) {
+            toast({ title: "Jugador Duplicado", description: "El goleador y el asistente no pueden ser el mismo jugador.", variant: "destructive" });
+            return;
+        }
+        payload.assist = {
+            playerNumber: trimmedAssistNumber,
+            playerName: selectedAssistPlayer?.name,
+        };
+    }
+    
+    dispatch({ type: 'ADD_GOAL', payload });
 
     toast({ title: "Gol Añadido", description: `Gol para el jugador #${trimmedScorerNumber} registrado.` });
     setScorerNumber('');
-    setSelectedPlayer(null);
+    setAssistNumber('');
   };
 
   return (
@@ -73,32 +90,35 @@ function AddGoalForm({ team }: { team: Team }) {
         <CardTitle className="text-lg">Añadir Nuevo Gol</CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="flex items-end gap-4">
-          <div className="flex-grow">
-            <Label htmlFor="new-scorer-number">Número del Goleador</Label>
-            <Input
-              id="new-scorer-number"
-              value={scorerNumber}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (/^\d*$/.test(val)) {
-                  setScorerNumber(val);
-                  const player = teamData?.players.find(p => p.number === val);
-                  setSelectedPlayer(player || null);
-                }
-              }}
-              placeholder="Ej: 99"
-            />
-          </div>
-          <Button type="submit">
-            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Gol
-          </Button>
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row items-end gap-4">
+            <div className="flex-grow w-full grid grid-cols-2 gap-4">
+                <div>
+                    <Label htmlFor="new-scorer-number"># Gol</Label>
+                    <Input
+                        id="new-scorer-number"
+                        value={scorerNumber}
+                        onChange={(e) => { if (/^\d*$/.test(e.target.value)) setScorerNumber(e.target.value); }}
+                        placeholder="Ej: 99"
+                        autoComplete="off"
+                    />
+                    {selectedPlayer && <p className="text-xs text-muted-foreground mt-1 truncate" title={selectedPlayer.name}>Jugador: {selectedPlayer.name}</p>}
+                </div>
+                <div>
+                    <Label htmlFor="new-assist-number"># Asistencia</Label>
+                    <Input
+                        id="new-assist-number"
+                        value={assistNumber}
+                        onChange={(e) => { if (/^\d*$/.test(e.target.value)) setAssistNumber(e.target.value); }}
+                        placeholder="(Opcional)"
+                         autoComplete="off"
+                    />
+                    {selectedAssistPlayer && <p className="text-xs text-muted-foreground mt-1 truncate" title={selectedAssistPlayer.name}>Asistente: {selectedAssistPlayer.name}</p>}
+                </div>
+            </div>
+            <Button type="submit" className="w-full sm:w-auto mt-2 sm:mt-0">
+                <PlusCircle className="mr-2 h-4 w-4" /> Añadir Gol
+            </Button>
         </form>
-         {selectedPlayer && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Jugador: {selectedPlayer.name}
-            </p>
-        )}
       </CardContent>
     </Card>
   );
@@ -122,6 +142,7 @@ function EditableGoalItem({ goal }: { goal: GoalLog }) {
   const [secInput, setSecInput] = useState(String(seconds).padStart(2, '0'));
   const [periodInput, setPeriodInput] = useState(goal.periodText);
   const [scorerNumberInput, setScorerNumberInput] = useState(goal.scorer?.playerNumber || '');
+  const [assistNumberInput, setAssistNumberInput] = useState(goal.assist?.playerNumber || '');
 
   const periodOptions = useMemo(() => {
     const options: { value: string, label: string }[] = [];
@@ -140,6 +161,7 @@ function EditableGoalItem({ goal }: { goal: GoalLog }) {
       setSecInput(String(totalSeconds % 60).padStart(2, '0'));
       setPeriodInput(goal.periodText);
       setScorerNumberInput(goal.scorer?.playerNumber || '');
+      setAssistNumberInput(goal.assist?.playerNumber || '');
     }
   }, [isEditing, goal]);
 
@@ -152,22 +174,41 @@ function EditableGoalItem({ goal }: { goal: GoalLog }) {
   const handleSave = () => {
     const trimmedScorerNumber = scorerNumberInput.trim();
     if (!trimmedScorerNumber || !/^\d+$/.test(trimmedScorerNumber)) {
-      toast({ title: "Número Inválido", description: "El número del goleador es requerido y debe ser numérico.", variant: "destructive" });
+      toast({ title: "Número de Goleador Inválido", description: "El número del goleador es requerido y debe ser numérico.", variant: "destructive" });
       return;
+    }
+
+    const trimmedAssistNumber = assistNumberInput.trim();
+    if (trimmedAssistNumber && !/^\d+$/.test(trimmedAssistNumber)) {
+      toast({ title: "Número de Asistencia Inválido", description: "El número de la asistencia debe ser numérico.", variant: "destructive" });
+      return;
+    }
+    if (trimmedScorerNumber && trimmedAssistNumber && trimmedScorerNumber === trimmedAssistNumber) {
+        toast({ title: "Jugador Duplicado", description: "El goleador y el asistente no pueden ser el mismo jugador.", variant: "destructive" });
+        return;
     }
     
     const mins = parseInt(minInput, 10) || 0;
     const secs = parseInt(secInput, 10) || 0;
     const newGameTime = (mins * 60 + secs) * 100;
     
-    const player = teamData?.players.find(p => p.number === trimmedScorerNumber);
+    const scorerPlayer = teamData?.players.find(p => p.number === trimmedScorerNumber);
 
     const updates: Partial<GoalLog> = {};
     if (newGameTime !== goal.gameTime) updates.gameTime = newGameTime;
     if (periodInput !== goal.periodText) updates.periodText = periodInput;
     if (trimmedScorerNumber !== goal.scorer?.playerNumber) {
-        updates.scorer = { playerNumber: trimmedScorerNumber, playerName: player?.name };
+        updates.scorer = { playerNumber: trimmedScorerNumber, playerName: scorerPlayer?.name };
     }
+    if (trimmedAssistNumber !== (goal.assist?.playerNumber || '') || (!trimmedAssistNumber && goal.assist)) {
+        if (trimmedAssistNumber) {
+            const assistPlayer = teamData?.players.find(p => p.number === trimmedAssistNumber);
+            updates.assist = { playerNumber: trimmedAssistNumber, playerName: assistPlayer?.name };
+        } else {
+            updates.assist = undefined;
+        }
+    }
+
 
     if (Object.keys(updates).length > 0) {
         dispatch({ type: 'EDIT_GOAL', payload: { goalId: goal.id, updates } });
@@ -213,10 +254,12 @@ function EditableGoalItem({ goal }: { goal: GoalLog }) {
                         </SelectContent>
                     </Select>
                 </div>
-                {/* Scorer Input */}
-                <div className="flex items-center gap-1">
-                    <Label htmlFor={`scorer-${goal.id}`} className="text-sm text-muted-foreground">Nº:</Label>
+                {/* Scorer and Assist Inputs */}
+                <div className="flex items-center gap-2">
+                    <Label htmlFor={`scorer-${goal.id}`} className="text-sm text-muted-foreground"># Gol:</Label>
                     <Input id={`scorer-${goal.id}`} value={scorerNumberInput} onChange={(e) => { if (/^\d*$/.test(e.target.value)) setScorerNumberInput(e.target.value); }} className="w-16 h-8 text-center" />
+                    <Label htmlFor={`assist-${goal.id}`} className="text-sm text-muted-foreground ml-2"># Asist:</Label>
+                    <Input id={`assist-${goal.id}`} value={assistNumberInput} onChange={(e) => { if (/^\d*$/.test(e.target.value)) setAssistNumberInput(e.target.value); }} className="w-16 h-8 text-center" placeholder="Opc."/>
                 </div>
             </div>
             <div className="flex justify-end gap-2">
@@ -237,7 +280,12 @@ function EditableGoalItem({ goal }: { goal: GoalLog }) {
             <span className="opacity-80">{displayTimestamp.date}</span>
           </div>
           <div className="font-semibold text-card-foreground truncate">
-            <p>Gol #{goal.scorer?.playerNumber || 'S/N'}</p>
+            <p>
+              Gol #{goal.scorer?.playerNumber || 'S/N'}
+              {goal.assist?.playerNumber && (
+                <span className="text-sm font-normal text-muted-foreground"> (Asist. #{goal.assist.playerNumber})</span>
+              )}
+            </p>
             <p className="text-sm text-muted-foreground font-normal">
               {formatTime(goal.gameTime)} - {goal.periodText}
             </p>
@@ -299,7 +347,7 @@ export function GoalManagementDialog({ isOpen, onOpenChange, team }: GoalManagem
         </ScrollArea>
         <DialogFooter className="border-t pt-4">
           <DialogClose asChild>
-            <Button type="button" variant="outline"><X className="mr-2 h-4 w-4"/>Cerrar</Button>
+            <Button type="button" variant="outline">Cerrar</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
