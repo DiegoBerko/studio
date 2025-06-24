@@ -162,10 +162,13 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
     const doc = new jsPDF();
     const teamTitle = `${state.homeTeamName} vs ${state.awayTeamName}`;
     const date = new Date().toLocaleDateString();
+    const finalScore = `${state.homeScore} - ${state.awayScore}`;
 
     doc.text(`Resumen del Partido: ${teamTitle}`, 14, 15);
     doc.setFontSize(10);
-    doc.text(`Fecha: ${date}`, 14, 20);
+    doc.text(`Fecha: ${date}`, 14, 22);
+    doc.setFontSize(12);
+    doc.text(`Resultado Final: ${finalScore}`, 14, 29);
 
     const addTeamSection = (doc: jsPDF, teamName: string, goals: GoalLog[], penalties: PenaltyLog[], startY: number) => {
         doc.setFontSize(14);
@@ -208,7 +211,7 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
         return (doc as any).lastAutoTable.finalY || (lastY + 20);
     };
 
-    const homeFinalY = addTeamSection(doc, state.homeTeamName, homeGoals, homePenalties, 30);
+    const homeFinalY = addTeamSection(doc, state.homeTeamName, homeGoals, homePenalties, 40);
     addTeamSection(doc, state.awayTeamName, awayGoals, awayPenalties, homeFinalY + 15);
 
     doc.save(`resumen_partido_${state.homeTeamName}_vs_${state.awayTeamName}.pdf`);

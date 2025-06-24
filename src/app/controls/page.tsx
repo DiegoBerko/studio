@@ -3,11 +3,13 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { flushSync } from 'react-dom';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { MiniScoreboard } from '@/components/controls/mini-scoreboard';
 import { PenaltyControlCard } from '@/components/controls/penalty-control-card';
 import { GoalManagementDialog } from '@/components/controls/goal-management-dialog';
 import { GameSummaryDialog } from '@/components/controls/game-summary-dialog';
-import { useGameState, type Team } from '@/contexts/game-state-context';
+import { useGameState, type Team, type GoalLog, type PenaltyLog, getCategoryNameById, formatTime } from '@/contexts/game-state-context';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -31,6 +33,7 @@ export default function ControlsPage() {
   
   const channelRef = useRef<BroadcastChannel | null>(null);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  const [isDownloadPromptOpen, setIsDownloadPromptOpen] = useState(false);
   
   const [isGoalManagementOpen, setIsGoalManagementOpen] = useState(false);
   const [editingTeamForGoals, setEditingTeamForGoals] = useState<Team | null>(null);
@@ -201,6 +204,101 @@ export default function ControlsPage() {
     });
     setShowResetConfirmation(false);
   };
+  
+  const handleConfirmReset = () => {
+    setShowResetConfirmation(false);
+    setIsDownloadPromptOpen(true);
+  };
+
+  const getEndReasonText = (reason?: PenaltyLog['endReason']): string => {
+    if (!reason) return 'Activa';
+    switch (reason) {
+        case 'completed': return 'Cumplida';
+        case 'deleted': return 'Eliminada';
+        case 'goal_on_pp': return 'Gol en Contra';
+        default: return 'Cerrada';
+    }
+  };
+
+  const handleDownloadAndReset = () => {
+    // --- PDF Generation Logic ---
+    const doc = new jsPDF();
+    const teamTitle = `${state.homeTeamName} vs ${state.awayTeamName}`;
+    const categoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories) || 'N/A';
+    
+    const date = new Date();
+    const dateString = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+    const filename = `${dateString} - Cat ${categoryName} - ${state.homeTeamName} vs ${state.awayTeamName}.pdf`;
+
+    const finalScore = `${state.homeScore} - ${state.awayScore}`;
+
+    doc.text(`Resumen del Partido: ${teamTitle}`, 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Fecha: ${date.toLocaleDateString()}`, 14, 22);
+    doc.setFontSize(12);
+    doc.text(`Resultado Final: ${finalScore}`, 14, 29);
+
+    const homeGoals = state.goals.filter(g => g.team === 'home').sort((a, b) => a.timestamp - b.timestamp);
+    const awayGoals = state.goals.filter(g => g.team === 'away').sort((a, b) => a.timestamp - b.timestamp);
+    const homePenalties = [...state.gameSummary.home.penalties].sort((a,b) => a.addTimestamp - b.addTimestamp);
+    const awayPenalties = [...state.gameSummary.away.penalties].sort((a,b) => a.addTimestamp - b.addTimestamp);
+    
+    const addTeamSection = (doc: jsPDF, teamName: string, goals: GoalLog[], penalties: PenaltyLog[], startY: number) => {
+        doc.setFontSize(14);
+        doc.text(`${teamName} - Goles`, 14, startY);
+        if (goals.length > 0) {
+            autoTable(doc, {
+                startY: startY + 2,
+                head: [['Tiempo', 'Periodo', 'Gol', 'Asistencia']],
+                body: goals.map(g => [
+                  formatTime(g.gameTime), 
+                  g.periodText, 
+                  `#${g.scorer?.playerNumber || 'S/N'} ${g.scorer?.playerName || ''}`.trim(),
+                  g.assist ? `#${g.assist.playerNumber} ${g.assist.playerName || ''}`.trim() : '---'
+                ]),
+                theme: 'striped',
+                headStyles: { fillColor: [41, 128, 185] },
+            });
+        } else {
+             doc.setFontSize(10);
+             doc.text("Sin goles registrados.", 14, startY + 8);
+        }
+
+        const lastY = (doc as any).lastAutoTable.finalY || (startY + 10);
+        doc.setFontSize(14);
+        doc.text(`${teamName} - Penalidades`, 14, lastY + 10);
+
+        if (penalties.length > 0) {
+            autoTable(doc, {
+                startY: lastY + 12,
+                head: [['Tiempo', 'Periodo', 'Jugador #', 'Nombre', 'Duración', 'Estado']],
+                body: penalties.map(p => [formatTime(p.addGameTime), p.addPeriodText, p.playerNumber, p.playerName || '---', formatTime(p.initialDuration * 100), getEndReasonText(p.endReason)]),
+                theme: 'striped',
+                headStyles: { fillColor: [231, 76, 60] },
+            });
+        } else {
+            doc.setFontSize(10);
+            doc.text("Sin penalidades registradas.", 14, lastY + 18);
+        }
+
+        return (doc as any).lastAutoTable.finalY || (lastY + 20);
+    };
+    
+    const homeFinalY = addTeamSection(doc, state.homeTeamName, homeGoals, homePenalties, 40);
+    addTeamSection(doc, state.awayTeamName, awayGoals, awayPenalties, homeFinalY + 15);
+
+    doc.save(filename);
+    // --- End PDF Generation Logic ---
+    
+    toast({
+        title: "Resumen Descargado",
+        description: `El archivo ${filename} se ha guardado.`,
+    });
+    
+    handleResetGame();
+    setIsDownloadPromptOpen(false);
+  };
+
 
   const handleActivatePendingPuckPenalties = () => {
     flushSync(() => {
@@ -292,7 +390,7 @@ export default function ControlsPage() {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleResetGame}>
+                  <AlertDialogAction onClick={handleConfirmReset}>
                     Confirmar Nuevo Partido
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -329,6 +427,28 @@ export default function ControlsPage() {
           isOpen={isSummaryDialogOpen}
           onOpenChange={setIsSummaryDialogOpen}
         />
+      )}
+
+      {isDownloadPromptOpen && (
+        <AlertDialog open={isDownloadPromptOpen} onOpenChange={setIsDownloadPromptOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Descargar Resumen del Partido</AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Deseas descargar un resumen en PDF del partido que acaba de finalizar antes de reiniciar?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { handleResetGame(); setIsDownloadPromptOpen(false); }} variant="outline">
+                Reiniciar sin Descargar
+              </AlertDialogAction>
+              <AlertDialogAction onClick={handleDownloadAndReset}>
+                Descargar y Reiniciar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );
