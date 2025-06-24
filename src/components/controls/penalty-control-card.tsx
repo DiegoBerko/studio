@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { useGameState, formatTime } from '@/contexts/game-state-context';
 import type { Penalty, Team, PlayerData } from '@/types';
@@ -37,8 +37,8 @@ const ADJUST_TIME_DELTA_SECONDS = 1;
 
 export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) {
   const { state, dispatch } = useGameState();
-  const [playerNumberForPenalty, setPlayerNumberForPenalty] = useState(''); // Number for the penalty itself
-  const [selectedPlayerName, setSelectedPlayerName] = useState<string | null>(null); // Name of player selected from popover
+  const [playerNumberForPenalty, setPlayerNumberForPenalty] = useState('');
+  const [selectedPlayerName, setSelectedPlayerName] = useState<string | null>(null);
   const [penaltyDurationSeconds, setPenaltyDurationSeconds] = useState('120');
   const { toast } = useToast();
 
@@ -50,6 +50,9 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   const justSelectedPlayerRef = useRef(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
 
+  // New state for editing penalty time
+  const [editingPenaltyId, setEditingPenaltyId] = useState<string | null>(null);
+  const [editTimeValue, setEditTimeValue] = useState('');
 
   const penalties = team === 'home' ? state.homePenalties : state.awayPenalties;
   const teamSubName = team === 'home' ? state.homeTeamSubName : state.awayTeamSubName;
@@ -63,23 +66,18 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   }, [state.teams, teamName, teamSubName, state.selectedMatchCategory]);
   
   const teamHasPlayers = useMemo(() => {
-      if (!state.enablePlayerSelectionForPenalties) return false; // Global setting check
+      if (!state.enablePlayerSelectionForPenalties) return false;
       return matchedTeam && matchedTeam.players.length > 0;
   }, [matchedTeam, state.enablePlayerSelectionForPenalties]);
 
-
   const filteredPlayers = useMemo(() => {
     if (!matchedTeam || !teamHasPlayers) return [];
-
-    // Filter to only include players with a number
     let playersToFilter = matchedTeam.players.filter(p => p.number && p.number.trim() !== '');
-
-    // Sort players by number
     playersToFilter.sort((a, b) => {
       const numA = parseInt(a.number, 10);
       const numB = parseInt(b.number, 10);
       if (isNaN(numA) || isNaN(numB)) {
-        return a.number.localeCompare(b.number); // Fallback for non-numeric or mixed numbers
+        return a.number.localeCompare(b.number);
       }
       return numA - numB;
     });
@@ -87,14 +85,12 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     const searchTermLower = playerSearchTerm.toLowerCase();
     if (!searchTermLower.trim()) return playersToFilter;
 
-    // Filter based on search term
     return playersToFilter.filter(
       (player: PlayerData) =>
         (player.number.toLowerCase().includes(searchTermLower)) ||
         (state.showAliasInPenaltyPlayerSelector && player.name.toLowerCase().includes(searchTermLower))
     );
   }, [matchedTeam, teamHasPlayers, playerSearchTerm, state.showAliasInPenaltyPlayerSelector]);
-
 
   const handleAddPenalty = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +100,6 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
       toast({ title: "Error", description: "Número de jugador para la penalidad y duración son requeridos.", variant: "destructive" });
       return;
     }
-    // This validation ensures the number entered for the penalty itself is numeric or numeric+letter
     if (!/^\d+$/.test(trimmedPlayerNumberForPenalty) && !/^\d+[A-Za-z]*$/.test(trimmedPlayerNumberForPenalty)) {
        toast({ title: "Error", description: "El número de jugador para la penalidad debe ser numérico o un número seguido de letras (ej. 1, 23, 15A).", variant: "destructive" });
        return;
@@ -116,8 +111,6 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
         type: 'ADD_PENALTY',
         payload: {
           team,
-          // The `playerNumber` on the penalty object is the one that will be displayed and used for game logic.
-          // It can be the player's actual number, or a manually entered one for the penalty.
           penalty: { playerNumber: trimmedPlayerNumberForPenalty.toUpperCase(), initialDuration: durationSec, remainingTime: durationSec },
         },
       });
@@ -144,6 +137,38 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     if (penalty) {
         toast({ title: "Tiempo de Penalidad Ajustado", description: `Tiempo para Jugador ${penalty.playerNumber} (${teamName}) ajustado en ${deltaSeconds > 0 ? '+' : ''}${deltaSeconds}s.` });
     }
+  };
+  
+  const handleSetPenaltyTime = (penaltyId: string) => {
+    const parts = editTimeValue.split(':');
+    let minutes = 0;
+    let seconds = 0;
+
+    if (parts.length === 2) {
+      minutes = parseInt(parts[0], 10);
+      seconds = parseInt(parts[1], 10);
+    } else if (parts.length === 1) {
+      seconds = parseInt(parts[0], 10);
+    }
+
+    if (isNaN(minutes) || isNaN(seconds)) {
+      toast({ title: "Tiempo Inválido", description: "Por favor, usa el formato MM:SS o solo segundos.", variant: "destructive" });
+      setEditingPenaltyId(null);
+      return;
+    }
+
+    const totalSeconds = (minutes * 60) + seconds;
+
+    flushSync(() => {
+      dispatch({
+        type: 'SET_PENALTY_TIME',
+        payload: { team, penaltyId, time: totalSeconds }
+      });
+    });
+
+    toast({ title: "Tiempo de Penalidad Establecido", description: `Tiempo actualizado a ${formatTime(totalSeconds * 100)}.` });
+    
+    setEditingPenaltyId(null);
   };
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, penaltyId: string) => {
@@ -233,7 +258,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-            <Command shouldFilter={false}> {/* We do custom filtering in `filteredPlayers` */}
+            <Command shouldFilter={false}>
               <CommandInput
                 placeholder="Buscar Nº o Nombre..."
                 value={playerSearchTerm}
@@ -245,12 +270,11 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                         const trimmedSearch = playerSearchTerm.trim().toUpperCase();
                         if (filteredPlayers.length > 0) {
                             const playerToSelect = filteredPlayers[0];
-                            setPlayerNumberForPenalty(playerToSelect.number); // This will always be a number
+                            setPlayerNumberForPenalty(playerToSelect.number);
                             setSelectedPlayerName(playerToSelect.name);
                         } else if (trimmedSearch && (/^\d+$/.test(trimmedSearch) || /^\d+[A-Za-z]*$/.test(trimmedSearch))) {
-                           // Allow entering a number not in list
                            setPlayerNumberForPenalty(trimmedSearch);
-                           setSelectedPlayerName(null); // No player matched from list
+                           setSelectedPlayerName(null);
                         }
                         justSelectedPlayerRef.current = true;
                         setIsPlayerPopoverOpen(false);
@@ -297,14 +321,13 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
         </Popover>
       );
     }
-    // Fallback to direct input if player selection is not available/enabled
     return (
       <Input
         id={`${team}-playerNumberForPenalty`}
         value={playerNumberForPenalty}
         onChange={(e) => {
             setPlayerNumberForPenalty(e.target.value.toUpperCase());
-            setSelectedPlayerName(null); // Clear selected player if number is manually typed
+            setSelectedPlayerName(null);
         }}
         placeholder="ej., 99 o 15A"
         required
@@ -312,7 +335,6 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
       />
     );
   };
-
 
   return (
     <>
@@ -374,11 +396,12 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                 pData => pData.number === p.playerNumber || (p.playerNumber === "S/N" && !pData.number)
               );
               const displayPenaltyNumber = p.playerNumber || 'S/N';
+              const isEditingThisPenalty = editingPenaltyId === p.id;
 
               return (
                 <Card
                   key={p.id}
-                  draggable
+                  draggable={!isEditingThisPenalty}
                   onDragStart={(e) => handleDragStart(e, p.id)}
                   onDragEnter={(e) => handleDragEnter(e, p.id)}
                   onDragLeave={handleDragLeave}
@@ -386,16 +409,17 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                   onDrop={(e) => handleDrop(e, p.id)}
                   onDragEnd={handleDragEnd}
                   className={cn(
-                    "p-3 bg-muted/30 flex flex-col cursor-move transition-all",
+                    "p-3 bg-muted/30 transition-all",
+                    !isEditingThisPenalty && "cursor-move",
                     draggedPenaltyId === p.id && "opacity-50 scale-95 shadow-lg",
                     dragOverPenaltyId === p.id && draggedPenaltyId !== p.id && "border-2 border-primary ring-2 ring-primary",
                     isWaitingSlot && "opacity-60 bg-muted/10",
-                    isPendingPuck && "opacity-40 bg-yellow-500/5 border-yellow-500/30" // Distintivo para pending_puck
+                    isPendingPuck && "opacity-40 bg-yellow-500/5 border-yellow-500/30"
                   )}
                 >
-                  <div className="flex justify-between items-center w-full">
-                    <div className="flex-1">
-                      <p className="font-semibold text-card-foreground">
+                  <div className="flex justify-between items-center w-full gap-2">
+                     <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-card-foreground truncate">
                         Jugador {displayPenaltyNumber}
                         {state.enablePlayerSelectionForPenalties && state.showAliasInControlsPenaltyList && matchedPlayerForPenaltyDisplay && matchedPlayerForPenaltyDisplay.name && (
                           <span className="ml-1 text-xs text-muted-foreground font-normal">
@@ -403,36 +427,55 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                           </span>
                         )}
                       </p>
-                      <div className="flex items-center text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3 mr-1" />
-                        <span>{formatTime(p.remainingTime * 100)} / {formatTime(p.initialDuration * 100)}</span>
-                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Total: {formatTime(p.initialDuration * 100)}
+                      </p>
                     </div>
-                    <div className="flex items-center gap-1 ml-2">
+
+                    <div className="flex items-center gap-1">
+                      {isEditingThisPenalty ? (
+                        <Input
+                          type="text"
+                          value={editTimeValue}
+                          onChange={(e) => setEditTimeValue(e.target.value)}
+                          onBlur={() => handleSetPenaltyTime(p.id)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleSetPenaltyTime(p.id); if (e.key === 'Escape') setEditingPenaltyId(null); }}
+                          className="w-20 h-8 text-center font-mono"
+                          autoFocus
+                          placeholder="MM:SS"
+                        />
+                      ) : (
+                        <div
+                          className="w-20 h-8 flex items-center justify-center font-mono text-lg cursor-pointer rounded-md hover:bg-white/10"
+                          onClick={() => {
+                            setEditingPenaltyId(p.id);
+                            setEditTimeValue(formatTime(p.remainingTime * 100));
+                          }}
+                        >
+                          {formatTime(p.remainingTime * 100)}
+                        </div>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6"
-                        onClick={() => handleAdjustPenaltyTime(p.id, -ADJUST_TIME_DELTA_SECONDS)}
-                        aria-label={`Restar ${ADJUST_TIME_DELTA_SECONDS}s a penalidad de jugador ${p.playerNumber}`}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
+                        className="h-8 w-8"
                         onClick={() => handleAdjustPenaltyTime(p.id, ADJUST_TIME_DELTA_SECONDS)}
-                        aria-label={`Sumar ${ADJUST_TIME_DELTA_SECONDS}s a penalidad de jugador ${p.playerNumber}`}
                       >
-                        <Plus className="h-3 w-3" />
+                        <Plus className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        className="h-8 w-8"
+                        onClick={() => handleAdjustPenaltyTime(p.id, -ADJUST_TIME_DELTA_SECONDS)}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => handleRemovePenalty(p.id)}
-                        aria-label={`Remover penalidad para jugador ${p.playerNumber}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

@@ -153,6 +153,7 @@ export type GameAction =
   | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id' | '_status'> } }
   | { type: 'REMOVE_PENALTY'; payload: { team: Team; penaltyId: string } }
   | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } }
+  | { type: 'SET_PENALTY_TIME'; payload: { team: Team; penaltyId: string; time: number } }
   | { type: 'REORDER_PENALTIES'; payload: { team: Team; startIndex: number; endIndex: number } }
   | { type: 'ACTIVATE_PENDING_PUCK_PENALTIES' }
   | { type: 'TICK' }
@@ -857,6 +858,29 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         if (p.id === penaltyId) {
           const newRemainingTimeSec = Math.max(0, p.remainingTime + delta);
           const cappedTimeSec = delta > 0 ? Math.min(newRemainingTimeSec, p.initialDuration) : newRemainingTimeSec;
+          return { ...p, remainingTime: cappedTimeSec };
+        }
+        return p;
+      });
+      updatedPenalties = updatePenaltyStatusesOnly(updatedPenalties, state.maxConcurrentPenalties);
+      updatedPenalties = sortPenaltiesByStatus(updatedPenalties);
+      newStateWithoutMeta = { ...state, [`${team}Penalties`]: updatedPenalties };
+      break;
+    }
+    case 'SET_PENALTY_TIME': {
+      const { team, penaltyId, time } = action.payload;
+      const penalties = state[`${team}Penalties`];
+      const penaltyToUpdate = penalties.find(p => p.id === penaltyId);
+
+      if (!penaltyToUpdate) {
+        newStateWithoutMeta = state;
+        break;
+      }
+
+      let updatedPenalties = penalties.map(p => {
+        if (p.id === penaltyId) {
+          const newRemainingTimeSec = Math.max(0, time);
+          const cappedTimeSec = Math.min(newRemainingTimeSec, p.initialDuration);
           return { ...p, remainingTime: cappedTimeSec };
         }
         return p;
