@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { useGameState, formatTime, type Team, type GoalLog, type PenaltyLog } from "@/contexts/game-state-context";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
@@ -99,7 +99,24 @@ const TeamSummaryColumn = ({ team, teamName, score, goals, penalties }: { team: 
 
 export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogProps) {
   const { state } = useGameState();
-  const { home, away } = state.gameSummary;
+  
+  // Generate goal lists directly from the main goals state
+  const homeGoals = useMemo(() => {
+    return state.goals.filter(g => g.team === 'home').sort((a, b) => a.timestamp - b.timestamp);
+  }, [state.goals]);
+  
+  const awayGoals = useMemo(() => {
+    return state.goals.filter(g => g.team === 'away').sort((a, b) => a.timestamp - b.timestamp);
+  }, [state.goals]);
+  
+  // Use penalty logs from the game summary (which are correctly updated)
+  const homePenalties = useMemo(() => {
+      return [...state.gameSummary.home.penalties].sort((a,b) => a.addTimestamp - b.addTimestamp);
+  }, [state.gameSummary.home.penalties]);
+
+  const awayPenalties = useMemo(() => {
+      return [...state.gameSummary.away.penalties].sort((a,b) => a.addTimestamp - b.addTimestamp);
+  }, [state.gameSummary.away.penalties]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -116,8 +133,8 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
               team="home"
               teamName={state.homeTeamName}
               score={state.homeScore}
-              goals={home?.goals || []}
-              penalties={home?.penalties || []}
+              goals={homeGoals}
+              penalties={homePenalties}
             />
             <Separator orientation="vertical" className="hidden md:block h-auto" />
             <Separator orientation="horizontal" className="block md:hidden" />
@@ -125,8 +142,8 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
               team="away"
               teamName={state.awayTeamName}
               score={state.awayScore}
-              goals={away?.goals || []}
-              penalties={away?.penalties || []}
+              goals={awayGoals}
+              penalties={awayPenalties}
             />
           </div>
         </ScrollArea>
