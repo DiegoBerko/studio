@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Home, Settings, Wrench, Server } from 'lucide-react';
+import { Home, Settings, Wrench } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
 export function Header() {
@@ -117,15 +117,6 @@ export function Header() {
           >
             Configuración
           </Link>
-          <Link
-            href="/server-ops"
-            className={cn(
-              "transition-colors hover:text-foreground/80",
-              pathname === "/server-ops" ? "text-foreground" : "text-foreground/60"
-            )}
-          >
-            Server Ops
-          </Link>
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
            <Button variant="ghost" size="icon" asChild className={pathname === "/" ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
@@ -141,11 +132,6 @@ export function Header() {
           <Button variant="ghost" size="icon" asChild className={pathname === "/config" ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
             <Link href="/config" aria-label="Configuración & Equipos">
               <Wrench className="h-5 w-5" />
-            </Link>
-          </Button>
-          <Button variant="ghost" size="icon" asChild className={pathname === "/server-ops" ? "text-primary-foreground bg-primary/80" : "text-foreground/60"}>
-            <Link href="/server-ops" aria-label="Server Ops">
-              <Server className="h-5 w-5" />
             </Link>
           </Button>
         </div>

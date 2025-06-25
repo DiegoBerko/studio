@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
 import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings, ScoreboardLayoutProfile, GameSummary, GoalLog, PenaltyLog } from '@/types';
 import { saveGameSummary } from '@/ai/flows/file-operations';
+import { toast } from '@/hooks/use-toast';
 
 // --- Constantes para la sincronización local ---
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
@@ -1806,11 +1807,8 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const prevPeriodDisplayOverrideRef = useRef<PeriodDisplayOverrideType>();
 
   useEffect(() => {
-    const previousOverride = prevPeriodDisplayOverrideRef.current;
-    const currentOverride = state.periodDisplayOverride;
-
-    // Check if the game has just transitioned to the "End of Game" state
-    if (previousOverride !== 'End of Game' && currentOverride === 'End of Game') {
+    // This effect runs only when the game ends.
+    if (prevPeriodDisplayOverrideRef.current !== 'End of Game' && state.periodDisplayOverride === 'End of Game') {
       const categoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories) || 'N/A';
       
       // Fire-and-forget the save operation
@@ -1824,16 +1822,29 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
             categoryName: categoryName,
             gameSummary: state.gameSummary
           });
-          // Log success/failure to console, but don't interact with UI
-          console.log('Automatic game summary save result:', result.message);
+          if (result.success) {
+            toast({
+              title: "Resumen Guardado",
+              description: `El resumen del partido se ha guardado en el servidor.`,
+            });
+          } else {
+             toast({
+              title: "Error al Guardar",
+              description: result.message,
+              variant: "destructive",
+            });
+          }
         } catch (e) {
           console.error('Failed to save game summary automatically:', e);
+          toast({
+            title: "Error al Guardar Resumen",
+            description: "No se pudo guardar el resumen del partido en el servidor.",
+            variant: "destructive",
+          });
         }
       })();
     }
-
-    // Update the ref for the next render
-    prevPeriodDisplayOverrideRef.current = currentOverride;
+    prevPeriodDisplayOverrideRef.current = state.periodDisplayOverride;
   }, [
       state.periodDisplayOverride,
       state.homeTeamName,
