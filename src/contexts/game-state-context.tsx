@@ -295,7 +295,6 @@ const handleAutoTransition = (currentState: GameState): GameState => {
   const numRegPeriods = currentState.numberOfRegularPeriods;
   const totalGamePeriods = numRegPeriods + currentState.numberOfOvertimePeriods;
   let shouldTriggerHorn = true;
-  let gameHasEnded = false;
 
   newGameStateAfterTransition.homePenalties = [...currentState.homePenalties];
   newGameStateAfterTransition.awayPenalties = [...currentState.awayPenalties];
@@ -357,12 +356,10 @@ const handleAutoTransition = (currentState: GameState): GameState => {
       newGameStateAfterTransition.currentTime = 0;
       newGameStateAfterTransition.isClockRunning = false;
       newGameStateAfterTransition.periodDisplayOverride = "End of Game";
-      gameHasEnded = true;
     } else {
       newGameStateAfterTransition.currentTime = 0;
       newGameStateAfterTransition.isClockRunning = false;
       newGameStateAfterTransition.periodDisplayOverride = "End of Game";
-      gameHasEnded = true;
     }
   } else {
     newGameStateAfterTransition.currentTime = 0;
@@ -373,25 +370,6 @@ const handleAutoTransition = (currentState: GameState): GameState => {
   if (!newGameStateAfterTransition.isClockRunning) {
     newGameStateAfterTransition.clockStartTimeMs = null;
     newGameStateAfterTransition.remainingTimeAtStartCs = null;
-  }
-
-  if (gameHasEnded) {
-    const categoryName = getCategoryNameById(newGameStateAfterTransition.selectedMatchCategory, newGameStateAfterTransition.availableCategories) || 'N/A';
-    (async () => {
-      try {
-        const result = await saveGameSummary({
-          homeTeamName: newGameStateAfterTransition.homeTeamName,
-          awayTeamName: newGameStateAfterTransition.awayTeamName,
-          homeScore: newGameStateAfterTransition.homeScore,
-          awayScore: newGameStateAfterTransition.awayScore,
-          categoryName: categoryName,
-          gameSummary: newGameStateAfterTransition.gameSummary
-        });
-        console.log('Automatic game summary save result:', result.message);
-      } catch (e) {
-        console.error('Failed to save game summary automatically:', e);
-      }
-    })();
   }
 
   newGameStateAfterTransition.playHornTrigger = shouldTriggerHorn
@@ -1206,24 +1184,6 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         };
         newStateWithoutMeta = finalState;
         newPlayHornTrigger = state.playHornTrigger + 1;
-  
-        // Call the save summary flow
-        const categoryName = getCategoryNameById(finalState.selectedMatchCategory, finalState.availableCategories) || 'N/A';
-        (async () => {
-          try {
-            const result = await saveGameSummary({
-              homeTeamName: finalState.homeTeamName,
-              awayTeamName: finalState.awayTeamName,
-              homeScore: finalState.homeScore,
-              awayScore: finalState.awayScore,
-              categoryName: categoryName,
-              gameSummary: finalState.gameSummary
-            });
-            console.log('Automatic game summary save result:', result.message);
-          } catch (e) {
-            console.error('Failed to save game summary automatically:', e);
-          }
-        })();
         break;
       }
     case 'ADD_FORMAT_AND_TIMINGS_PROFILE': {
@@ -1843,6 +1803,47 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPageVisible, setIsPageVisible] = useState(true);
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const prevPeriodDisplayOverrideRef = useRef<PeriodDisplayOverrideType>();
+
+  useEffect(() => {
+    const previousOverride = prevPeriodDisplayOverrideRef.current;
+    const currentOverride = state.periodDisplayOverride;
+
+    // Check if the game has just transitioned to the "End of Game" state
+    if (previousOverride !== 'End of Game' && currentOverride === 'End of Game') {
+      const categoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories) || 'N/A';
+      
+      // Fire-and-forget the save operation
+      (async () => {
+        try {
+          const result = await saveGameSummary({
+            homeTeamName: state.homeTeamName,
+            awayTeamName: state.awayTeamName,
+            homeScore: state.homeScore,
+            awayScore: state.awayScore,
+            categoryName: categoryName,
+            gameSummary: state.gameSummary
+          });
+          // Log success/failure to console, but don't interact with UI
+          console.log('Automatic game summary save result:', result.message);
+        } catch (e) {
+          console.error('Failed to save game summary automatically:', e);
+        }
+      })();
+    }
+
+    // Update the ref for the next render
+    prevPeriodDisplayOverrideRef.current = currentOverride;
+  }, [
+      state.periodDisplayOverride,
+      state.homeTeamName,
+      state.awayTeamName,
+      state.homeScore,
+      state.awayScore,
+      state.selectedMatchCategory,
+      state.availableCategories,
+      state.gameSummary
+  ]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
