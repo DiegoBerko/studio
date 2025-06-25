@@ -4,22 +4,23 @@
  * @fileOverview A Genkit flow for server-side file operations.
  *
  * - performFileOperation - A function that handles reading and writing files on the server.
+ * - saveGameSummary - A function that saves a game summary to the filesystem.
  * - FileOperationInput - The input type for the performFileOperation function.
  * - FileOperationOutput - The return type for the performFileOperation function.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 
-export const FileOperationInputSchema = z.object({
+const FileOperationInputSchema = z.object({
   operation: z.enum(['read', 'write']).describe("The file operation to perform."),
   content: z.string().optional().describe("The content to write to the file. Required for 'write' operation."),
 });
 export type FileOperationInput = z.infer<typeof FileOperationInputSchema>;
 
-export const FileOperationOutputSchema = z.object({
+const FileOperationOutputSchema = z.object({
   success: z.boolean().describe("Whether the operation was successful."),
   content: z.string().optional().describe("The content read from the file. Returned for 'read' operation."),
   message: z.string().describe("A message describing the result of the operation."),
@@ -42,7 +43,7 @@ const fileOperationFlow = ai.defineFlow(
     switch (input.operation) {
       case 'read':
         try {
-          const content = fs.readFileSync(filePath, 'utf-8');
+          const content = await fs.readFile(filePath, 'utf-8');
           return {
             success: true,
             content,
@@ -89,6 +90,68 @@ const fileOperationFlow = ai.defineFlow(
           success: false,
           message: 'Invalid operation specified.',
         };
+    }
+  }
+);
+
+
+// New flow for saving game summaries
+const GameSummaryInputSchema = z.object({
+  homeTeamName: z.string(),
+  awayTeamName: z.string(),
+  homeScore: z.number(),
+  awayScore: z.number(),
+  categoryName: z.string(),
+  gameSummary: z.any(),
+});
+export type GameSummaryInput = z.infer<typeof GameSummaryInputSchema>;
+
+export async function saveGameSummary(input: GameSummaryInput): Promise<{ success: boolean; message: string; filePath?: string; }> {
+  return saveGameSummaryFlow(input);
+}
+
+const saveGameSummaryFlow = ai.defineFlow(
+  {
+    name: 'saveGameSummaryFlow',
+    inputSchema: GameSummaryInputSchema,
+    outputSchema: z.object({ success: z.boolean(), message: z.string(), filePath: z.string().optional() }),
+  },
+  async (input) => {
+    try {
+      const summariesDir = path.join(process.cwd(), 'src', 'resumenes');
+      
+      await fs.mkdir(summariesDir, { recursive: true });
+
+      const date = new Date();
+      const dateString = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}_${date.getHours().toString().padStart(2, '0')}${date.getMinutes().toString().padStart(2, '0')}`;
+      
+      const fileName = `${dateString} - Cat ${input.categoryName} - ${input.homeTeamName} vs ${input.awayTeamName}.json`;
+      const sanitizedFileName = fileName.replace(/[/\\?%*:|"<>]/g, '-');
+      const filePath = path.join(summariesDir, sanitizedFileName);
+
+      const contentToSave = {
+        date: date.toISOString(),
+        category: input.categoryName,
+        homeTeam: input.homeTeamName,
+        awayTeam: input.awayTeamName,
+        finalScore: `${input.homeScore} - ${input.awayScore}`,
+        summary: input.gameSummary,
+      };
+
+      await fs.writeFile(filePath, JSON.stringify(contentToSave, null, 2), 'utf-8');
+
+      return {
+        success: true,
+        message: `Game summary saved successfully to ${filePath}`,
+        filePath: filePath,
+      };
+    } catch (error) {
+      console.error('Error saving game summary:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        message: `Error saving game summary on the server: ${errorMessage}`,
+      };
     }
   }
 );

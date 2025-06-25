@@ -5,6 +5,7 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
 import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings, ScoreboardLayoutProfile, GameSummary, GoalLog, PenaltyLog } from '@/types';
+import { saveGameSummary } from '@/ai/flows/file-operations';
 
 // --- Constantes para la sincronización local ---
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
@@ -294,6 +295,7 @@ const handleAutoTransition = (currentState: GameState): GameState => {
   const numRegPeriods = currentState.numberOfRegularPeriods;
   const totalGamePeriods = numRegPeriods + currentState.numberOfOvertimePeriods;
   let shouldTriggerHorn = true;
+  let gameHasEnded = false;
 
   newGameStateAfterTransition.homePenalties = [...currentState.homePenalties];
   newGameStateAfterTransition.awayPenalties = [...currentState.awayPenalties];
@@ -355,10 +357,12 @@ const handleAutoTransition = (currentState: GameState): GameState => {
       newGameStateAfterTransition.currentTime = 0;
       newGameStateAfterTransition.isClockRunning = false;
       newGameStateAfterTransition.periodDisplayOverride = "End of Game";
+      gameHasEnded = true;
     } else {
       newGameStateAfterTransition.currentTime = 0;
       newGameStateAfterTransition.isClockRunning = false;
       newGameStateAfterTransition.periodDisplayOverride = "End of Game";
+      gameHasEnded = true;
     }
   } else {
     newGameStateAfterTransition.currentTime = 0;
@@ -369,6 +373,25 @@ const handleAutoTransition = (currentState: GameState): GameState => {
   if (!newGameStateAfterTransition.isClockRunning) {
     newGameStateAfterTransition.clockStartTimeMs = null;
     newGameStateAfterTransition.remainingTimeAtStartCs = null;
+  }
+
+  if (gameHasEnded) {
+    const categoryName = getCategoryNameById(newGameStateAfterTransition.selectedMatchCategory, newGameStateAfterTransition.availableCategories) || 'N/A';
+    (async () => {
+      try {
+        const result = await saveGameSummary({
+          homeTeamName: newGameStateAfterTransition.homeTeamName,
+          awayTeamName: newGameStateAfterTransition.awayTeamName,
+          homeScore: newGameStateAfterTransition.homeScore,
+          awayScore: newGameStateAfterTransition.awayScore,
+          categoryName: categoryName,
+          gameSummary: newGameStateAfterTransition.gameSummary
+        });
+        console.log('Automatic game summary save result:', result.message);
+      } catch (e) {
+        console.error('Failed to save game summary automatically:', e);
+      }
+    })();
   }
 
   newGameStateAfterTransition.playHornTrigger = shouldTriggerHorn
@@ -1171,17 +1194,38 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
       break;
     case 'MANUAL_END_GAME':
-      newStateWithoutMeta = {
-        ...state,
-        currentTime: 0,
-        isClockRunning: false,
-        periodDisplayOverride: 'End of Game',
-        clockStartTimeMs: null,
-        remainingTimeAtStartCs: null,
-        preTimeoutState: null,
-      };
-      newPlayHornTrigger = state.playHornTrigger + 1;
-      break;
+      {
+        const finalState = {
+          ...state,
+          currentTime: 0,
+          isClockRunning: false,
+          periodDisplayOverride: 'End of Game',
+          clockStartTimeMs: null,
+          remainingTimeAtStartCs: null,
+          preTimeoutState: null,
+        };
+        newStateWithoutMeta = finalState;
+        newPlayHornTrigger = state.playHornTrigger + 1;
+  
+        // Call the save summary flow
+        const categoryName = getCategoryNameById(finalState.selectedMatchCategory, finalState.availableCategories) || 'N/A';
+        (async () => {
+          try {
+            const result = await saveGameSummary({
+              homeTeamName: finalState.homeTeamName,
+              awayTeamName: finalState.awayTeamName,
+              homeScore: finalState.homeScore,
+              awayScore: finalState.awayScore,
+              categoryName: categoryName,
+              gameSummary: finalState.gameSummary
+            });
+            console.log('Automatic game summary save result:', result.message);
+          } catch (e) {
+            console.error('Failed to save game summary automatically:', e);
+          }
+        })();
+        break;
+      }
     case 'ADD_FORMAT_AND_TIMINGS_PROFILE': {
       const newProfile = createDefaultFormatAndTimingsProfile(crypto.randomUUID(), action.payload.name);
       if (action.payload.profileData) {
