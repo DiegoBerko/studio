@@ -1807,13 +1807,12 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const [isPageVisible, setIsPageVisible] = useState(true);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const prevPeriodDisplayOverrideRef = useRef<PeriodDisplayOverrideType>();
+  const lastSaveTimestampRef = useRef<number>(0);
 
   useEffect(() => {
-    // This effect runs only when the game ends.
     if (prevPeriodDisplayOverrideRef.current !== 'End of Game' && state.periodDisplayOverride === 'End of Game') {
       const categoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories) || 'N/A';
       
-      // Fire-and-forget the save operation
       (async () => {
         try {
           const result = await saveGameSummary({
@@ -1984,22 +1983,33 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    if (isLoading || typeof window === 'undefined' || state._lastActionOriginator !== TAB_ID || !state._initialConfigLoadComplete) {
+    if (isLoading || typeof window === 'undefined' || !state._initialConfigLoadComplete) {
       return;
     }
 
-    try {
-      const stateForStorage: GameState = { ...state };
-      stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
-      stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
+    const now = Date.now();
+    
+    // The originating tab is responsible for saving state and broadcasting.
+    if (state._lastActionOriginator === TAB_ID) {
+        
+        // Throttle the expensive localStorage write operation to once per second.
+        if (now - lastSaveTimestampRef.current > 1000) {
+            try {
+                const stateForStorage: GameState = { ...state };
+                stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
+                stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
 
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
+                lastSaveTimestampRef.current = now;
+            } catch (error) {
+                console.error("Error saving throttled state to localStorage:", error);
+            }
+        }
 
-      if (channelRef.current) {
-        channelRef.current.postMessage(state);
-      }
-    } catch (error) {
-      console.error("Error saving state to localStorage or broadcasting:", error);
+        // Broadcast every state change immediately for real-time UI synchronization.
+        if (channelRef.current) {
+            channelRef.current.postMessage(state);
+        }
     }
   }, [state, isLoading]);
 
@@ -2017,7 +2027,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [state.isClockRunning, state.currentTime, state.homePenalties, state.awayPenalties, isPageVisible, isLoading, state._initialConfigLoadComplete]);
   
-  // Save state on unload to prevent data loss when closing tab with clock running
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (state._initialConfigLoadComplete) {
