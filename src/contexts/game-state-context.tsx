@@ -14,6 +14,7 @@ const LOCAL_STORAGE_KEY = 'icevision-game-state';
 const CENTISECONDS_PER_SECOND = 100;
 const TICK_INTERVAL_MS = 200;
 const DEFAULT_HORN_SOUND_FILE_PATH = '/audio/default-horn.wav'; 
+const DEFAULT_PENALTY_BEEP_FILE_PATH = '/audio/penalty_beep.wav';
 
 
 let TAB_ID: string;
@@ -49,6 +50,10 @@ const IN_CODE_INITIAL_ENABLE_PLAYER_SELECTION_FOR_PENALTIES = true;
 const IN_CODE_INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR = true;
 const IN_CODE_INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST = true;
 const IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES = true;
+const IN_CODE_INITIAL_ENABLE_PENALTY_COUNTDOWN_SOUND = true;
+const IN_CODE_INITIAL_PENALTY_COUNTDOWN_START_TIME = 10;
+const IN_CODE_INITIAL_CUSTOM_PENALTY_BEEP_SOUND_DATA_URL = null;
+
 
 export const IN_CODE_INITIAL_LAYOUT_SETTINGS: ScoreboardLayoutSettings = {
   scoreboardVerticalPosition: -4, // rem
@@ -135,6 +140,7 @@ interface GameState extends ConfigFields {
   clockStartTimeMs: number | null;
   remainingTimeAtStartCs: number | null; 
   playHornTrigger: number; 
+  playPenaltyBeepTrigger: number;
   teams: TeamData[];
   formatAndTimingsProfiles: FormatAndTimingsProfile[];
   selectedFormatAndTimingsProfileId: string | null;
@@ -192,18 +198,16 @@ export type GameAction =
   | { type: 'SET_AUTO_START_TIMEOUTS_VALUE'; payload: boolean }
   | { type: 'SET_PLAY_SOUND_AT_PERIOD_END'; payload: boolean }
   | { type: 'SET_CUSTOM_HORN_SOUND_DATA_URL'; payload: string | null }
-  | { type: 'SET_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD'; payload: boolean }
-  | { type: 'SET_ENABLE_PLAYER_SELECTION_FOR_PENALTIES'; payload: boolean }
-  | { type: 'SET_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR'; payload: boolean }
-  | { type: 'SET_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST'; payload: boolean }
-  | { type: 'SET_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES'; payload: boolean }
+  | { type: 'SET_ENABLE_PENALTY_COUNTDOWN_SOUND'; payload: boolean }
+  | { type: 'SET_PENALTY_COUNTDOWN_START_TIME'; payload: number }
+  | { type: 'SET_CUSTOM_PENALTY_BEEP_SOUND_DATA_URL'; payload: string | null }
   | { type: 'UPDATE_LAYOUT_SETTINGS'; payload: Partial<ScoreboardLayoutSettings> }
   | { type: 'ADD_SCOREBOARD_LAYOUT_PROFILE'; payload: { name: string } }
   | { type: 'UPDATE_SCOREBOARD_LAYOUT_PROFILE_NAME'; payload: { profileId: string; newName: string } }
   | { type: 'DELETE_SCOREBOARD_LAYOUT_PROFILE'; payload: { profileId: string } }
   | { type: 'SELECT_SCOREBOARD_LAYOUT_PROFILE'; payload: { profileId: string } }
   | { type: 'SAVE_CURRENT_LAYOUT_TO_PROFILE' }
-  | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<Pick<ConfigFields, 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl' | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties' | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties' | 'scoreboardLayoutProfiles'>> }
+  | { type: 'LOAD_SOUND_AND_DISPLAY_CONFIG'; payload: Partial<Pick<ConfigFields, 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl' | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties' | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties' | 'scoreboardLayoutProfiles' | 'enablePenaltyCountdownSound' | 'penaltyCountdownStartTime' | 'customPenaltyBeepSoundDataUrl'>> }
   | { type: 'SET_AVAILABLE_CATEGORIES'; payload: CategoryData[] }
   | { type: 'SET_SELECTED_MATCH_CATEGORY'; payload: string }
   | { type: 'HYDRATE_FROM_STORAGE'; payload: Partial<GameState> }
@@ -263,6 +267,9 @@ const initialGlobalState: GameState = {
   showAliasInPenaltyPlayerSelector: IN_CODE_INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR,
   showAliasInControlsPenaltyList: IN_CODE_INITIAL_SHOW_ALIAS_IN_CONTROLS_PENALTY_LIST,
   showAliasInScoreboardPenalties: IN_CODE_INITIAL_SHOW_ALIAS_IN_SCOREBOARD_PENALTIES,
+  enablePenaltyCountdownSound: IN_CODE_INITIAL_ENABLE_PENALTY_COUNTDOWN_SOUND,
+  penaltyCountdownStartTime: IN_CODE_INITIAL_PENALTY_COUNTDOWN_START_TIME,
+  customPenaltyBeepSoundDataUrl: IN_CODE_INITIAL_CUSTOM_PENALTY_BEEP_SOUND_DATA_URL,
   scoreboardLayout: IN_CODE_INITIAL_LAYOUT_SETTINGS,
   scoreboardLayoutProfiles: [defaultInitialLayoutProfile],
   selectedScoreboardLayoutProfileId: defaultInitialLayoutProfile.id,
@@ -278,6 +285,7 @@ const initialGlobalState: GameState = {
   clockStartTimeMs: null,
   remainingTimeAtStartCs: null,
   playHornTrigger: 0,
+  playPenaltyBeepTrigger: 0,
   teams: [],
   _lastActionOriginator: undefined,
   _lastUpdatedTimestamp: undefined,
@@ -482,8 +490,9 @@ const applyScoreboardLayoutProfileToState = (state: GameState, profileId: string
 
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
-  let newStateWithoutMeta: Omit<GameState, '_lastActionOriginator' | '_lastUpdatedTimestamp' | 'playHornTrigger' | '_initialConfigLoadComplete'>;
+  let newStateWithoutMeta: Omit<GameState, '_lastActionOriginator' | '_lastUpdatedTimestamp' | 'playHornTrigger' | 'playPenaltyBeepTrigger' | '_initialConfigLoadComplete'>;
   let newPlayHornTrigger = state.playHornTrigger;
+  let newPlayPenaltyBeepTrigger = state.playPenaltyBeepTrigger;
   let newTimestamp = Date.now();
   let tempState = { ...state }; 
 
@@ -531,6 +540,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         availableCategories: hydratedCategories, 
         teams: (action.payload?.teams || state.teams).map(t => ({...t, subName: t.subName || undefined })), 
         playHornTrigger: state.playHornTrigger, 
+        playPenaltyBeepTrigger: state.playPenaltyBeepTrigger,
         _initialConfigLoadComplete: true, 
       };
       
@@ -555,9 +565,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         updatePenaltyStatusesOnly(rawAwayPenaltiesFromStorage as Penalty[], hydratedBase.maxConcurrentPenalties)
       );
       
-      const { _lastActionOriginator, _lastUpdatedTimestamp, playHornTrigger: hydratedHornTrigger, _initialConfigLoadComplete, ...restOfHydrated } = hydratedBase;
+      const { _lastActionOriginator, _lastUpdatedTimestamp, playHornTrigger: hydratedHornTrigger, playPenaltyBeepTrigger: hydratedBeepTrigger, _initialConfigLoadComplete, ...restOfHydrated } = hydratedBase;
       newStateWithoutMeta = restOfHydrated;
-      return { ...newStateWithoutMeta, playHornTrigger: state.playHornTrigger, _lastActionOriginator: undefined, _lastUpdatedTimestamp: action.payload?._lastUpdatedTimestamp, _initialConfigLoadComplete: true };
+      return { ...newStateWithoutMeta, playHornTrigger: state.playHornTrigger, playPenaltyBeepTrigger: state.playPenaltyBeepTrigger, _lastActionOriginator: undefined, _lastUpdatedTimestamp: action.payload?._lastUpdatedTimestamp, _initialConfigLoadComplete: true };
     }
     case 'SET_STATE_FROM_LOCAL_BROADCAST': {
       const incomingTimestamp = action.payload._lastUpdatedTimestamp;
@@ -570,10 +580,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
          return { ...state, _lastActionOriginator: undefined };
       }
 
-      const { _lastActionOriginator, playHornTrigger: receivedPlayHornTrigger, _initialConfigLoadComplete, ...restOfPayload } = action.payload;
+      const { _lastActionOriginator, playHornTrigger: receivedPlayHornTrigger, playPenaltyBeepTrigger: receivedPenaltyBeepTrigger, _initialConfigLoadComplete, ...restOfPayload } = action.payload;
       newStateWithoutMeta = restOfPayload;
       newPlayHornTrigger = receivedPlayHornTrigger !== state.playHornTrigger ? receivedPlayHornTrigger : state.playHornTrigger;
-      return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, _lastActionOriginator: undefined, _lastUpdatedTimestamp: incomingTimestamp, _initialConfigLoadComplete: state._initialConfigLoadComplete };
+      newPlayPenaltyBeepTrigger = receivedPenaltyBeepTrigger !== state.playPenaltyBeepTrigger ? receivedPenaltyBeepTrigger : state.playPenaltyBeepTrigger;
+      return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, playPenaltyBeepTrigger: newPlayPenaltyBeepTrigger, _lastActionOriginator: undefined, _lastUpdatedTimestamp: incomingTimestamp, _initialConfigLoadComplete: state._initialConfigLoadComplete };
     }
     case 'TOGGLE_CLOCK': {
       let newCurrentTimeCs = state.currentTime;
@@ -925,12 +936,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const updatedPenalties = penalties.map(p => {
         if (p.id === penaltyId) {
           const newDurationInSeconds = time;
-          // If penalty is running, adjust expirationTime based on new remaining time
           if (p._status === 'running') {
             const newExpirationTime = state.currentTime - (newDurationInSeconds * CENTISECONDS_PER_SECOND);
             return { ...p, expirationTime: newExpirationTime };
           } 
-          // If penalty is NOT running, adjust only the initialDuration
           else {
             return { ...p, initialDuration: newDurationInSeconds, expirationTime: undefined };
           }
@@ -983,11 +992,26 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
          newCalculatedTimeCs = 0;
       }
       
-      // First, update statuses to see who should be running now
+      const checkPenaltyBeep = (penalties: Penalty[]) => {
+          if (state.enablePenaltyCountdownSound && state.isClockRunning && state.periodDisplayOverride === null) {
+              penalties.forEach(p => {
+                  if (p._status === 'running' && p.expirationTime !== undefined) {
+                      const previousRemainingTimeCs = p.expirationTime - state.currentTime;
+                      const currentRemainingTimeCs = p.expirationTime - newCalculatedTimeCs;
+
+                      if (currentRemainingTimeCs / CENTISECONDS_PER_SECOND <= state.penaltyCountdownStartTime && currentRemainingTimeCs > 0) {
+                          if (Math.floor(previousRemainingTimeCs / CENTISECONDS_PER_SECOND) > Math.floor(currentRemainingTimeCs / CENTISECONDS_PER_SECOND)) {
+                              newPlayPenaltyBeepTrigger++;
+                          }
+                      }
+                  }
+              });
+          }
+      };
+
       homePenaltiesResult = updatePenaltyStatusesOnly(homePenaltiesResult, state.maxConcurrentPenalties);
       awayPenaltiesResult = updatePenaltyStatusesOnly(awayPenaltiesResult, state.maxConcurrentPenalties);
       
-      // Second, for any penalty that is now 'running' but has no expiration, set it.
       const setExpirations = (penalties: Penalty[]): Penalty[] => {
         return penalties.map(p => {
           if (p._status === 'running' && p.expirationTime === undefined) {
@@ -1001,6 +1025,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
       homePenaltiesResult = setExpirations(homePenaltiesResult);
       awayPenaltiesResult = setExpirations(awayPenaltiesResult);
+
+      checkPenaltyBeep(homePenaltiesResult);
+      checkPenaltyBeep(awayPenaltiesResult);
       
       const processExpiredPenalties = (penalties: Penalty[], team: Team): Penalty[] => {
         const stillActivePenalties: Penalty[] = [];
@@ -1046,6 +1073,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         const transitionResult = handleAutoTransition(stateBeforeTransition);
         newStateWithoutMeta = transitionResult; 
         newPlayHornTrigger = transitionResult.playHornTrigger;
+        newPlayPenaltyBeepTrigger = state.playPenaltyBeepTrigger;
       } else {
         newStateWithoutMeta = {
           ...state,
@@ -1466,6 +1494,15 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_CUSTOM_HORN_SOUND_DATA_URL':
       newStateWithoutMeta = { ...state, customHornSoundDataUrl: action.payload };
       break;
+    case 'SET_ENABLE_PENALTY_COUNTDOWN_SOUND':
+        newStateWithoutMeta = { ...state, enablePenaltyCountdownSound: action.payload };
+        break;
+    case 'SET_PENALTY_COUNTDOWN_START_TIME':
+        newStateWithoutMeta = { ...state, penaltyCountdownStartTime: Math.max(1, action.payload) };
+        break;
+    case 'SET_CUSTOM_PENALTY_BEEP_SOUND_DATA_URL':
+        newStateWithoutMeta = { ...state, customPenaltyBeepSoundDataUrl: action.payload };
+        break;
     case 'UPDATE_LAYOUT_SETTINGS':
       newStateWithoutMeta = { ...state, scoreboardLayout: { ...state.scoreboardLayout, ...action.payload } };
       break;
@@ -1583,6 +1620,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             showAliasInPenaltyPlayerSelector: showAliasInSelector,
             showAliasInControlsPenaltyList: showAliasInControls,
             showAliasInScoreboardPenalties: showAliasInScoreboard,
+            enablePenaltyCountdownSound: config.enablePenaltyCountdownSound ?? state.enablePenaltyCountdownSound,
+            penaltyCountdownStartTime: config.penaltyCountdownStartTime ?? state.penaltyCountdownStartTime,
+            customPenaltyBeepSoundDataUrl: config.customPenaltyBeepSoundDataUrl === undefined ? state.customPenaltyBeepSoundDataUrl : config.customPenaltyBeepSoundDataUrl,
             scoreboardLayout: layoutSettings,
             scoreboardLayoutProfiles: profilesToLoad,
             selectedScoreboardLayoutProfileId: newSelectedId,
@@ -1627,6 +1667,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         selectedScoreboardLayoutProfileId: selectedLayoutProfileId,
         playSoundAtPeriodEnd: IN_CODE_INITIAL_PLAY_SOUND_AT_PERIOD_END,
         customHornSoundDataUrl: IN_CODE_INITIAL_CUSTOM_HORN_SOUND_DATA_URL,
+        enablePenaltyCountdownSound: IN_CODE_INITIAL_ENABLE_PENALTY_COUNTDOWN_SOUND,
+        penaltyCountdownStartTime: IN_CODE_INITIAL_PENALTY_COUNTDOWN_START_TIME,
+        customPenaltyBeepSoundDataUrl: IN_CODE_INITIAL_CUSTOM_PENALTY_BEEP_SOUND_DATA_URL,
         enableTeamSelectionInMiniScoreboard: IN_CODE_INITIAL_ENABLE_TEAM_SELECTION_IN_MINI_SCOREBOARD,
         enablePlayerSelectionForPenalties: IN_CODE_INITIAL_ENABLE_PLAYER_SELECTION_FOR_PENALTIES,
         showAliasInPenaltyPlayerSelector: IN_CODE_INITIAL_SHOW_ALIAS_IN_PENALTY_PLAYER_SELECTOR,
@@ -1670,6 +1713,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         gameSummary: IN_CODE_INITIAL_GAME_SUMMARY,
       };
       newPlayHornTrigger = state.playHornTrigger;
+      newPlayPenaltyBeepTrigger = state.playPenaltyBeepTrigger;
       break;
     }
     case 'ADD_TEAM': {
@@ -1796,6 +1840,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newStateWithoutMeta = state;
       newTimestamp = state._lastUpdatedTimestamp || Date.now();
       newPlayHornTrigger = state.playHornTrigger;
+      newPlayPenaltyBeepTrigger = state.playPenaltyBeepTrigger;
       break;
   }
 
@@ -1809,10 +1854,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           JSON.stringify(state.awayPenalties) === JSON.stringify(newStateWithoutMeta.awayPenalties)) {
           return state; // No actual change, so no need to update state or trigger effects
       }
-      return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, _lastActionOriginator: undefined, _lastUpdatedTimestamp: (newStateWithoutMeta as GameState)._lastUpdatedTimestamp, _initialConfigLoadComplete: (newStateWithoutMeta as GameState)._initialConfigLoadComplete };
+      return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, playPenaltyBeepTrigger: newPlayPenaltyBeepTrigger, _lastActionOriginator: undefined, _lastUpdatedTimestamp: (newStateWithoutMeta as GameState)._lastUpdatedTimestamp, _initialConfigLoadComplete: (newStateWithoutMeta as GameState)._initialConfigLoadComplete };
   }
   
-  return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, _lastActionOriginator: TAB_ID, _lastUpdatedTimestamp: newTimestamp, _initialConfigLoadComplete: state._initialConfigLoadComplete };
+  return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, playPenaltyBeepTrigger: newPlayPenaltyBeepTrigger, _lastActionOriginator: TAB_ID, _lastUpdatedTimestamp: newTimestamp, _initialConfigLoadComplete: state._initialConfigLoadComplete };
 };
 
 
@@ -1895,7 +1940,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
                 teamsConfig
             ] = await Promise.all([
                 fetchConfig('/defaults/format-timings.custom.json', '/defaults/default-format-timings.json', initialGlobalState.formatAndTimingsProfiles, data => Array.isArray(data) && data.length > 0),
-                fetchConfig('/defaults/sound-display.custom.json', '/defaults/default-sound-display.json', { playSoundAtPeriodEnd: initialGlobalState.playSoundAtPeriodEnd, customHornSoundDataUrl: initialGlobalState.customHornSoundDataUrl, enableTeamSelectionInMiniScoreboard: initialGlobalState.enableTeamSelectionInMiniScoreboard, enablePlayerSelectionForPenalties: initialGlobalState.enablePlayerSelectionForPenalties, showAliasInPenaltyPlayerSelector: initialGlobalState.showAliasInPenaltyPlayerSelector, showAliasInControlsPenaltyList: initialGlobalState.showAliasInControlsPenaltyList, showAliasInScoreboardPenalties: initialGlobalState.showAliasInScoreboardPenalties, scoreboardLayoutProfiles: initialGlobalState.scoreboardLayoutProfiles }),
+                fetchConfig('/defaults/sound-display.custom.json', '/defaults/default-sound-display.json', { playSoundAtPeriodEnd: initialGlobalState.playSoundAtPeriodEnd, customHornSoundDataUrl: initialGlobalState.customHornSoundDataUrl, enableTeamSelectionInMiniScoreboard: initialGlobalState.enableTeamSelectionInMiniScoreboard, enablePlayerSelectionForPenalties: initialGlobalState.enablePlayerSelectionForPenalties, showAliasInPenaltyPlayerSelector: initialGlobalState.showAliasInPenaltyPlayerSelector, showAliasInControlsPenaltyList: initialGlobalState.showAliasInControlsPenaltyList, showAliasInScoreboardPenalties: initialGlobalState.showAliasInScoreboardPenalties, scoreboardLayoutProfiles: initialGlobalState.scoreboardLayoutProfiles, enablePenaltyCountdownSound: initialGlobalState.enablePenaltyCountdownSound, penaltyCountdownStartTime: initialGlobalState.penaltyCountdownStartTime, customPenaltyBeepSoundDataUrl: initialGlobalState.customPenaltyBeepSoundDataUrl }),
                 fetchConfig('/defaults/categories.custom.json', '/defaults/default-categories.json', initialGlobalState.availableCategories, data => Array.isArray(data)),
                 fetchConfig('/defaults/teams.custom.json', '/defaults/default-teams.json', initialGlobalState.teams, data => Array.isArray(data))
             ]);
@@ -2094,6 +2139,7 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 };
 
 export const DEFAULT_SOUND_PATH = DEFAULT_HORN_SOUND_FILE_PATH;
+export const DEFAULT_PENALTY_BEEP_PATH = DEFAULT_PENALTY_BEEP_FILE_PATH;
 
 export const getCategoryNameById = (categoryId: string, availableCategories: CategoryData[]): string | undefined => {
   if (!Array.isArray(availableCategories)) return undefined; 

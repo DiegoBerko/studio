@@ -148,6 +148,9 @@ export interface ConfigFields extends FormatAndTimingsProfileData {
   showAliasInPenaltyPlayerSelector: boolean;
   showAliasInControlsPenaltyList: boolean;
   showAliasInScoreboardPenalties: boolean;
+  enablePenaltyCountdownSound: boolean;
+  penaltyCountdownStartTime: number;
+  customPenaltyBeepSoundDataUrl: string | null;
 
   // Layout settings (the active/live one)
   scoreboardLayout: ScoreboardLayoutSettings;

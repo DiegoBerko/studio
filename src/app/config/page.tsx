@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { DurationSettingsCard, type DurationSettingsCardRef } from "@/components/config/duration-settings-card";
 import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/config/penalty-settings-card";
 import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card";
+import { PenaltyCountdownSoundCard, type PenaltyCountdownSoundCardRef } from "@/components/config/penalty-countdown-sound-card";
 import { TeamSettingsCard, type TeamSettingsCardRef } from "@/components/config/team-settings-card";
 import { CategorySettingsCard, type CategorySettingsCardRef } from "@/components/config/category-settings-card";
 import { LayoutSettingsCard, type LayoutSettingsCardRef } from "@/components/config/layout-settings-card";
@@ -47,6 +48,7 @@ const VALID_TAB_VALUES = ["formatAndTimings", "soundAndDisplay", "categoriesAndT
 
 type ExportableSoundAndDisplayConfig = Pick<ConfigFields,
   | 'playSoundAtPeriodEnd' | 'customHornSoundDataUrl'
+  | 'enablePenaltyCountdownSound' | 'penaltyCountdownStartTime' | 'customPenaltyBeepSoundDataUrl'
   | 'enableTeamSelectionInMiniScoreboard' | 'enablePlayerSelectionForPenalties'
   | 'showAliasInPenaltyPlayerSelector' | 'showAliasInControlsPenaltyList' | 'showAliasInScoreboardPenalties'
   | 'scoreboardLayoutProfiles'
@@ -62,6 +64,7 @@ export default function ConfigPage() {
   const durationSettingsRef = useRef<DurationSettingsCardRef>(null);
   const penaltySettingsRef = useRef<PenaltySettingsCardRef>(null);
   const soundSettingsRef = useRef<SoundSettingsCardRef>(null);
+  const penaltyCountdownSoundRef = useRef<PenaltyCountdownSoundCardRef>(null);
   const teamSettingsRef = useRef<TeamSettingsCardRef>(null);
   const categorySettingsRef = useRef<CategorySettingsCardRef>(null);
   const layoutSettingsRef = useRef<LayoutSettingsCardRef>(null);
@@ -72,6 +75,7 @@ export default function ConfigPage() {
   const [isDurationDirty, setIsDurationDirty] = useState(false);
   const [isPenaltyDirty, setIsPenaltyDirty] = useState(false);
   const [isSoundDirty, setIsSoundDirty] = useState(false);
+  const [isPenaltyCountdownSoundDirty, setIsPenaltyCountdownSoundDirty] = useState(false);
   const [isTeamSettingsDirty, setIsTeamSettingsDirty] = useState(false);
   const [isCategorySettingsDirty, setIsCategorySettingsDirty] = useState(false);
   
@@ -137,7 +141,7 @@ export default function ConfigPage() {
   }, [selectedFTProfile.id]); 
 
   const isFormatAndTimingsSectionDirty = isDurationDirty || isPenaltyDirty;
-  const isSoundAndDisplaySectionDirty = isSoundDirty || isTeamSettingsDirty || isLayoutDirty;
+  const isSoundAndDisplaySectionDirty = isSoundDirty || isPenaltyCountdownSoundDirty || isTeamSettingsDirty || isLayoutDirty;
 
   const handleSaveChanges_FormatAndTimings = () => {
     let durationSaveSuccess = true;
@@ -171,10 +175,12 @@ export default function ConfigPage() {
 
   const handleSaveChanges_SoundAndDisplay = () => {
     if (soundSettingsRef.current && isSoundDirty) soundSettingsRef.current.handleSave();
+    if (penaltyCountdownSoundRef.current && isPenaltyCountdownSoundDirty) penaltyCountdownSoundRef.current.handleSave();
     if (teamSettingsRef.current && isTeamSettingsDirty) teamSettingsRef.current.handleSave();
     if (layoutSettingsRef.current && isLayoutDirty) layoutSettingsRef.current.handleSave();
     
     setIsSoundDirty(false);
+    setIsPenaltyCountdownSoundDirty(false);
     setIsTeamSettingsDirty(false);
     // isLayoutDirty will update via memoization, becoming false after save
     
@@ -183,6 +189,7 @@ export default function ConfigPage() {
 
   const handleDiscardChanges_SoundAndDisplay = () => {
     if (soundSettingsRef.current && isSoundDirty) { soundSettingsRef.current.handleDiscard(); setIsSoundDirty(false); }
+    if (penaltyCountdownSoundRef.current && isPenaltyCountdownSoundDirty) { penaltyCountdownSoundRef.current.handleDiscard(); setIsPenaltyCountdownSoundDirty(false); }
     if (teamSettingsRef.current && isTeamSettingsDirty) { teamSettingsRef.current.handleDiscard(); setIsTeamSettingsDirty(false); }
     if (layoutSettingsRef.current && isLayoutDirty) { layoutSettingsRef.current.handleDiscard(); }
     
@@ -261,6 +268,9 @@ export default function ConfigPage() {
     const configToExport: ExportableSoundAndDisplayConfig = {
       playSoundAtPeriodEnd: state.playSoundAtPeriodEnd,
       customHornSoundDataUrl: state.customHornSoundDataUrl,
+      enablePenaltyCountdownSound: state.enablePenaltyCountdownSound,
+      penaltyCountdownStartTime: state.penaltyCountdownStartTime,
+      customPenaltyBeepSoundDataUrl: state.customPenaltyBeepSoundDataUrl,
       enableTeamSelectionInMiniScoreboard: state.enableTeamSelectionInMiniScoreboard,
       enablePlayerSelectionForPenalties: state.enablePlayerSelectionForPenalties,
       showAliasInPenaltyPlayerSelector: state.showAliasInPenaltyPlayerSelector,
@@ -322,6 +332,7 @@ export default function ConfigPage() {
         } else if (dispatchActionType === 'LOAD_SOUND_AND_DISPLAY_CONFIG') {
             setIsSoundDirty(false);
             setIsTeamSettingsDirty(false);
+            setIsPenaltyCountdownSoundDirty(false);
         }
 
         toast({
@@ -354,7 +365,7 @@ export default function ConfigPage() {
 
   const handleImportSoundAndDisplay = (event: React.ChangeEvent<HTMLInputElement>) => {
     genericImportHandler(event, "Sonido y Display",
-      ['playSoundAtPeriodEnd', 'scoreboardLayoutProfiles'], 
+      ['playSoundAtPeriodEnd', 'scoreboardLayoutProfiles', 'enablePenaltyCountdownSound', 'penaltyCountdownStartTime'], 
       'LOAD_SOUND_AND_DISPLAY_CONFIG',
       fileInputSoundAndDisplayRef
     );
@@ -369,6 +380,7 @@ export default function ConfigPage() {
     setIsDurationDirty(false);
     setIsPenaltyDirty(false);
     setIsSoundDirty(false);
+    setIsPenaltyCountdownSoundDirty(false);
     setIsTeamSettingsDirty(false);
     setIsCategorySettingsDirty(false);
 
@@ -634,6 +646,8 @@ export default function ConfigPage() {
         <TabsContent value="soundAndDisplay" className={tabContentClassName}>
            <div className="space-y-6">
             <SoundSettingsCard ref={soundSettingsRef} onDirtyChange={setIsSoundDirty} />
+            <Separator />
+            <PenaltyCountdownSoundCard ref={penaltyCountdownSoundRef} onDirtyChange={setIsPenaltyCountdownSoundDirty} />
             <Separator />
             <TeamSettingsCard ref={teamSettingsRef} onDirtyChange={setIsTeamSettingsDirty}/>
             <Separator />

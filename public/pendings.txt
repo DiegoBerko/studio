@@ -1,7 +1,5 @@
 Bugs
-1. Resolver que la penalidad no empiece al modificar el tiempo. 
-(Si el estado no es activa)
-
+1. 
 
 Mejoras
 1. Al borrar los minutos o segundos del reloj o de las penalidades, asumir vacio como 0
