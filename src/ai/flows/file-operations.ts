@@ -33,8 +33,17 @@ const saveGameSummaryFlow = ai.defineFlow(
     outputSchema: z.object({ success: z.boolean(), message: z.string(), filePath: z.string().optional() }),
   },
   async (input) => {
+    // Disable saving in Firebase App Hosting preview environments
+    if (process.env.FIREBASE_APP_HOSTING_PREVIEW_URL) {
+      return {
+        success: true,
+        message: 'Guardado de resumen deshabilitado en modo preview.',
+      };
+    }
+    
     try {
-      const summariesDir = path.join(process.cwd(), 'src', 'resumenes');
+      // Save to a 'resumenes' folder in the project root
+      const summariesDir = path.join(process.cwd(), 'resumenes');
       
       await fs.mkdir(summariesDir, { recursive: true });
 
