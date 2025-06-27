@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { flushSync } from 'react-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { MiniScoreboard } from '@/components/controls/mini-scoreboard';
@@ -165,9 +164,7 @@ export default function ControlsPage() {
         }
         
         event.preventDefault();
-        flushSync(() => {
-          dispatch({ type: 'TOGGLE_CLOCK' });
-        });
+        dispatch({ type: 'TOGGLE_CLOCK' });
       }
     };
 
@@ -195,9 +192,7 @@ export default function ControlsPage() {
 
 
   const handleResetGame = () => {
-    flushSync(() => {
-      dispatch({ type: 'RESET_GAME_STATE' });
-    });
+    dispatch({ type: 'RESET_GAME_STATE' });
     toast({
       title: "Nuevo Partido Iniciado",
       description: "El estado del juego ha sido restablecido.",
@@ -301,9 +296,7 @@ export default function ControlsPage() {
 
 
   const handleActivatePendingPuckPenalties = () => {
-    flushSync(() => {
-      dispatch({ type: 'ACTIVATE_PENDING_PUCK_PENALTIES' });
-    });
+    dispatch({ type: 'ACTIVATE_PENDING_PUCK_PENALTIES' });
   };
 
   const hasPendingPuckPenalties = useMemo(() => {

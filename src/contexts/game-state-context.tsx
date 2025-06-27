@@ -1801,7 +1801,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const [isPageVisible, setIsPageVisible] = useState(true);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const prevPeriodDisplayOverrideRef = useRef<PeriodDisplayOverrideType>();
-  const lastSaveTimestampRef = useRef<number>(0);
 
   useEffect(() => {
     if (prevPeriodDisplayOverrideRef.current !== 'End of Game' && state.periodDisplayOverride === 'End of Game') {
@@ -1981,26 +1980,17 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const now = Date.now();
-    
     // The originating tab is responsible for saving state and broadcasting.
     if (state._lastActionOriginator === TAB_ID) {
-        
-        // Throttle the expensive localStorage write operation to once per second.
-        if (now - lastSaveTimestampRef.current > 1000) {
-            try {
-                const stateForStorage: GameState = { ...state };
-                stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
-                stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
-
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
-                lastSaveTimestampRef.current = now;
-            } catch (error) {
-                console.error("Error saving throttled state to localStorage:", error);
-            }
+        try {
+            const stateForStorage: GameState = { ...state };
+            stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
+            stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
+        } catch (error) {
+            console.error("Error saving state to localStorage:", error);
         }
-
-        // Broadcast every state change immediately for real-time UI synchronization.
+        
         if (channelRef.current) {
             channelRef.current.postMessage(state);
         }
