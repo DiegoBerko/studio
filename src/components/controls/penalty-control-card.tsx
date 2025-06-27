@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useRef } from 'react';
@@ -459,7 +460,9 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
               const displayPenaltyNumber = p.playerNumber || 'S/N';
               const isEditingThisPenalty = editingPenaltyId === p.id;
               
-              const remainingTimeCs = Math.max(0, state.currentTime - p.expirationTime);
+              const remainingTimeCs = p.expirationTime !== undefined
+                ? Math.max(0, state.currentTime - p.expirationTime)
+                : p.initialDuration * 100;
               const isEndingSoon = p._status === 'running' && remainingTimeCs > 0 && remainingTimeCs < 1000;
 
               const isSelectedForDeletion = selectedPenaltyIds.includes(p.id);

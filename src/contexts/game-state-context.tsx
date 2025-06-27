@@ -773,12 +773,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
     case 'ADD_PENALTY': {
       const newPenaltyId = crypto.randomUUID();
-      const durationCs = action.payload.penalty.initialDuration * CENTISECONDS_PER_SECOND;
       const newPenalty: Penalty = {
         playerNumber: action.payload.penalty.playerNumber,
         initialDuration: action.payload.penalty.initialDuration,
         id: newPenaltyId,
-        expirationTime: state.currentTime - durationCs,
         _status: 'pending_puck', 
       };
 
@@ -823,7 +821,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       let newGameSummary = state.gameSummary;
       if (penaltyToRemove) {
-        const remainingTimeCs = Math.max(0, state.currentTime - penaltyToRemove.expirationTime);
+        const remainingTimeCs = penaltyToRemove.expirationTime !== undefined ? Math.max(0, state.currentTime - penaltyToRemove.expirationTime) : penaltyToRemove.initialDuration * 100;
         const remainingTimeSec = Math.round(remainingTimeCs / CENTISECONDS_PER_SECOND);
         const timeServed = penaltyToRemove.initialDuration - remainingTimeSec;
 
@@ -869,7 +867,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
       penalties = sortPenaltiesByStatus(penalties);
 
-      const remainingTimeCs = Math.max(0, state.currentTime - penaltyToEnd.expirationTime);
+      const remainingTimeCs = penaltyToEnd.expirationTime !== undefined ? Math.max(0, state.currentTime - penaltyToEnd.expirationTime) : penaltyToEnd.initialDuration * 100;
       const remainingTimeSec = Math.round(remainingTimeCs / CENTISECONDS_PER_SECOND);
       const timeServed = penaltyToEnd.initialDuration - remainingTimeSec;
 
@@ -905,7 +903,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'ADJUST_PENALTY_TIME': {
       const { team, penaltyId, delta } = action.payload;
       let updatedPenalties = state[`${team}Penalties`].map(p => {
-        if (p.id === penaltyId) {
+        if (p.id === penaltyId && p.expirationTime !== undefined) {
           const newExpirationTime = p.expirationTime + (delta * CENTISECONDS_PER_SECOND);
           return { ...p, expirationTime: newExpirationTime };
         }
@@ -979,10 +977,29 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
          newCalculatedTimeCs = 0;
       }
       
+      // First, update statuses to see who should be running now
+      homePenaltiesResult = updatePenaltyStatusesOnly(homePenaltiesResult, state.maxConcurrentPenalties);
+      awayPenaltiesResult = updatePenaltyStatusesOnly(awayPenaltiesResult, state.maxConcurrentPenalties);
+      
+      // Second, for any penalty that is now 'running' but has no expiration, set it.
+      const setExpirations = (penalties: Penalty[]): Penalty[] => {
+        return penalties.map(p => {
+          if (p._status === 'running' && p.expirationTime === undefined) {
+            return {
+              ...p,
+              expirationTime: newCalculatedTimeCs - (p.initialDuration * 100),
+            };
+          }
+          return p;
+        });
+      };
+      homePenaltiesResult = setExpirations(homePenaltiesResult);
+      awayPenaltiesResult = setExpirations(awayPenaltiesResult);
+      
       const processExpiredPenalties = (penalties: Penalty[], team: Team): Penalty[] => {
         const stillActivePenalties: Penalty[] = [];
         penalties.forEach(p => {
-          if (p._status === 'running' && newCalculatedTimeCs <= p.expirationTime) {
+          if (p._status === 'running' && p.expirationTime !== undefined && newCalculatedTimeCs <= p.expirationTime) {
             const logIndex = newGameSummary[team].penalties.findIndex(log => log.id === p.id && !log.endReason);
             if (logIndex > -1) {
               newGameSummary[team].penalties[logIndex] = {
@@ -1006,9 +1023,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         awayPenaltiesResult = processExpiredPenalties(awayPenaltiesResult, 'away');
       }
 
-      homePenaltiesResult = updatePenaltyStatusesOnly(homePenaltiesResult, state.maxConcurrentPenalties);
       homePenaltiesResult = sortPenaltiesByStatus(homePenaltiesResult);
-      awayPenaltiesResult = updatePenaltyStatusesOnly(awayPenaltiesResult, state.maxConcurrentPenalties);
       awayPenaltiesResult = sortPenaltiesByStatus(awayPenaltiesResult);
 
       if (state.isClockRunning && newCalculatedTimeCs <= 0) {

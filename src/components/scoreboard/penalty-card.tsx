@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import type { Penalty } from '@/types';
@@ -89,7 +90,9 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
     return null;
   }
   const statusText = getStatusTextForScoreboard();
-  const remainingTimeCs = Math.max(0, currentTime - penalty.expirationTime);
+  const remainingTimeCs = penalty.expirationTime !== undefined
+    ? Math.max(0, state.currentTime - penalty.expirationTime)
+    : penalty.initialDuration * 100;
 
   return (
     <Card className={cardClasses}>
