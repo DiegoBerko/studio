@@ -1784,17 +1784,19 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
   }
 
-  const nonOriginatingActionTypes: GameAction['type'][] = ['HYDRATE_FROM_STORAGE', 'SET_STATE_FROM_LOCAL_BROADCAST'];
+  const nonOriginatingActionTypes: GameAction['type'][] = ['HYDRATE_FROM_STORAGE', 'SET_STATE_FROM_LOCAL_BROADCAST', 'TICK'];
+  
   if (nonOriginatingActionTypes.includes(action.type)) {
-    return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, _lastActionOriginator: undefined, _lastUpdatedTimestamp: (newStateWithoutMeta as GameState)._lastUpdatedTimestamp, _initialConfigLoadComplete: (newStateWithoutMeta as GameState)._initialConfigLoadComplete };
-  } else if (action.type === 'TICK' && !state.isClockRunning && !newStateWithoutMeta.isClockRunning) {
-    if (state.currentTime === newStateWithoutMeta.currentTime &&
-        JSON.stringify(state.homePenalties) === JSON.stringify(newStateWithoutMeta.homePenalties) &&
-        JSON.stringify(state.awayPenalties) === JSON.stringify(newStateWithoutMeta.awayPenalties) ) {
-        return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, _lastActionOriginator: state._lastActionOriginator, _lastUpdatedTimestamp: state._lastUpdatedTimestamp, _initialConfigLoadComplete: state._initialConfigLoadComplete };
-    }
+      if (action.type === 'TICK' && 
+          state.isClockRunning === newStateWithoutMeta.isClockRunning && 
+          state.currentTime === newStateWithoutMeta.currentTime &&
+          JSON.stringify(state.homePenalties) === JSON.stringify(newStateWithoutMeta.homePenalties) &&
+          JSON.stringify(state.awayPenalties) === JSON.stringify(newStateWithoutMeta.awayPenalties)) {
+          return state; // No actual change, so no need to update state or trigger effects
+      }
+      return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, _lastActionOriginator: undefined, _lastUpdatedTimestamp: (newStateWithoutMeta as GameState)._lastUpdatedTimestamp, _initialConfigLoadComplete: (newStateWithoutMeta as GameState)._initialConfigLoadComplete };
   }
-
+  
   return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, _lastActionOriginator: TAB_ID, _lastUpdatedTimestamp: newTimestamp, _initialConfigLoadComplete: state._initialConfigLoadComplete };
 };
 
@@ -2014,6 +2016,26 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       }
     };
   }, [state.isClockRunning, state.currentTime, state.homePenalties, state.awayPenalties, isPageVisible, isLoading, state._initialConfigLoadComplete]);
+  
+  // Save state on unload to prevent data loss when closing tab with clock running
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (state._initialConfigLoadComplete) {
+        try {
+          const stateForStorage: GameState = { ...state };
+          stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
+          stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
+        } catch (error) {
+          console.error("Error saving state on beforeunload:", error);
+        }
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [state]);
 
 
   return (
