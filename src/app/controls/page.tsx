@@ -14,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { RefreshCw, AlertTriangle, PlayCircle, FileText } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { saveGameSummary } from '@/ai/flows/file-operations';
 
 const CONTROLS_LOCK_KEY = 'icevision-controls-lock-id';
 const CONTROLS_CHANNEL_NAME = 'icevision-controls-channel';
@@ -37,6 +38,77 @@ export default function ControlsPage() {
   const [isGoalManagementOpen, setIsGoalManagementOpen] = useState(false);
   const [editingTeamForGoals, setEditingTeamForGoals] = useState<Team | null>(null);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
+
+  const prevPeriodDisplayOverrideRef = useRef<string | null>();
+  const isInitialMount = useRef(true);
+
+
+  useEffect(() => {
+    // Skip the effect on the initial render/hydration cycle
+    if (isInitialMount.current) {
+        isInitialMount.current = false;
+        prevPeriodDisplayOverrideRef.current = state.periodDisplayOverride;
+        return;
+    }
+
+    // Only the primary controls tab should handle saving
+    if (pageDisplayState !== 'Primary') {
+        prevPeriodDisplayOverrideRef.current = state.periodDisplayOverride;
+        return;
+    }
+
+    // Check for the specific transition from not-ended to ended
+    if (prevPeriodDisplayOverrideRef.current !== 'End of Game' && state.periodDisplayOverride === 'End of Game') {
+        const categoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories) || 'N/A';
+        
+        (async () => {
+            try {
+                const result = await saveGameSummary({
+                    homeTeamName: state.homeTeamName,
+                    awayTeamName: state.awayTeamName,
+                    homeScore: state.homeScore,
+                    awayScore: state.awayScore,
+                    categoryName: categoryName,
+                    gameSummary: state.gameSummary
+                });
+                if (result.success) {
+                    toast({
+                        title: "Resumen Guardado",
+                        description: `El resumen del partido se ha guardado en el servidor.`,
+                    });
+                } else {
+                    toast({
+                        title: "Error al Guardar",
+                        description: result.message,
+                        variant: "destructive",
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to save game summary from controls page:', e);
+                toast({
+                    title: "Error al Guardar Resumen",
+                    description: "No se pudo guardar el resumen del partido en el servidor.",
+                    variant: "destructive",
+                });
+            }
+        })();
+    }
+
+    // Always update the ref for the next render
+    prevPeriodDisplayOverrideRef.current = state.periodDisplayOverride;
+
+  }, [
+      state.periodDisplayOverride, 
+      pageDisplayState, 
+      state.selectedMatchCategory, 
+      state.availableCategories, 
+      state.homeTeamName, 
+      state.awayTeamName, 
+      state.homeScore, 
+      state.awayScore, 
+      state.gameSummary,
+      toast
+  ]);
 
 
   useEffect(() => {

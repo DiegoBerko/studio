@@ -1800,57 +1800,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPageVisible, setIsPageVisible] = useState(true);
   const channelRef = useRef<BroadcastChannel | null>(null);
-  const prevPeriodDisplayOverrideRef = useRef<PeriodDisplayOverrideType>();
-
-  useEffect(() => {
-    // Only save if the state *transitions* to 'End of Game'
-    if (prevPeriodDisplayOverrideRef.current !== 'End of Game' && state.periodDisplayOverride === 'End of Game') {
-      const categoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories) || 'N/A';
-      
-      (async () => {
-        try {
-          const result = await saveGameSummary({
-            homeTeamName: state.homeTeamName,
-            awayTeamName: state.awayTeamName,
-            homeScore: state.homeScore,
-            awayScore: state.awayScore,
-            categoryName: categoryName,
-            gameSummary: state.gameSummary
-          });
-          if (result.success) {
-            toast({
-              title: "Resumen Guardado",
-              description: `El resumen del partido se ha guardado en el servidor.`,
-            });
-          } else {
-             toast({
-              title: "Error al Guardar",
-              description: result.message,
-              variant: "destructive",
-            });
-          }
-        } catch (e) {
-          console.error('Failed to save game summary automatically:', e);
-          toast({
-            title: "Error al Guardar Resumen",
-            description: "No se pudo guardar el resumen del partido en el servidor.",
-            variant: "destructive",
-          });
-        }
-      })();
-    }
-    // Update the ref with the current state for the next render.
-    prevPeriodDisplayOverrideRef.current = state.periodDisplayOverride;
-  }, [
-      state.periodDisplayOverride,
-      state.homeTeamName,
-      state.awayTeamName,
-      state.homeScore,
-      state.awayScore,
-      state.selectedMatchCategory,
-      state.availableCategories,
-      state.gameSummary
-  ]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
