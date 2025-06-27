@@ -12,7 +12,7 @@ import { toast } from '@/hooks/use-toast';
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
 const LOCAL_STORAGE_KEY = 'icevision-game-state';
 const CENTISECONDS_PER_SECOND = 100;
-const TICK_INTERVAL_MS = 50;
+const TICK_INTERVAL_MS = 200;
 const DEFAULT_HORN_SOUND_FILE_PATH = '/audio/default-horn.wav'; 
 
 
@@ -152,7 +152,7 @@ export type GameAction =
   | { type: 'ADD_GOAL'; payload: Omit<GoalLog, 'id'> }
   | { type: 'EDIT_GOAL'; payload: { goalId: string; updates: Partial<GoalLog> } }
   | { type: 'DELETE_GOAL'; payload: { goalId: string } }
-  | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: Omit<Penalty, 'id' | '_status'> } }
+  | { type: 'ADD_PENALTY'; payload: { team: Team; penalty: { playerNumber: string; initialDuration: number; } } }
   | { type: 'REMOVE_PENALTY'; payload: { team: Team; penaltyId: string } }
   | { type: 'END_PENALTY_FOR_GOAL'; payload: { team: Team; penaltyId: string } }
   | { type: 'ADJUST_PENALTY_TIME'; payload: { team: Team; penaltyId: string; delta: number } }
@@ -388,9 +388,6 @@ const updatePenaltyStatusesOnly = (penalties: Penalty[], maxConcurrent: number):
   let concurrentRunningCount = 0;
 
   for (const p of penalties) {
-    if (p.remainingTime <= 0 && p._status !== 'pending_puck') {
-      continue;
-    }
     if (p._status === 'pending_puck') {
       newPenalties.push({ ...p });
       continue;
@@ -776,13 +773,15 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
     case 'ADD_PENALTY': {
       const newPenaltyId = crypto.randomUUID();
+      const durationCs = action.payload.penalty.initialDuration * CENTISECONDS_PER_SECOND;
       const newPenalty: Penalty = {
-        ...action.payload.penalty,
+        playerNumber: action.payload.penalty.playerNumber,
         initialDuration: action.payload.penalty.initialDuration,
-        remainingTime: action.payload.penalty.remainingTime,
         id: newPenaltyId,
+        expirationTime: state.currentTime - durationCs,
         _status: 'pending_puck', 
       };
+
       let penalties = [...state[`${action.payload.team}Penalties`], newPenalty];
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
       penalties = sortPenaltiesByStatus(penalties);
@@ -824,7 +823,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       let newGameSummary = state.gameSummary;
       if (penaltyToRemove) {
-        const timeServed = penaltyToRemove.initialDuration - penaltyToRemove.remainingTime;
+        const remainingTimeCs = Math.max(0, state.currentTime - penaltyToRemove.expirationTime);
+        const remainingTimeSec = Math.round(remainingTimeCs / CENTISECONDS_PER_SECOND);
+        const timeServed = penaltyToRemove.initialDuration - remainingTimeSec;
+
         const newTeamLogs = newGameSummary[action.payload.team].penalties.map(p => {
           if (p.id === action.payload.penaltyId && !p.endReason) {
             return {
@@ -867,7 +869,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
       penalties = sortPenaltiesByStatus(penalties);
 
-      const timeServed = penaltyToEnd.initialDuration - penaltyToEnd.remainingTime;
+      const remainingTimeCs = Math.max(0, state.currentTime - penaltyToEnd.expirationTime);
+      const remainingTimeSec = Math.round(remainingTimeCs / CENTISECONDS_PER_SECOND);
+      const timeServed = penaltyToEnd.initialDuration - remainingTimeSec;
+
       const newTeamLogs = state.gameSummary[team].penalties.map(p => {
         if (p.id === penaltyId && !p.endReason) {
           return {
@@ -901,9 +906,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const { team, penaltyId, delta } = action.payload;
       let updatedPenalties = state[`${team}Penalties`].map(p => {
         if (p.id === penaltyId) {
-          const newRemainingTimeSec = Math.max(0, p.remainingTime + delta);
-          const cappedTimeSec = delta > 0 ? Math.min(newRemainingTimeSec, p.initialDuration) : newRemainingTimeSec;
-          return { ...p, remainingTime: cappedTimeSec };
+          const newExpirationTime = p.expirationTime + (delta * CENTISECONDS_PER_SECOND);
+          return { ...p, expirationTime: newExpirationTime };
         }
         return p;
       });
@@ -924,9 +928,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       let updatedPenalties = penalties.map(p => {
         if (p.id === penaltyId) {
-          const newRemainingTimeSec = Math.max(0, time);
-          const cappedTimeSec = Math.min(newRemainingTimeSec, p.initialDuration);
-          return { ...p, remainingTime: cappedTimeSec };
+          const newExpirationTime = state.currentTime - (time * CENTISECONDS_PER_SECOND);
+          return { ...p, expirationTime: newExpirationTime };
         }
         return p;
       });
@@ -972,46 +975,37 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         const elapsedMs = Date.now() - state.clockStartTimeMs;
         const elapsedCs = Math.floor(elapsedMs / 10);
         newCalculatedTimeCs = Math.max(0, state.remainingTimeAtStartCs - elapsedCs);
-
-        const gameClockWasTickingForPenalties = state.periodDisplayOverride === null && state.currentPeriod > 0;
-
-        if (gameClockWasTickingForPenalties) {
-          const oldSecondBoundary = Math.floor(state.currentTime / CENTISECONDS_PER_SECOND);
-          const newSecondBoundary = Math.floor(newCalculatedTimeCs / CENTISECONDS_PER_SECOND);
-          const secondsDecremented = oldSecondBoundary - newSecondBoundary;
-          
-          if (secondsDecremented > 0) { 
-            const decrementRunningPenalties = (penalties: Penalty[], team: Team): Penalty[] => {
-              return penalties.map(p => {
-                if (p._status === 'running' && p.remainingTime > 0) {
-                  const newRemaining = Math.max(0, p.remainingTime - secondsDecremented);
-                  if (p.remainingTime > 0 && newRemaining <= 0) {
-                    // Penalty just finished, log it
-                    const logIndex = newGameSummary[team].penalties.findIndex(log => log.id === p.id && !log.endReason);
-                    if (logIndex > -1) {
-                      newGameSummary[team].penalties[logIndex] = {
-                        ...newGameSummary[team].penalties[logIndex],
-                        endTimestamp: Date.now(),
-                        endGameTime: state.currentTime,
-                        endPeriodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
-                        endReason: 'completed',
-                        timeServed: newGameSummary[team].penalties[logIndex].initialDuration,
-                      };
-                    }
-                  }
-                  return { ...p, remainingTime: newRemaining };
-                }
-                return p;
-              });
-            };
-            homePenaltiesResult = decrementRunningPenalties(homePenaltiesResult, 'home');
-            awayPenaltiesResult = decrementRunningPenalties(awayPenaltiesResult, 'away');
-          }
-        }
       } else if (state.isClockRunning && state.currentTime <= 0) {
          newCalculatedTimeCs = 0;
       }
       
+      const processExpiredPenalties = (penalties: Penalty[], team: Team): Penalty[] => {
+        const stillActivePenalties: Penalty[] = [];
+        penalties.forEach(p => {
+          if (p._status === 'running' && newCalculatedTimeCs <= p.expirationTime) {
+            const logIndex = newGameSummary[team].penalties.findIndex(log => log.id === p.id && !log.endReason);
+            if (logIndex > -1) {
+              newGameSummary[team].penalties[logIndex] = {
+                ...newGameSummary[team].penalties[logIndex],
+                endTimestamp: Date.now(),
+                endGameTime: p.expirationTime,
+                endPeriodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
+                endReason: 'completed',
+                timeServed: newGameSummary[team].penalties[logIndex].initialDuration,
+              };
+            }
+          } else {
+            stillActivePenalties.push(p);
+          }
+        });
+        return stillActivePenalties;
+      };
+
+      if (state.isClockRunning && state.periodDisplayOverride === null && state.currentPeriod > 0) {
+        homePenaltiesResult = processExpiredPenalties(homePenaltiesResult, 'home');
+        awayPenaltiesResult = processExpiredPenalties(awayPenaltiesResult, 'away');
+      }
+
       homePenaltiesResult = updatePenaltyStatusesOnly(homePenaltiesResult, state.maxConcurrentPenalties);
       homePenaltiesResult = sortPenaltiesByStatus(homePenaltiesResult);
       awayPenaltiesResult = updatePenaltyStatusesOnly(awayPenaltiesResult, state.maxConcurrentPenalties);
@@ -1622,8 +1616,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         gameSummary: IN_CODE_INITIAL_GAME_SUMMARY,
       };
       const newMaxPen = tempState.maxConcurrentPenalties;
-      tempState.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.homePenalties, newMaxPen));
-      tempState.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly(state.awayPenalties, newMaxPen));
+      tempState.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly([], newMaxPen));
+      tempState.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly([], newMaxPen));
       newStateWithoutMeta = tempState;
       break;
     }

@@ -127,7 +127,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
         type: 'ADD_PENALTY',
         payload: {
           team,
-          penalty: { playerNumber: trimmedPlayerNumberForPenalty.toUpperCase(), initialDuration: durationSec, remainingTime: durationSec },
+          penalty: { playerNumber: trimmedPlayerNumberForPenalty.toUpperCase(), initialDuration: durationSec },
         },
       });
     });
@@ -469,7 +469,10 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
               );
               const displayPenaltyNumber = p.playerNumber || 'S/N';
               const isEditingThisPenalty = editingPenaltyId === p.id;
-              const isEndingSoon = p._status === 'running' && p.remainingTime > 0 && p.remainingTime < 10;
+              
+              const remainingTimeCs = Math.max(0, state.currentTime - p.expirationTime);
+              const isEndingSoon = p._status === 'running' && remainingTimeCs > 0 && remainingTimeCs < 1000;
+
               const isSelectedForDeletion = selectedPenaltyIds.includes(p.id);
 
               return (
@@ -539,10 +542,11 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
                              if(isDeleteSelectionMode) return;
                              e.stopPropagation();
                              setEditingPenaltyId(p.id);
-                             setEditTimeValue(formatTime(p.remainingTime * 100));
+                             const remainingSeconds = Math.round(remainingTimeCs / 100);
+                             setEditTimeValue(formatTime(remainingSeconds * 100));
                           }}
                         >
-                          {formatTime(p.remainingTime * 100)}
+                          {formatTime(remainingTimeCs)}
                         </div>
                       )}
                       

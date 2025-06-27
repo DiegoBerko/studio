@@ -35,7 +35,7 @@ const CagedUserIcon = ({ size, className }: { size: number; className?: string }
 
 export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
   const { state } = useGameState();
-  const { scoreboardLayout } = state;
+  const { scoreboardLayout, currentTime } = state;
 
   const currentTeamSubName = state.homeTeamName === teamName ? state.homeTeamSubName : state.awayTeamName;
 
@@ -89,6 +89,7 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
     return null;
   }
   const statusText = getStatusTextForScoreboard();
+  const remainingTimeCs = Math.max(0, currentTime - penalty.expirationTime);
 
   return (
     <Card className={cardClasses}>
@@ -115,7 +116,7 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
                 width: `${scoreboardLayout.penaltyTimeSize * 0.5}rem`,
               }}
             />
-            {formatTime(penalty.remainingTime * 100, { showTenths: false })}
+            {formatTime(remainingTimeCs, { showTenths: false })}
           </div>
         </div>
         <div className="flex justify-between items-center">

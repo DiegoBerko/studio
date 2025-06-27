@@ -1,8 +1,9 @@
 
+
 export interface Penalty {
   id: string;
   playerNumber: string;
-  remainingTime: number; // in seconds
+  expirationTime: number; // Game time in centiseconds when penalty expires
   initialDuration: number; // in seconds
   _status?: 'running' | 'pending_concurrent' | 'pending_player' | 'pending_puck'; // Transient status for display logic
 }
