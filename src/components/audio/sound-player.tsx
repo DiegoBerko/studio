@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useGameState, DEFAULT_SOUND_PATH, DEFAULT_PENALTY_BEEP_PATH } from '@/contexts/game-state-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,6 +14,13 @@ export function SoundPlayer() {
 
   const lastPlayedBeepTriggerRef = useRef<number>(state.playPenaltyBeepTrigger);
   const penaltyAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
 
   const hornSoundSrc = state.customHornSoundDataUrl || DEFAULT_SOUND_PATH;
   const penaltyBeepSoundSrc = state.customPenaltyBeepSoundDataUrl || DEFAULT_PENALTY_BEEP_PATH;
@@ -88,6 +95,10 @@ export function SoundPlayer() {
       }
     }
   }, [state.playPenaltyBeepTrigger, state.enablePenaltyCountdownSound, state.isLoading, toast]);
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <>
