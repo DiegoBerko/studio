@@ -1,8 +1,7 @@
-
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Home, Settings, Wrench } from 'lucide-react';
@@ -10,10 +9,18 @@ import { useState, useEffect, useRef } from 'react';
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const isScoreboardPage = pathname === '/';
 
   const [isVisible, setIsVisible] = useState(!isScoreboardPage);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Prefetch all main routes as soon as the header loads to make navigation instant
+  useEffect(() => {
+    router.prefetch('/');
+    router.prefetch('/controls');
+    router.prefetch('/config');
+  }, [router]);
 
   useEffect(() => {
     if (isScoreboardPage) {
