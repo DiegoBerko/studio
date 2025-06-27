@@ -1803,6 +1803,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const prevPeriodDisplayOverrideRef = useRef<PeriodDisplayOverrideType>();
 
   useEffect(() => {
+    // Only save if the state *transitions* to 'End of Game'
     if (prevPeriodDisplayOverrideRef.current !== 'End of Game' && state.periodDisplayOverride === 'End of Game') {
       const categoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories) || 'N/A';
       
@@ -1838,6 +1839,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         }
       })();
     }
+    // Update the ref with the current state for the next render.
     prevPeriodDisplayOverrideRef.current = state.periodDisplayOverride;
   }, [
       state.periodDisplayOverride,
