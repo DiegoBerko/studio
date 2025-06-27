@@ -15,12 +15,40 @@ export function SoundPlayer() {
   const lastPlayedBeepTriggerRef = useRef<number>(state.playPenaltyBeepTrigger);
   const penaltyAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Directly derive the src from the state. This avoids the intermediate empty string state.
   const hornSoundSrc = state.customHornSoundDataUrl || DEFAULT_SOUND_PATH;
   const penaltyBeepSoundSrc = state.customPenaltyBeepSoundDataUrl || DEFAULT_PENALTY_BEEP_PATH;
 
+  const handleAudioError = (e: React.SyntheticEvent<HTMLAudioElement, Event>, soundName: string) => {
+    const error = e.currentTarget.error;
+    if (!error) return;
+    
+    let errorMessage = `Código de error: ${error.code}.`;
+    switch (error.code) {
+      case error.MEDIA_ERR_ABORTED:
+        errorMessage = 'La carga de audio fue abortada.';
+        break;
+      case error.MEDIA_ERR_NETWORK:
+        errorMessage = 'Ocurrió un error de red al cargar el audio.';
+        break;
+      case error.MEDIA_ERR_DECODE:
+        errorMessage = 'El archivo de audio está corrupto o no es soportado.';
+        break;
+      case error.MEDIA_ERR_SRC_NOT_SUPPORTED:
+        errorMessage = 'No se encontró o no se soporta el archivo de audio. Verifica que exista en la carpeta /public.';
+        break;
+      default:
+        errorMessage = 'Ocurrió un error desconocido al cargar el audio.';
+        break;
+    }
 
-  // Effect to play the horn sound
+    console.error(`Error de Audio (${soundName}):`, error.message, e.currentTarget.src);
+    toast({
+        title: `Error de Sonido (${soundName})`,
+        description: errorMessage,
+        variant: "destructive"
+    });
+  };
+
   useEffect(() => {
     if (state.isLoading) return;
 
@@ -41,7 +69,6 @@ export function SoundPlayer() {
     }
   }, [state.playHornTrigger, state.playSoundAtPeriodEnd, state.isLoading, toast]);
 
-  // Effect to play the penalty beep sound
   useEffect(() => {
     if (state.isLoading) return;
 
@@ -64,8 +91,18 @@ export function SoundPlayer() {
 
   return (
     <>
-      <audio ref={hornAudioRef} src={hornSoundSrc} preload="auto" />
-      <audio ref={penaltyAudioRef} src={penaltyBeepSoundSrc} preload="auto" />
+      <audio 
+        ref={hornAudioRef} 
+        src={hornSoundSrc} 
+        preload="auto"
+        onError={(e) => handleAudioError(e, 'Bocina')} 
+      />
+      <audio 
+        ref={penaltyAudioRef} 
+        src={penaltyBeepSoundSrc} 
+        preload="auto" 
+        onError={(e) => handleAudioError(e, 'Beep Penalidad')}
+      />
     </>
   );
 }
