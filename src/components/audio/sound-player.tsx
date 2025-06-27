@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useGameState, DEFAULT_SOUND_PATH, DEFAULT_PENALTY_BEEP_PATH } from '@/contexts/game-state-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,17 +15,9 @@ export function SoundPlayer() {
   const lastPlayedBeepTriggerRef = useRef<number>(state.playPenaltyBeepTrigger);
   const penaltyAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const [hornSoundSrc, setHornSoundSrc] = useState('');
-  const [penaltyBeepSoundSrc, setPenaltyBeepSoundSrc] = useState('');
-
-  // Effect to update the audio sources when they change in the global state
-  useEffect(() => {
-    setHornSoundSrc(state.customHornSoundDataUrl || DEFAULT_SOUND_PATH);
-  }, [state.customHornSoundDataUrl]);
-
-  useEffect(() => {
-    setPenaltyBeepSoundSrc(state.customPenaltyBeepSoundDataUrl || DEFAULT_PENALTY_BEEP_PATH);
-  }, [state.customPenaltyBeepSoundDataUrl]);
+  // Directly derive the src from the state. This avoids the intermediate empty string state.
+  const hornSoundSrc = state.customHornSoundDataUrl || DEFAULT_SOUND_PATH;
+  const penaltyBeepSoundSrc = state.customPenaltyBeepSoundDataUrl || DEFAULT_PENALTY_BEEP_PATH;
 
 
   // Effect to play the horn sound
