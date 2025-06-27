@@ -903,13 +903,17 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'ADJUST_PENALTY_TIME': {
       const { team, penaltyId, delta } = action.payload;
       let updatedPenalties = state[`${team}Penalties`].map(p => {
-        if (p.id === penaltyId && p.expirationTime !== undefined) {
-          const newExpirationTime = p.expirationTime + (delta * CENTISECONDS_PER_SECOND);
-          return { ...p, expirationTime: newExpirationTime };
+        if (p.id === penaltyId) {
+          if (p._status === 'running' && p.expirationTime !== undefined) {
+            const newExpirationTime = p.expirationTime + (delta * CENTISECONDS_PER_SECOND);
+            return { ...p, expirationTime: newExpirationTime };
+          } else {
+            const newInitialDuration = Math.max(0, p.initialDuration + delta);
+            return { ...p, initialDuration: newInitialDuration };
+          }
         }
         return p;
       });
-      updatedPenalties = updatePenaltyStatusesOnly(updatedPenalties, state.maxConcurrentPenalties);
       updatedPenalties = sortPenaltiesByStatus(updatedPenalties);
       newStateWithoutMeta = { ...state, [`${team}Penalties`]: updatedPenalties };
       break;
@@ -917,23 +921,25 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'SET_PENALTY_TIME': {
       const { team, penaltyId, time } = action.payload;
       const penalties = state[`${team}Penalties`];
-      const penaltyToUpdate = penalties.find(p => p.id === penaltyId);
-
-      if (!penaltyToUpdate) {
-        newStateWithoutMeta = state;
-        break;
-      }
-
-      let updatedPenalties = penalties.map(p => {
+      
+      const updatedPenalties = penalties.map(p => {
         if (p.id === penaltyId) {
-          const newExpirationTime = state.currentTime - (time * CENTISECONDS_PER_SECOND);
-          return { ...p, expirationTime: newExpirationTime };
+          const newDurationInSeconds = time;
+          // If penalty is running, adjust expirationTime based on new remaining time
+          if (p._status === 'running') {
+            const newExpirationTime = state.currentTime - (newDurationInSeconds * CENTISECONDS_PER_SECOND);
+            return { ...p, expirationTime: newExpirationTime };
+          } 
+          // If penalty is NOT running, adjust only the initialDuration
+          else {
+            return { ...p, initialDuration: newDurationInSeconds, expirationTime: undefined };
+          }
         }
         return p;
       });
-      updatedPenalties = updatePenaltyStatusesOnly(updatedPenalties, state.maxConcurrentPenalties);
-      updatedPenalties = sortPenaltiesByStatus(updatedPenalties);
-      newStateWithoutMeta = { ...state, [`${team}Penalties`]: updatedPenalties };
+
+      const sortedPenalties = sortPenaltiesByStatus(updatedPenalties);
+      newStateWithoutMeta = { ...state, [`${team}Penalties`]: sortedPenalties };
       break;
     }
     case 'REORDER_PENALTIES': {

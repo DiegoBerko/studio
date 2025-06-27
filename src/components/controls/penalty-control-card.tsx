@@ -460,7 +460,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
               const displayPenaltyNumber = p.playerNumber || 'S/N';
               const isEditingThisPenalty = editingPenaltyId === p.id;
               
-              const remainingTimeCs = p.expirationTime !== undefined
+              const remainingTimeCs = (p._status === 'running' && p.expirationTime !== undefined)
                 ? Math.max(0, state.currentTime - p.expirationTime)
                 : p.initialDuration * 100;
               const isEndingSoon = p._status === 'running' && remainingTimeCs > 0 && remainingTimeCs < 1000;
