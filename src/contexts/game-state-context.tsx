@@ -938,7 +938,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           const newDurationInSeconds = time;
           if (p._status === 'running') {
             const newExpirationTime = state.currentTime - (newDurationInSeconds * CENTISECONDS_PER_SECOND);
-            return { ...p, expirationTime: newExpirationTime };
+            return { ...p, expirationTime: newExpirationTime, initialDuration: newDurationInSeconds };
           } 
           else {
             return { ...p, initialDuration: newDurationInSeconds, expirationTime: undefined };
@@ -996,8 +996,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           if (state.enablePenaltyCountdownSound && state.isClockRunning && state.periodDisplayOverride === null) {
               penalties.forEach(p => {
                   if (p._status === 'running' && p.expirationTime !== undefined) {
-                      const previousRemainingTimeCs = p.expirationTime - state.currentTime;
-                      const currentRemainingTimeCs = p.expirationTime - newCalculatedTimeCs;
+                      const previousRemainingTimeCs = state.currentTime - p.expirationTime;
+                      const currentRemainingTimeCs = newCalculatedTimeCs - p.expirationTime;
 
                       if (currentRemainingTimeCs / CENTISECONDS_PER_SECOND <= state.penaltyCountdownStartTime && currentRemainingTimeCs > 0) {
                           if (Math.floor(previousRemainingTimeCs / CENTISECONDS_PER_SECOND) > Math.floor(currentRemainingTimeCs / CENTISECONDS_PER_SECOND)) {
