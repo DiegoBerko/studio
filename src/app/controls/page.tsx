@@ -9,6 +9,7 @@ import { PenaltyControlCard } from '@/components/controls/penalty-control-card';
 import { GoalManagementDialog } from '@/components/controls/goal-management-dialog';
 import { GameSummaryDialog } from '@/components/controls/game-summary-dialog';
 import { useGameState, type Team, type GoalLog, type PenaltyLog, getCategoryNameById, formatTime } from '@/contexts/game-state-context';
+import type { PlayerData } from '@/types';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -309,8 +310,21 @@ export default function ControlsPage() {
     const awayGoals = state.goals.filter(g => g.team === 'away').sort((a, b) => a.timestamp - b.timestamp);
     const homePenalties = [...state.gameSummary.home.penalties].sort((a,b) => a.addTimestamp - b.addTimestamp);
     const awayPenalties = [...state.gameSummary.away.penalties].sort((a,b) => a.addTimestamp - b.addTimestamp);
+
+    const homeTeamData = state.teams.find(t => t.name === state.homeTeamName && (t.subName || undefined) === (state.homeTeamSubName || undefined) && t.category === state.selectedMatchCategory);
+    const awayTeamData = state.teams.find(t => t.name === state.awayTeamName && (t.subName || undefined) === (state.awayTeamSubName || undefined) && t.category === state.selectedMatchCategory);
+
+    const homeAttendanceIds = new Set(state.gameSummary.attendance?.home || []);
+    const homeAttendedPlayers = homeTeamData?.players
+        .filter(p => homeAttendanceIds.has(p.id))
+        .sort((a,b) => (parseInt(a.number) || 999) - (parseInt(b.number) || 999)) || [];
+
+    const awayAttendanceIds = new Set(state.gameSummary.attendance?.away || []);
+    const awayAttendedPlayers = awayTeamData?.players
+        .filter(p => awayAttendanceIds.has(p.id))
+        .sort((a,b) => (parseInt(a.number) || 999) - (parseInt(b.number) || 999)) || [];
     
-    const addTeamSection = (doc: jsPDF, teamName: string, goals: GoalLog[], penalties: PenaltyLog[], startY: number) => {
+    const addTeamSection = (doc: jsPDF, teamName: string, goals: GoalLog[], penalties: PenaltyLog[], attendedPlayers: PlayerData[], startY: number) => {
         doc.setFontSize(14);
         doc.text(`${teamName} - Goles`, 14, startY);
         if (goals.length > 0) {
@@ -331,7 +345,7 @@ export default function ControlsPage() {
              doc.text("Sin goles registrados.", 14, startY + 8);
         }
 
-        const lastY = (doc as any).lastAutoTable.finalY || (startY + 10);
+        let lastY = (doc as any).lastAutoTable.finalY || (startY + 10);
         doc.setFontSize(14);
         doc.text(`${teamName} - Penalidades`, 14, lastY + 10);
 
@@ -348,11 +362,28 @@ export default function ControlsPage() {
             doc.text("Sin penalidades registradas.", 14, lastY + 18);
         }
 
+        lastY = (doc as any).lastAutoTable.finalY || (lastY + 20);
+
+        doc.setFontSize(14);
+        doc.text(`${teamName} - Asistencia`, 14, lastY + 10);
+        if (attendedPlayers.length > 0) {
+            autoTable(doc, {
+                startY: lastY + 12,
+                head: [['#', 'Nombre']],
+                body: attendedPlayers.map(p => [p.number || 'S/N', p.name || '---']),
+                theme: 'grid',
+                headStyles: { fillColor: [22, 163, 74] },
+            });
+        } else {
+            doc.setFontSize(10);
+            doc.text("Sin jugadores marcados como asistentes.", 14, lastY + 18);
+        }
+
         return (doc as any).lastAutoTable.finalY || (lastY + 20);
     };
     
-    const homeFinalY = addTeamSection(doc, state.homeTeamName, homeGoals, homePenalties, 40);
-    addTeamSection(doc, state.awayTeamName, awayGoals, awayPenalties, homeFinalY + 15);
+    const homeFinalY = addTeamSection(doc, state.homeTeamName, homeGoals, homePenalties, homeAttendedPlayers, 40);
+    addTeamSection(doc, state.awayTeamName, awayGoals, awayPenalties, awayAttendedPlayers, homeFinalY + 15);
 
     doc.save(filename);
     // --- End PDF Generation Logic ---
