@@ -2,8 +2,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useGameState, formatTime, type Team } from "@/contexts/game-state-context";
-import type { PenaltyLog } from "@/types";
+import { useGameState, formatTime, type Team, getEndReasonText } from "@/contexts/game-state-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,17 +23,7 @@ const formatLogTimestamp = (timestamp?: number): string => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 };
 
-const getEndReasonText = (reason?: PenaltyLog['endReason']): string => {
-    if (!reason) return 'Activa';
-    switch (reason) {
-        case 'completed': return 'Cumplida';
-        case 'deleted': return 'Eliminada';
-        case 'goal_on_pp': return 'Gol en Contra';
-        default: return 'Cerrada';
-    }
-};
-
-const getEndReasonVariant = (reason?: PenaltyLog['endReason']): "secondary" | "default" => {
+const getEndReasonVariant = (reason?: 'completed' | 'deleted' | 'goal_on_pp'): "secondary" | "default" => {
     return reason ? 'secondary' : 'default';
 };
 

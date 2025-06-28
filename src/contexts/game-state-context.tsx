@@ -124,7 +124,7 @@ interface PreTimeoutState {
   remainingTimeAtStartCs: number | null; 
 }
 
-interface GameState extends ConfigFields {
+export interface GameState extends ConfigFields {
   homeScore: number;
   awayScore: number;
   currentTime: number; 
@@ -2154,6 +2154,16 @@ export const centisecondsToDisplayMinutes = (centiseconds: number): string => {
 
 export const DEFAULT_SOUND_PATH = DEFAULT_HORN_SOUND_FILE_PATH;
 export const DEFAULT_PENALTY_BEEP_PATH = DEFAULT_PENALTY_BEEP_FILE_PATH;
+
+export const getEndReasonText = (reason?: PenaltyLog['endReason']): string => {
+    if (!reason) return 'Activa';
+    switch (reason) {
+        case 'completed': return 'Cumplida';
+        case 'deleted': return 'Eliminada';
+        case 'goal_on_pp': return 'Gol en Contra';
+        default: return 'Cerrada';
+    }
+};
 
 export const getCategoryNameById = (categoryId: string, availableCategories: CategoryData[]): string | undefined => {
   if (!Array.isArray(availableCategories)) return undefined; 

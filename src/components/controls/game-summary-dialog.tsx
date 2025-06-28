@@ -2,10 +2,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { useGameState, formatTime, type Team, type GoalLog, type PenaltyLog, getCategoryNameById } from "@/contexts/game-state-context";
-import type { PlayerData } from '@/types';
+import { useGameState, formatTime, type Team, type GoalLog, type PenaltyLog, getCategoryNameById, getEndReasonText } from "@/contexts/game-state-context";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,21 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Goal, Siren, X, FileText, FileDown } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { exportGameSummaryPDF } from "@/lib/pdf-generator";
 
 interface GameSummaryDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
-
-const getEndReasonText = (reason?: PenaltyLog['endReason']): string => {
-    if (!reason) return 'Activa';
-    switch (reason) {
-        case 'completed': return 'Cumplida';
-        case 'deleted': return 'Eliminada';
-        case 'goal_on_pp': return 'Gol en Contra';
-        default: return 'Cerrada';
-    }
-};
 
 const TeamSummaryColumn = ({ team, teamName, score, goals, penalties }: { team: Team; teamName: string; score: number; goals: GoalLog[]; penalties: PenaltyLog[] }) => (
   <div className="flex-1 space-y-4">
@@ -112,6 +101,7 @@ const TeamSummaryColumn = ({ team, teamName, score, goals, penalties }: { team: 
 
 export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogProps) {
   const { state } = useGameState();
+  const { toast } = useToast();
   
   const homeGoals = useMemo(() => {
     return state.goals.filter(g => g.team === 'home').sort((a, b) => a.timestamp - b.timestamp);
@@ -160,108 +150,11 @@ export function GameSummaryDialog({ isOpen, onOpenChange }: GameSummaryDialogPro
   };
   
   const handleExportPDF = () => {
-    const doc = new jsPDF();
-    const teamTitle = `${state.homeTeamName} vs ${state.awayTeamName}`;
-    const date = new Date().toLocaleDateString();
-    const finalScore = `${state.homeScore} - ${state.awayScore}`;
-    const categoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories) || 'N/A';
-
-    doc.text(`Resumen del Partido: ${teamTitle} (Cat. ${categoryName})`, 14, 15);
-    doc.setFontSize(10);
-    doc.text(`Fecha: ${date}`, 14, 22);
-    doc.setFontSize(12);
-    doc.text(`Resultado Final: ${finalScore}`, 14, 29);
-
-    const homeTeamData = state.teams.find(t => t.name === state.homeTeamName && (t.subName || undefined) === (state.homeTeamSubName || undefined) && t.category === state.selectedMatchCategory);
-    const awayTeamData = state.teams.find(t => t.name === state.awayTeamName && (t.subName || undefined) === (state.awayTeamSubName || undefined) && t.category === state.selectedMatchCategory);
-
-    const homeAttendanceIds = new Set(state.gameSummary.attendance?.home || []);
-    const homeAttendedPlayers = homeTeamData?.players
-        .filter(p => homeAttendanceIds.has(p.id))
-        .sort((a,b) => (parseInt(a.number) || 999) - (parseInt(b.number) || 999)) || [];
-
-    const awayAttendanceIds = new Set(state.gameSummary.attendance?.away || []);
-    const awayAttendedPlayers = awayTeamData?.players
-        .filter(p => awayAttendanceIds.has(p.id))
-        .sort((a,b) => (parseInt(a.number) || 999) - (parseInt(b.number) || 999)) || [];
-
-    const addTeamSection = (doc: jsPDF, teamName: string, goals: GoalLog[], penalties: PenaltyLog[], attendedPlayers: PlayerData[], startY: number): number => {
-        let currentY = startY;
-
-        // --- Goles Section ---
-        doc.setFontSize(14);
-        doc.text(`${teamName} - Goles`, 14, currentY);
-        currentY += 2; // Move down for the table/text
-
-        if (goals.length > 0) {
-            autoTable(doc, {
-                startY: currentY,
-                head: [['Tiempo', 'Periodo', 'Gol', 'Asistencia']],
-                body: goals.map(g => [
-                  formatTime(g.gameTime), 
-                  g.periodText, 
-                  `#${g.scorer?.playerNumber || 'S/N'} ${g.scorer?.playerName || ''}`.trim(),
-                  g.assist ? `#${g.assist.playerNumber} ${g.assist.playerName || ''}`.trim() : '---'
-                ]),
-                theme: 'striped',
-                headStyles: { fillColor: [41, 128, 185] },
-            });
-            currentY = (doc as any).lastAutoTable.finalY;
-        } else {
-             doc.setFontSize(10);
-             doc.text("Sin goles registrados.", 14, currentY + 6);
-             currentY += 10; // Approx height for the text line + padding
-        }
-        
-        // --- Penalidades Section ---
-        currentY += 12; // Padding before next section
-        doc.setFontSize(14);
-        doc.text(`${teamName} - Penalidades`, 14, currentY);
-        currentY += 2;
-
-        if (penalties.length > 0) {
-            autoTable(doc, {
-                startY: currentY,
-                head: [['Tiempo', 'Periodo', 'Jugador #', 'Nombre', 'Duración', 'Estado']],
-                body: penalties.map(p => [formatTime(p.addGameTime), p.addPeriodText, p.playerNumber, p.playerName || '---', formatTime(p.initialDuration * 100), getEndReasonText(p.endReason)]),
-                theme: 'striped',
-                headStyles: { fillColor: [231, 76, 60] },
-            });
-            currentY = (doc as any).lastAutoTable.finalY;
-        } else {
-            doc.setFontSize(10);
-            doc.text("Sin penalidades registradas.", 14, currentY + 6);
-            currentY += 10;
-        }
-
-        // --- Asistencia Section ---
-        currentY += 12; // Padding before next section
-        doc.setFontSize(14);
-        doc.text(`${teamName} - Asistencia`, 14, currentY);
-        currentY += 2;
-        
-        if (attendedPlayers.length > 0) {
-            autoTable(doc, {
-                startY: currentY,
-                head: [['#', 'Nombre']],
-                body: attendedPlayers.map(p => [p.number || 'S/N', p.name || '---']),
-                theme: 'grid',
-                headStyles: { fillColor: [22, 163, 74] },
-            });
-            currentY = (doc as any).lastAutoTable.finalY;
-        } else {
-            doc.setFontSize(10);
-            doc.text("Sin jugadores marcados como asistentes.", 14, currentY + 6);
-            currentY += 10;
-        }
-
-        return currentY;
-    };
-
-    const homeFinalY = addTeamSection(doc, state.homeTeamName, homeGoals, homePenalties, homeAttendedPlayers, 40);
-    addTeamSection(doc, state.awayTeamName, awayGoals, awayPenalties, awayAttendedPlayers, homeFinalY + 15);
-
-    doc.save(`resumen_partido_${state.homeTeamName}_vs_${state.awayTeamName}.pdf`);
+    const filename = exportGameSummaryPDF(state);
+    toast({
+        title: "Resumen Descargado",
+        description: `El archivo ${filename} se ha guardado.`,
+    });
   };
 
   return (
