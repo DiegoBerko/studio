@@ -324,12 +324,17 @@ export default function ControlsPage() {
         .filter(p => awayAttendanceIds.has(p.id))
         .sort((a,b) => (parseInt(a.number) || 999) - (parseInt(b.number) || 999)) || [];
     
-    const addTeamSection = (doc: jsPDF, teamName: string, goals: GoalLog[], penalties: PenaltyLog[], attendedPlayers: PlayerData[], startY: number) => {
+    const addTeamSection = (doc: jsPDF, teamName: string, goals: GoalLog[], penalties: PenaltyLog[], attendedPlayers: PlayerData[], startY: number): number => {
+        let currentY = startY;
+
+        // --- Goles Section ---
         doc.setFontSize(14);
-        doc.text(`${teamName} - Goles`, 14, startY);
+        doc.text(`${teamName} - Goles`, 14, currentY);
+        currentY += 2; // Move down for the table/text
+
         if (goals.length > 0) {
             autoTable(doc, {
-                startY: startY + 2,
+                startY: currentY,
                 head: [['Tiempo', 'Periodo', 'Gol', 'Asistencia']],
                 body: goals.map(g => [
                   formatTime(g.gameTime), 
@@ -340,46 +345,56 @@ export default function ControlsPage() {
                 theme: 'striped',
                 headStyles: { fillColor: [41, 128, 185] },
             });
+            currentY = (doc as any).lastAutoTable.finalY;
         } else {
              doc.setFontSize(10);
-             doc.text("Sin goles registrados.", 14, startY + 8);
+             doc.text("Sin goles registrados.", 14, currentY + 6);
+             currentY += 10; // Approx height for the text line + padding
         }
-
-        let lastY = (doc as any).lastAutoTable.finalY || (startY + 10);
+        
+        // --- Penalidades Section ---
+        currentY += 12; // Padding before next section
         doc.setFontSize(14);
-        doc.text(`${teamName} - Penalidades`, 14, lastY + 10);
+        doc.text(`${teamName} - Penalidades`, 14, currentY);
+        currentY += 2;
 
         if (penalties.length > 0) {
             autoTable(doc, {
-                startY: lastY + 12,
+                startY: currentY,
                 head: [['Tiempo', 'Periodo', 'Jugador #', 'Nombre', 'Duración', 'Estado']],
                 body: penalties.map(p => [formatTime(p.addGameTime), p.addPeriodText, p.playerNumber, p.playerName || '---', formatTime(p.initialDuration * 100), getEndReasonText(p.endReason)]),
                 theme: 'striped',
                 headStyles: { fillColor: [231, 76, 60] },
             });
+            currentY = (doc as any).lastAutoTable.finalY;
         } else {
             doc.setFontSize(10);
-            doc.text("Sin penalidades registradas.", 14, lastY + 18);
+            doc.text("Sin penalidades registradas.", 14, currentY + 6);
+            currentY += 10;
         }
 
-        lastY = (doc as any).lastAutoTable.finalY || (lastY + 20);
-
+        // --- Asistencia Section ---
+        currentY += 12; // Padding before next section
         doc.setFontSize(14);
-        doc.text(`${teamName} - Asistencia`, 14, lastY + 10);
+        doc.text(`${teamName} - Asistencia`, 14, currentY);
+        currentY += 2;
+        
         if (attendedPlayers.length > 0) {
             autoTable(doc, {
-                startY: lastY + 12,
+                startY: currentY,
                 head: [['#', 'Nombre']],
                 body: attendedPlayers.map(p => [p.number || 'S/N', p.name || '---']),
                 theme: 'grid',
                 headStyles: { fillColor: [22, 163, 74] },
             });
+            currentY = (doc as any).lastAutoTable.finalY;
         } else {
             doc.setFontSize(10);
-            doc.text("Sin jugadores marcados como asistentes.", 14, lastY + 18);
+            doc.text("Sin jugadores marcados como asistentes.", 14, currentY + 6);
+            currentY += 10;
         }
 
-        return (doc as any).lastAutoTable.finalY || (lastY + 20);
+        return currentY;
     };
     
     const homeFinalY = addTeamSection(doc, state.homeTeamName, homeGoals, homePenalties, homeAttendedPlayers, 40);
