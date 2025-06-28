@@ -7,6 +7,7 @@ import React, { createContext, useContext, useReducer, useEffect, useRef, useSta
 import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings, ScoreboardLayoutProfile, GameSummary, GoalLog, PenaltyLog } from '@/types';
 import { saveGameSummary } from '@/ai/flows/file-operations';
 import { toast } from '@/hooks/use-toast';
+import isEqual from 'lodash.isequal';
 
 // --- Constantes para la sincronización local ---
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
@@ -979,6 +980,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     case 'TICK': {
+      let hasChanged = false;
       let newCalculatedTimeCs = state.currentTime;
       let homePenaltiesResult = [...state.homePenalties];
       let awayPenaltiesResult = [...state.awayPenalties];
@@ -988,6 +990,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         const elapsedMs = Date.now() - state.clockStartTimeMs;
         const elapsedCs = Math.floor(elapsedMs / 10);
         newCalculatedTimeCs = Math.max(0, state.remainingTimeAtStartCs - elapsedCs);
+        if (newCalculatedTimeCs !== state.currentTime) {
+          hasChanged = true;
+        }
       } else if (state.isClockRunning && state.currentTime <= 0) {
          newCalculatedTimeCs = 0;
       }
@@ -1002,6 +1007,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
                       if (currentRemainingTimeCs / CENTISECONDS_PER_SECOND <= state.penaltyCountdownStartTime && currentRemainingTimeCs > 0) {
                           if (Math.floor(previousRemainingTimeCs / CENTISECONDS_PER_SECOND) > Math.floor(currentRemainingTimeCs / CENTISECONDS_PER_SECOND)) {
                               newPlayPenaltyBeepTrigger++;
+                              hasChanged = true;
                           }
                       }
                   }
@@ -1015,6 +1021,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const setExpirations = (penalties: Penalty[]): Penalty[] => {
         return penalties.map(p => {
           if (p._status === 'running' && p.expirationTime === undefined) {
+            hasChanged = true;
             return {
               ...p,
               expirationTime: newCalculatedTimeCs - (p.initialDuration * 100),
@@ -1033,6 +1040,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         const stillActivePenalties: Penalty[] = [];
         penalties.forEach(p => {
           if (p._status === 'running' && p.expirationTime !== undefined && newCalculatedTimeCs <= p.expirationTime) {
+            hasChanged = true;
             const logIndex = newGameSummary[team].penalties.findIndex(log => log.id === p.id && !log.endReason);
             if (logIndex > -1) {
               newGameSummary[team].penalties[logIndex] = {
@@ -1058,6 +1066,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       homePenaltiesResult = sortPenaltiesByStatus(homePenaltiesResult);
       awayPenaltiesResult = sortPenaltiesByStatus(awayPenaltiesResult);
+      
+      if (!isEqual(homePenaltiesResult, state.homePenalties) || !isEqual(awayPenaltiesResult, state.awayPenalties)) {
+        hasChanged = true;
+      }
 
       if (state.isClockRunning && newCalculatedTimeCs <= 0) {
         const stateBeforeTransition: GameState = {
@@ -1074,7 +1086,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         newStateWithoutMeta = transitionResult; 
         newPlayHornTrigger = transitionResult.playHornTrigger;
         newPlayPenaltyBeepTrigger = state.playPenaltyBeepTrigger;
-      } else {
+      } else if (hasChanged) {
         newStateWithoutMeta = {
           ...state,
           currentTime: newCalculatedTimeCs,
@@ -1088,6 +1100,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             newStateWithoutMeta.remainingTimeAtStartCs = null;
             newPlayHornTrigger = state.playHornTrigger + 1;
         }
+      } else {
+        return state; 
       }
       break;
     }
