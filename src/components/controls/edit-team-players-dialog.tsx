@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -45,13 +45,14 @@ export function EditTeamPlayersDialog({
   const { toast } = useToast();
   const [editablePlayers, setEditablePlayers] = useState<EditablePlayer[]>([]);
   const [attendedPlayerIds, setAttendedPlayerIds] = useState<Set<string>>(new Set());
+  const isInitialized = useRef(false);
 
   const teamDetails = useMemo(() => {
     return state.teams.find(t => t.id === teamId);
   }, [state.teams, teamId]);
 
   useEffect(() => {
-    if (isOpen && teamDetails) {
+    if (isOpen && teamDetails && !isInitialized.current) {
       const sortedPlayers = [...teamDetails.players].sort((a, b) => {
         if (a.type === 'goalkeeper' && b.type !== 'goalkeeper') return -1;
         if (a.type !== 'goalkeeper' && b.type === 'goalkeeper') return 1;
@@ -77,9 +78,11 @@ export function EditTeamPlayersDialog({
       );
       const attendedIds = state.gameSummary?.attendance?.[teamType] || [];
       setAttendedPlayerIds(new Set(attendedIds));
+      isInitialized.current = true;
     } else if (!isOpen) {
       setEditablePlayers([]);
       setAttendedPlayerIds(new Set());
+      isInitialized.current = false;
     }
   }, [isOpen, teamDetails, state.gameSummary, teamType]);
 
