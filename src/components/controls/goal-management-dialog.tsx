@@ -54,8 +54,8 @@ function AddGoalForm({ team }: { team: Team }) {
     const payload: Omit<GoalLog, 'id'> = {
         team,
         timestamp: Date.now(),
-        gameTime: state.currentTime,
-        periodText: getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods),
+        gameTime: state.clock.currentTime,
+        periodText: getActualPeriodText(state.clock.currentPeriod, state.clock.periodDisplayOverride, state.numberOfRegularPeriods),
         scorer: {
           playerNumber: trimmedScorerNumber,
           playerName: selectedPlayer?.name,

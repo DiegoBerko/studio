@@ -38,6 +38,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from '@/components/ui/checkbox';
+import { getActualPeriodText } from '@/contexts/game-state-context';
 
 
 interface PenaltyControlCardProps {
@@ -461,7 +462,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
               const isEditingThisPenalty = editingPenaltyId === p.id;
               
               const remainingTimeCs = (p._status === 'running' && p.expirationTime !== undefined)
-                ? Math.max(0, state.currentTime - p.expirationTime)
+                ? Math.max(0, state.clock.currentTime - p.expirationTime)
                 : p.initialDuration * 100;
               const isEndingSoon = p._status === 'running' && remainingTimeCs > 0 && remainingTimeCs < 1000;
 

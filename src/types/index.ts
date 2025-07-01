@@ -182,24 +182,26 @@ export interface PreTimeoutState {
   remainingTimeAtStartCs: number | null;
 }
 
+export interface ClockState {
+  currentTime: number;
+  currentPeriod: number;
+  isClockRunning: boolean;
+  periodDisplayOverride: PeriodDisplayOverrideType;
+  preTimeoutState: PreTimeoutState | null;
+  clockStartTimeMs: number | null;
+  remainingTimeAtStartCs: number | null;
+}
+
 export interface LiveGameState {
     homeScore: number;
     awayScore: number;
-    currentTime: number;
-    currentPeriod: number;
-    isClockRunning: boolean;
+    clock: ClockState;
     homePenalties: Penalty[];
     awayPenalties: Penalty[];
     homeTeamName: string;
     homeTeamSubName?: string;
     awayTeamName: string;
     awayTeamSubName?: string;
-    periodDisplayOverride: PeriodDisplayOverrideType;
-    preTimeoutState: PreTimeoutState | null;
-    clockStartTimeMs: number | null;
-    remainingTimeAtStartCs: number | null;
-    playHornTrigger: number;
-    playPenaltyBeepTrigger: number;
     goals: GoalLog[];
     gameSummary: GameSummary;
 }

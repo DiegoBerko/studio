@@ -92,7 +92,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
     return { minutes, seconds, tenths };
   }, []);
 
-  const timeParts = getTimeParts(state.currentTime);
+  const timeParts = getTimeParts(state.clock.currentTime);
 
   useEffect(() => {
     if (editingSegment && inputRef.current) {
@@ -102,7 +102,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
   }, [editingSegment]);
 
   const handleTimeAdjust = (deltaSeconds: number) => {
-    if (state.periodDisplayOverride === "End of Game") return;
+    if (state.clock.periodDisplayOverride === "End of Game") return;
     dispatch({ type: 'ADJUST_TIME', payload: deltaSeconds * 100 });
     toast({
       title: "Reloj Ajustado",
@@ -111,11 +111,11 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
   };
 
   const handleToggleClock = () => {
-    if (state.periodDisplayOverride === "End of Game") return;
+    if (state.clock.periodDisplayOverride === "End of Game") return;
     setEditingSegment(null);
-    const isFirstGameAction = state.currentPeriod === 0 &&
-                              state.periodDisplayOverride === 'Warm-up' &&
-                              state.currentTime === state.defaultWarmUpDuration;
+    const isFirstGameAction = state.clock.currentPeriod === 0 &&
+                              state.clock.periodDisplayOverride === 'Warm-up' &&
+                              state.clock.currentTime === state.defaultWarmUpDuration;
     const hasDefaultTeamNames = (state.homeTeamName.trim().toUpperCase() === 'LOCAL' || state.homeTeamName.trim() === '') ||
                                 (state.awayTeamName.trim().toUpperCase() === 'VISITANTE' || state.awayTeamName.trim() === '');
 
@@ -123,7 +123,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
       dispatch({ type: 'TOGGLE_CLOCK' });
     };
 
-    if (!state.isClockRunning && isFirstGameAction && hasDefaultTeamNames && state.enableTeamSelectionInMiniScoreboard) {
+    if (!state.clock.isClockRunning && isFirstGameAction && hasDefaultTeamNames && state.enableTeamSelectionInMiniScoreboard) {
       checkAndConfirm(
         true,
         "Nombres de Equipo por Defecto",
@@ -180,47 +180,47 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
       }
     };
 
-    if (state.periodDisplayOverride === "End of Game") {
+    if (state.clock.periodDisplayOverride === "End of Game") {
       actionToGoToLastPeriod();
       return;
     }
 
-    if (state.periodDisplayOverride === "Time Out") {
+    if (state.clock.periodDisplayOverride === "Time Out") {
       toast({ title: "Time Out Activo", description: "Finaliza el Time Out para cambiar de período.", variant: "destructive" });
       return;
     }
 
-    if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
+    if (state.clock.periodDisplayOverride === "Break" || state.clock.periodDisplayOverride === "Pre-OT Break") {
       const actionToConfirm = () => {
-        dispatch({ type: 'SET_PERIOD', payload: state.currentPeriod });
-        toast({ title: "Período Restaurado", description: `Retornando a ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
+        dispatch({ type: 'SET_PERIOD', payload: state.clock.currentPeriod });
+        toast({ title: "Período Restaurado", description: `Retornando a ${getPeriodText(state.clock.currentPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
       };
 
-      const currentBreakDurationCs = state.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
-      const shouldConfirm = state.currentTime > 0 && state.currentTime < currentBreakDurationCs;
+      const currentBreakDurationCs = state.clock.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
+      const shouldConfirm = state.clock.currentTime > 0 && state.clock.currentTime < currentBreakDurationCs;
 
       checkAndConfirm(
         shouldConfirm,
         "Confirmar Acción",
-        `El descanso no ha finalizado. ¿Estás seguro de que quieres retornar a ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)}?`,
+        `El descanso no ha finalizado. ¿Estás seguro de que quieres retornar a ${getPeriodText(state.clock.currentPeriod, state.numberOfRegularPeriods)}?`,
         actionToConfirm
       );
     } else {
-      if (state.currentPeriod === 1) {
+      if (state.clock.currentPeriod === 1) {
         const actionToConfirm = () => {
           dispatch({ type: 'SET_PERIOD', payload: 0 });
           toast({ title: "Entrada en Calor Reiniciada", description: `Reloj de Entrada en Calor (${centisecondsToDisplayMinutes(state.defaultWarmUpDuration)} min) ${state.autoStartWarmUp ? 'corriendo.' : 'pausado.'}` });
         };
-        const shouldConfirm = state.currentTime > 0 && state.currentTime < state.defaultPeriodDuration;
+        const shouldConfirm = state.clock.currentTime > 0 && state.clock.currentTime < state.defaultPeriodDuration;
         checkAndConfirm(
           shouldConfirm,
           "Confirmar Acción",
           "El reloj del 1er período ha corrido. ¿Estás seguro de que quieres volver a la Entrada en Calor (reiniciará su tiempo)?",
           actionToConfirm
         );
-      } else if (state.currentPeriod > 1) {
+      } else if (state.clock.currentPeriod > 1) {
         const actionToConfirm = () => {
-          const periodBeforeIntendedBreak = state.currentPeriod -1;
+          const periodBeforeIntendedBreak = state.clock.currentPeriod -1;
           dispatch({ type: 'START_BREAK_AFTER_PREVIOUS_PERIOD' });
           const isPreOT = periodBeforeIntendedBreak >= state.numberOfRegularPeriods;
           const breakType = isPreOT ? "Pre-OT Break" : "Break";
@@ -232,9 +232,9 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
           });
         };
 
-        const isCurrentPeriodOT = state.currentPeriod > state.numberOfRegularPeriods;
+        const isCurrentPeriodOT = state.clock.currentPeriod > state.numberOfRegularPeriods;
         const currentPeriodExpectedDurationCs = isCurrentPeriodOT ? state.defaultOTPeriodDuration : state.defaultPeriodDuration;
-        const shouldConfirm = state.currentTime > 0 && state.currentTime < currentPeriodExpectedDurationCs;
+        const shouldConfirm = state.clock.currentTime > 0 && state.clock.currentTime < currentPeriodExpectedDurationCs;
         checkAndConfirm(
           shouldConfirm,
           "Confirmar Acción",
@@ -249,10 +249,10 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
 
   const handleNextAction = () => {
     setEditingSegment(null);
-    if (state.periodDisplayOverride === "End of Game") return;
+    if (state.clock.periodDisplayOverride === "End of Game") return;
 
-    if (state.periodDisplayOverride === "Time Out") {
-      if (state.currentTime <= 0) {
+    if (state.clock.periodDisplayOverride === "Time Out") {
+      if (state.clock.currentTime <= 0) {
         dispatch({ type: 'END_TIMEOUT' });
         toast({ title: "Time Out Finalizado", description: "Juego reanudado al estado anterior." });
       } else {
@@ -261,28 +261,28 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
       return;
     }
 
-    if (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up") {
+    if (state.clock.currentPeriod === 0 && state.clock.periodDisplayOverride === "Warm-up") {
       const actionToConfirm = () => {
         dispatch({ type: 'SET_PERIOD', payload: 1 });
         toast({ title: "1er Período Iniciado", description: `Reloj de 1er Período (${centisecondsToDisplayMinutes(state.defaultPeriodDuration)} min) pausado.` });
       };
-      const shouldConfirm = state.currentTime > 0 && state.currentTime < state.defaultWarmUpDuration;
+      const shouldConfirm = state.clock.currentTime > 0 && state.clock.currentTime < state.defaultWarmUpDuration;
         checkAndConfirm(
           shouldConfirm,
           "Confirmar Acción",
           "La Entrada en Calor no ha finalizado. ¿Estás seguro de que quieres iniciar el 1er Período?",
           actionToConfirm
         );
-    } else if (state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") {
-      const nextNumericPeriod = state.currentPeriod + 1;
+    } else if (state.clock.periodDisplayOverride === "Break" || state.clock.periodDisplayOverride === "Pre-OT Break") {
+      const nextNumericPeriod = state.clock.currentPeriod + 1;
       if (nextNumericPeriod <= MAX_TOTAL_GAME_PERIODS) {
         const actionToConfirm = () => {
             dispatch({ type: 'SET_PERIOD', payload: nextNumericPeriod });
             toast({ title: "Período Cambiado", description: `Período establecido a ${getPeriodText(nextNumericPeriod, state.numberOfRegularPeriods)}. Reloj reiniciado y pausado.` });
         };
 
-        const currentBreakDurationCs = state.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
-        const shouldConfirm = state.currentTime > 0 && state.currentTime < currentBreakDurationCs;
+        const currentBreakDurationCs = state.clock.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
+        const shouldConfirm = state.clock.currentTime > 0 && state.clock.currentTime < currentBreakDurationCs;
 
         checkAndConfirm(
             shouldConfirm,
@@ -295,8 +295,8 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
           dispatch({ type: 'MANUAL_END_GAME' });
           toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
         };
-        const currentBreakDurationCs = state.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
-        const shouldConfirm = state.currentTime > 0 && state.currentTime < currentBreakDurationCs;
+        const currentBreakDurationCs = state.clock.periodDisplayOverride === "Break" ? state.defaultBreakDuration : state.defaultPreOTBreakDuration;
+        const shouldConfirm = state.clock.currentTime > 0 && state.clock.currentTime < currentBreakDurationCs;
          checkAndConfirm(
             shouldConfirm,
             "Confirmar Finalizar Partido",
@@ -304,25 +304,25 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
             actionToConfirm
         );
       }
-    } else if (state.periodDisplayOverride === null) { // Active game period
-      if (state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) { 
+    } else if (state.clock.periodDisplayOverride === null) { // Active game period
+      if (state.clock.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) { 
         const actionToConfirm = () => {
           dispatch({ type: 'MANUAL_END_GAME' });
           toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
         };
-        const shouldConfirm = state.currentTime > 0;
+        const shouldConfirm = state.clock.currentTime > 0;
         checkAndConfirm(
           shouldConfirm,
           "Confirmar Finalizar Partido",
           "El reloj del último período aún tiene tiempo. ¿Estás seguro de que quieres finalizar el partido ahora?",
           actionToConfirm
         );
-      } else if (MAX_TOTAL_GAME_PERIODS === 0 && state.currentPeriod === 0) { 
+      } else if (MAX_TOTAL_GAME_PERIODS === 0 && state.clock.currentPeriod === 0) { 
          const actionToConfirm = () => {
           dispatch({ type: 'MANUAL_END_GAME' });
           toast({ title: "Partido Finalizado", description: "El juego ha terminado." });
         };
-        const shouldConfirm = state.currentTime > 0;
+        const shouldConfirm = state.clock.currentTime > 0;
          checkAndConfirm(
           shouldConfirm,
           "Confirmar Finalizar Partido",
@@ -331,7 +331,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
         );
       } else { 
         const actionToConfirm = () => {
-          const isPreOT = state.currentPeriod >= state.numberOfRegularPeriods;
+          const isPreOT = state.clock.currentPeriod >= state.numberOfRegularPeriods;
           if (isPreOT) {
             dispatch({ type: 'START_PRE_OT_BREAK' });
           } else {
@@ -342,12 +342,12 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
           const autoStart = isPreOT ? state.autoStartPreOTBreaks : state.autoStartBreaks;
           toast({
               title: `${breakType} Iniciado`,
-              description: `${breakType} iniciado después de ${getPeriodText(state.currentPeriod, state.numberOfRegularPeriods)} (${centisecondsToDisplayMinutes(durationCs)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
+              description: `${breakType} iniciado después de ${getPeriodText(state.clock.currentPeriod, state.numberOfRegularPeriods)} (${centisecondsToDisplayMinutes(durationCs)} min). Reloj ${autoStart ? 'corriendo' : 'pausado'}.`
           });
         };
-        const isCurrentPeriodOT = state.currentPeriod > state.numberOfRegularPeriods;
+        const isCurrentPeriodOT = state.clock.currentPeriod > state.numberOfRegularPeriods;
         const currentPeriodExpectedDurationCs = isCurrentPeriodOT ? state.defaultOTPeriodDuration : state.defaultPeriodDuration;
-        const shouldConfirm = state.currentTime > 0 && state.currentTime < currentPeriodExpectedDurationCs;
+        const shouldConfirm = state.clock.currentTime > 0 && state.clock.currentTime < currentPeriodExpectedDurationCs;
 
         checkAndConfirm(
           shouldConfirm,
@@ -359,50 +359,50 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
     }
   };
 
-  const isPreviousPeriodDisabled = (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up") || state.periodDisplayOverride === "Time Out";
+  const isPreviousPeriodDisabled = (state.clock.currentPeriod === 0 && state.clock.periodDisplayOverride === "Warm-up") || state.clock.periodDisplayOverride === "Time Out";
 
   let isNextActionDisabled = false;
-  if (state.periodDisplayOverride === "Time Out" && state.currentTime > 0) {
+  if (state.clock.periodDisplayOverride === "Time Out" && state.clock.currentTime > 0) {
       isNextActionDisabled = true;
-  } else if (state.periodDisplayOverride === "End of Game") {
+  } else if (state.clock.periodDisplayOverride === "End of Game") {
       isNextActionDisabled = true;
   }
 
 
-  const showNextActionButton = state.currentTime <= 0 && !state.isClockRunning && state.periodDisplayOverride !== "End of Game";
+  const showNextActionButton = state.clock.currentTime <= 0 && !state.clock.isClockRunning && state.clock.periodDisplayOverride !== "End of Game";
 
 
   let nextActionButtonText = "Siguiente";
-  if (state.periodDisplayOverride === "Time Out" && state.currentTime <=0) {
+  if (state.clock.periodDisplayOverride === "Time Out" && state.clock.currentTime <=0) {
     nextActionButtonText = "Finalizar Time Out";
-  } else if (state.currentPeriod === 0 && state.periodDisplayOverride === "Warm-up" && state.currentTime <= 0) {
+  } else if (state.clock.currentPeriod === 0 && state.clock.periodDisplayOverride === "Warm-up" && state.clock.currentTime <= 0) {
     if (MAX_TOTAL_GAME_PERIODS > 0) {
         nextActionButtonText = "Iniciar 1er Período";
     } else {
         nextActionButtonText = "Finalizar Partido"; 
     }
-  } else if (state.periodDisplayOverride === null && state.currentTime <= 0 && state.currentPeriod < MAX_TOTAL_GAME_PERIODS) {
+  } else if (state.clock.periodDisplayOverride === null && state.clock.currentTime <= 0 && state.clock.currentPeriod < MAX_TOTAL_GAME_PERIODS) {
     nextActionButtonText = "Iniciar Descanso";
-  } else if (state.periodDisplayOverride === null && state.currentTime <= 0 && ((state.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) || (MAX_TOTAL_GAME_PERIODS === 0 && state.currentPeriod === 0))) {
+  } else if (state.clock.periodDisplayOverride === null && state.clock.currentTime <= 0 && ((state.clock.currentPeriod >= MAX_TOTAL_GAME_PERIODS && MAX_TOTAL_GAME_PERIODS > 0) || (MAX_TOTAL_GAME_PERIODS === 0 && state.clock.currentPeriod === 0))) {
      nextActionButtonText = "Finalizar Partido";
-  } else if ((state.periodDisplayOverride === "Break" || state.periodDisplayOverride === "Pre-OT Break") && state.currentTime <= 0) {
-     if (state.currentPeriod + 1 <= MAX_TOTAL_GAME_PERIODS) {
-        nextActionButtonText = `Iniciar ${getPeriodText(state.currentPeriod + 1, state.numberOfRegularPeriods)}`;
+  } else if ((state.clock.periodDisplayOverride === "Break" || state.clock.periodDisplayOverride === "Pre-OT Break") && state.clock.currentTime <= 0) {
+     if (state.clock.currentPeriod + 1 <= MAX_TOTAL_GAME_PERIODS) {
+        nextActionButtonText = `Iniciar ${getPeriodText(state.clock.currentPeriod + 1, state.numberOfRegularPeriods)}`;
      } else {
         nextActionButtonText = "Finalizar Partido";
      }
   }
 
 
-  const isMainClockLastMinute = state.currentTime < 6000 && state.currentTime >= 0 &&
-                               (state.periodDisplayOverride !== null || state.currentPeriod >= 0) &&
-                               state.periodDisplayOverride !== "End of Game";
+  const isMainClockLastMinute = state.clock.currentTime < 6000 && state.clock.currentTime >= 0 &&
+                               (state.clock.periodDisplayOverride !== null || state.clock.currentPeriod >= 0) &&
+                               state.clock.periodDisplayOverride !== "End of Game";
 
-  const preTimeoutTimeCs = state.preTimeoutState?.time;
+  const preTimeoutTimeCs = state.clock.preTimeoutState?.time;
   const isPreTimeoutLastMinute = typeof preTimeoutTimeCs === 'number' && preTimeoutTimeCs < 6000 && preTimeoutTimeCs >= 0;
 
   const handleSegmentClick = (segment: EditingSegment) => {
-    if (state.isClockRunning || state.periodDisplayOverride === "End of Game") return;
+    if (state.clock.isClockRunning || state.clock.periodDisplayOverride === "End of Game") return;
     setEditingSegment(segment);
     switch (segment) {
       case 'minutes': setEditValue(String(timeParts.minutes).padStart(2, '0')); break;
@@ -412,10 +412,10 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
   };
 
   const handleTimeEditConfirm = () => {
-    if (!editingSegment || state.periodDisplayOverride === "End of Game") return;
+    if (!editingSegment || state.clock.periodDisplayOverride === "End of Game") return;
 
     const { minutes: currentMins, seconds: currentSecs, tenths: currentTenths } = timeParts;
-    let newTimeCs = state.currentTime;
+    let newTimeCs = state.clock.currentTime;
     const value = parseInt(editValue, 10);
 
     if (isNaN(value)) {
@@ -459,7 +459,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
     "text-5xl font-bold",
     isMainClockLastMinute ? "text-orange-500" : "text-accent"
   );
-  const commonSpanClass = cn(!(state.isClockRunning || state.periodDisplayOverride === "End of Game") && "cursor-pointer hover:underline");
+  const commonSpanClass = cn(!(state.clock.isClockRunning || state.clock.periodDisplayOverride === "End of Game") && "cursor-pointer hover:underline");
 
   const activeHomePenaltiesCount = state.homePenalties.filter(p => p._status === 'running').length;
   const playersOnIceForHome = Math.max(0, state.playersPerTeamOnIce - activeHomePenaltiesCount);
@@ -570,9 +570,9 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
   };
 
   const isTimeOutButtonDisabled = 
-    state.periodDisplayOverride === "Break" ||
-    state.periodDisplayOverride === "Pre-OT Break" ||
-    state.periodDisplayOverride === "Time Out";
+    state.clock.periodDisplayOverride === "Break" ||
+    state.clock.periodDisplayOverride === "Pre-OT Break" ||
+    state.clock.periodDisplayOverride === "Time Out";
 
   const timeoutDurationInSeconds = state.defaultTimeoutDuration / 100;
   const autoStartBehavior = state.autoStartTimeouts ? "se iniciará automáticamente" : "deberá iniciarse manualmente";
@@ -728,16 +728,16 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
               <Button
                 onClick={handleToggleClock}
                 className="w-full max-w-[180px] mx-auto mb-2"
-                variant={state.isClockRunning ? "destructive" : "default"}
-                aria-label={state.isClockRunning ? "Pausar Reloj" : "Iniciar Reloj"}
-                disabled={(state.currentTime <= 0 && !state.isClockRunning && state.periodDisplayOverride !== "Time Out") || state.periodDisplayOverride === "End of Game"}
+                variant={state.clock.isClockRunning ? "destructive" : "default"}
+                aria-label={state.clock.isClockRunning ? "Pausar Reloj" : "Iniciar Reloj"}
+                disabled={(state.clock.currentTime <= 0 && !state.clock.isClockRunning && state.clock.periodDisplayOverride !== "Time Out") || state.clock.periodDisplayOverride === "End of Game"}
               >
-                {state.isClockRunning ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
-                {state.isClockRunning ? 'Pausar' : 'Iniciar'} Reloj
+                {state.clock.isClockRunning ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
+                {state.clock.isClockRunning ? 'Pausar' : 'Iniciar'} Reloj
               </Button>
             )}
 
-            {state.periodDisplayOverride === "End of Game" ? (
+            {state.clock.periodDisplayOverride === "End of Game" ? (
                 <div className={cn(
                     "text-3xl font-bold tabular-nums flex items-baseline justify-center gap-0.5 text-accent py-4"
                   )}>
@@ -745,14 +745,14 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
                 </div>
             ) : (
                 <div className={cn("text-5xl font-bold tabular-nums flex items-baseline justify-center gap-0.5", isMainClockLastMinute ? "text-orange-500" : "text-accent")}>
-                  {!(state.isClockRunning || state.periodDisplayOverride === "End of Game") && (
+                  {!(state.clock.isClockRunning || state.clock.periodDisplayOverride === "End of Game") && (
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 text-muted-foreground hover:text-accent self-center mr-1"
                       onClick={() => handleTimeAdjust(-1)}
                       aria-label="Restar 1 segundo al reloj"
-                      disabled={state.currentTime <=0 || editingSegment !== null || state.periodDisplayOverride === "End of Game"}
+                      disabled={state.clock.currentTime <=0 || editingSegment !== null || state.clock.periodDisplayOverride === "End of Game"}
                     >
                       <Minus className="h-3 w-3" />
                     </Button>
@@ -836,14 +836,14 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
                       )}
                     </>
                   )}
-                  {!(state.isClockRunning || state.periodDisplayOverride === "End of Game") && (
+                  {!(state.clock.isClockRunning || state.clock.periodDisplayOverride === "End of Game") && (
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 text-muted-foreground hover:text-accent self-center ml-1"
                       onClick={() => handleTimeAdjust(1)}
                       aria-label="Sumar 1 segundo al reloj"
-                      disabled={editingSegment !== null || state.periodDisplayOverride === "End of Game"}
+                      disabled={editingSegment !== null || state.clock.periodDisplayOverride === "End of Game"}
                     >
                       <Plus className="h-3 w-3" />
                     </Button>
@@ -864,7 +864,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
                 <ChevronLeft className="h-5 w-5" />
               </Button>
               <p className="text-lg text-primary-foreground uppercase w-36 truncate text-center">
-                {getActualPeriodText(state.currentPeriod, state.periodDisplayOverride, state.numberOfRegularPeriods)}
+                {getActualPeriodText(state.clock.currentPeriod, state.clock.periodDisplayOverride, state.numberOfRegularPeriods)}
               </p>
               <Button
                 onClick={handleNextAction}
@@ -876,19 +876,19 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
               >
                 <ChevronRight className="h-5 w-5" />
               </Button>
-              {!state.isClockRunning && state.currentTime > 0 && state.periodDisplayOverride !== "End of Game" && !showNextActionButton && editingSegment === null && (
+              {!state.clock.isClockRunning && state.clock.currentTime > 0 && state.clock.periodDisplayOverride !== "End of Game" && !showNextActionButton && editingSegment === null && (
                 <span className="absolute top-[-0.25rem] right-1 text-[0.6rem] font-normal text-muted-foreground normal-case px-1 rounded-sm bg-background/30">
                   Paused
                 </span>
               )}
             </div>
-            {state.preTimeoutState && state.periodDisplayOverride !== "End of Game" && (
+            {state.clock.preTimeoutState && state.clock.periodDisplayOverride !== "End of Game" && (
               <div className={cn(
                   "text-xs mt-1 normal-case",
                   isPreTimeoutLastMinute ? "text-orange-500/80" : "text-muted-foreground"
                 )}>
-                Retornando a: {getPeriodText(state.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.preTimeoutState.time, { showTenths: isPreTimeoutLastMinute, includeMinutesForTenths: true })}
-                {state.preTimeoutState.override ? ` (${state.preTimeoutState.override})` : ''}
+                Retornando a: {getPeriodText(state.clock.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.clock.preTimeoutState.time, { showTenths: isPreTimeoutLastMinute, includeMinutesForTenths: true })}
+                {state.clock.preTimeoutState.override ? ` (${state.clock.preTimeoutState.override})` : ''}
               </div>
             )}
           </div>

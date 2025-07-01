@@ -47,18 +47,18 @@ export default function ControlsPage() {
     // Skip the effect on the initial render/hydration cycle
     if (isInitialMount.current) {
         isInitialMount.current = false;
-        prevPeriodDisplayOverrideRef.current = state.periodDisplayOverride;
+        prevPeriodDisplayOverrideRef.current = state.clock.periodDisplayOverride;
         return;
     }
 
     // Only the primary controls tab should handle saving
     if (pageDisplayState !== 'Primary') {
-        prevPeriodDisplayOverrideRef.current = state.periodDisplayOverride;
+        prevPeriodDisplayOverrideRef.current = state.clock.periodDisplayOverride;
         return;
     }
 
     // Check for the specific transition from not-ended to ended
-    if (prevPeriodDisplayOverrideRef.current !== 'End of Game' && state.periodDisplayOverride === 'End of Game') {
+    if (prevPeriodDisplayOverrideRef.current !== 'End of Game' && state.clock.periodDisplayOverride === 'End of Game') {
         const categoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories) || 'N/A';
         
         (async () => {
@@ -95,10 +95,10 @@ export default function ControlsPage() {
     }
 
     // Always update the ref for the next render
-    prevPeriodDisplayOverrideRef.current = state.periodDisplayOverride;
+    prevPeriodDisplayOverrideRef.current = state.clock.periodDisplayOverride;
 
   }, [
-      state.periodDisplayOverride, 
+      state.clock.periodDisplayOverride, 
       pageDisplayState, 
       state.selectedMatchCategory, 
       state.availableCategories, 

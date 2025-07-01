@@ -36,7 +36,7 @@ const CagedUserIcon = ({ size, className }: { size: number; className?: string }
 
 export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
   const { state } = useGameState();
-  const { scoreboardLayout, currentTime } = state;
+  const { scoreboardLayout, clock } = state;
 
   const currentTeamSubName = state.homeTeamName === teamName ? state.homeTeamSubName : state.awayTeamName;
 
@@ -91,7 +91,7 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
   }
   const statusText = getStatusTextForScoreboard();
   const remainingTimeCs = penalty.expirationTime !== undefined
-    ? Math.max(0, state.currentTime - penalty.expirationTime)
+    ? Math.max(0, clock.currentTime - penalty.expirationTime)
     : penalty.initialDuration * 100;
 
   return (
