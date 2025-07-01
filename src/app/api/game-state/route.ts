@@ -7,7 +7,7 @@ import type { LiveGameState } from '@/types';
 export async function POST(request: Request) {
   try {
     const gameStateData = (await request.json()) as LiveGameState;
-    if (!gameStateData) {
+    if (!gameStateData || !gameStateData.clock || !gameStateData.score || !gameStateData.penalties) {
       return NextResponse.json({ message: 'Invalid game state data provided.' }, { status: 400 });
     }
 

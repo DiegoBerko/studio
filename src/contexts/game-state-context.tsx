@@ -4,7 +4,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
-import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings, ScoreboardLayoutProfile, GameSummary, GoalLog, PenaltyLog, LiveGameState, PreTimeoutState, PeriodDisplayOverrideType } from '@/types';
+import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings, ScoreboardLayoutProfile, GameSummary, GoalLog, PenaltyLog, LiveGameState, PreTimeoutState, PeriodDisplayOverrideType, ClockState, ScoreState, PenaltiesState } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import isEqual from 'lodash.isequal';
 import { updateConfigOnServer, updateGameStateOnServer } from '@/app/actions';
@@ -120,7 +120,14 @@ const createDefaultScoreboardLayoutProfile = (id?: string, name?: string): Score
     ...IN_CODE_INITIAL_LAYOUT_SETTINGS
 });
 
-export interface GameState extends ConfigFields, LiveGameState {
+export interface GameState extends ConfigFields {
+  score: ScoreState;
+  penalties: PenaltiesState;
+  clock: ClockState;
+  homeTeamName: string;
+  homeTeamSubName?: string;
+  awayTeamName: string;
+  awayTeamSubName?: string;
   playHornTrigger: number;
   playPenaltyBeepTrigger: number;
   _lastActionOriginator?: string;
@@ -207,8 +214,14 @@ const defaultInitialProfile = createDefaultFormatAndTimingsProfile();
 const defaultInitialLayoutProfile = createDefaultScoreboardLayoutProfile();
 
 const initialGlobalState: GameState = {
-  homeScore: 0,
-  awayScore: 0,
+  score: {
+    home: 0,
+    away: 0,
+  },
+  penalties: {
+    home: [],
+    away: [],
+  },
   clock: {
     currentTime: defaultInitialProfile.defaultWarmUpDuration,
     currentPeriod: 0,
@@ -218,8 +231,6 @@ const initialGlobalState: GameState = {
     clockStartTimeMs: null,
     remainingTimeAtStartCs: null,
   },
-  homePenalties: [],
-  awayPenalties: [],
   homeTeamName: 'Local',
   homeTeamSubName: undefined,
   awayTeamName: 'Visitante',
@@ -278,8 +289,8 @@ const handleAutoTransition = (currentState: GameState): GameState => {
   const totalGamePeriods = numRegPeriods + currentState.numberOfOvertimePeriods;
   let shouldTriggerHorn = true;
 
-  newGameStateAfterTransition.homePenalties = [...currentState.homePenalties];
-  newGameStateAfterTransition.awayPenalties = [...currentState.awayPenalties];
+  newGameStateAfterTransition.penalties.home = [...currentState.penalties.home];
+  newGameStateAfterTransition.penalties.away = [...currentState.penalties.away];
 
   if (currentState.clock.periodDisplayOverride === 'Warm-up') {
     newGameStateAfterTransition.clock.currentPeriod = 1;
@@ -528,13 +539,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         hydratedBase.selectedMatchCategory = ''; 
       }
 
-      const rawHomePenaltiesFromStorage = action.payload?.homePenalties || [];
-      const rawAwayPenaltiesFromStorage = action.payload?.awayPenalties || [];
+      const rawHomePenaltiesFromStorage = action.payload?.penalties?.home || [];
+      const rawAwayPenaltiesFromStorage = action.payload?.penalties?.away || [];
 
-      hydratedBase.homePenalties = sortPenaltiesByStatus(
+      hydratedBase.penalties.home = sortPenaltiesByStatus(
         updatePenaltyStatusesOnly(rawHomePenaltiesFromStorage as Penalty[], hydratedBase.maxConcurrentPenalties)
       );
-      hydratedBase.awayPenalties = sortPenaltiesByStatus(
+      hydratedBase.penalties.away = sortPenaltiesByStatus(
         updatePenaltyStatusesOnly(rawAwayPenaltiesFromStorage as Penalty[], hydratedBase.maxConcurrentPenalties)
       );
       
@@ -722,8 +733,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newStateWithoutMeta = {
         ...state,
         goals: newGoals,
-        homeScore: newHomeScore,
-        awayScore: newAwayScore,
+        score: { home: newHomeScore, away: newAwayScore },
       };
       break;
     }
@@ -734,8 +744,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newStateWithoutMeta = {
         ...state,
         goals: newGoals,
-        homeScore: newHomeScore,
-        awayScore: newAwayScore,
+        score: { home: newHomeScore, away: newAwayScore },
       };
       break;
     }
@@ -746,8 +755,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       newStateWithoutMeta = {
         ...state,
         goals: newGoals,
-        homeScore: newHomeScore,
-        awayScore: newAwayScore,
+        score: { home: newHomeScore, away: newAwayScore },
       };
       break;
     }
@@ -760,7 +768,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         _status: 'pending_puck', 
       };
 
-      let penalties = [...state[`${action.payload.team}Penalties`], newPenalty];
+      let penalties = [...state.penalties[action.payload.team], newPenalty];
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
       penalties = sortPenaltiesByStatus(penalties);
       
@@ -788,14 +796,17 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       newStateWithoutMeta = { 
         ...state, 
-        [`${action.payload.team}Penalties`]: penalties,
+        penalties: {
+            ...state.penalties,
+            [action.payload.team]: penalties,
+        },
         gameSummary: newGameSummary,
       };
       break;
     }
     case 'REMOVE_PENALTY': {
-      const penaltyToRemove = state[`${action.payload.team}Penalties`].find(p => p.id === action.payload.penaltyId);
-      let penalties = state[`${action.payload.team}Penalties`].filter(p => p.id !== action.payload.penaltyId);
+      const penaltyToRemove = state.penalties[action.payload.team].find(p => p.id === action.payload.penaltyId);
+      let penalties = state.penalties[action.payload.team].filter(p => p.id !== action.payload.penaltyId);
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
       penalties = sortPenaltiesByStatus(penalties);
 
@@ -830,20 +841,23 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       newStateWithoutMeta = { 
         ...state, 
-        [`${action.payload.team}Penalties`]: penalties,
+        penalties: {
+            ...state.penalties,
+            [action.payload.team]: penalties,
+        },
         gameSummary: newGameSummary,
       };
       break;
     }
     case 'END_PENALTY_FOR_GOAL': {
       const { team, penaltyId } = action.payload;
-      const penaltyToEnd = state[`${team}Penalties`].find(p => p.id === penaltyId);
+      const penaltyToEnd = state.penalties[team].find(p => p.id === penaltyId);
       if (!penaltyToEnd) {
         newStateWithoutMeta = state;
         break;
       }
 
-      let penalties = state[`${team}Penalties`].filter(p => p.id !== penaltyId);
+      let penalties = state.penalties[team].filter(p => p.id !== penaltyId);
       penalties = updatePenaltyStatusesOnly(penalties, state.maxConcurrentPenalties);
       penalties = sortPenaltiesByStatus(penalties);
 
@@ -875,14 +889,17 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       newStateWithoutMeta = {
         ...state,
-        [`${team}Penalties`]: penalties,
+        penalties: {
+            ...state.penalties,
+            [team]: penalties,
+        },
         gameSummary: newGameSummary,
       };
       break;
     }
     case 'ADJUST_PENALTY_TIME': {
       const { team, penaltyId, delta } = action.payload;
-      let updatedPenalties = state[`${team}Penalties`].map(p => {
+      let updatedPenalties = state.penalties[team].map(p => {
         if (p.id === penaltyId) {
           if (p._status === 'running' && p.expirationTime !== undefined) {
             const newExpirationTime = p.expirationTime + (delta * CENTISECONDS_PER_SECOND);
@@ -895,12 +912,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return p;
       });
       updatedPenalties = sortPenaltiesByStatus(updatedPenalties);
-      newStateWithoutMeta = { ...state, [`${team}Penalties`]: updatedPenalties };
+      newStateWithoutMeta = { ...state, penalties: { ...state.penalties, [team]: updatedPenalties } };
       break;
     }
     case 'SET_PENALTY_TIME': {
       const { team, penaltyId, time } = action.payload;
-      const penalties = state[`${team}Penalties`];
+      const penalties = state.penalties[team];
       
       const updatedPenalties = penalties.map(p => {
         if (p.id === penaltyId) {
@@ -917,41 +934,41 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       });
 
       const sortedPenalties = sortPenaltiesByStatus(updatedPenalties);
-      newStateWithoutMeta = { ...state, [`${team}Penalties`]: sortedPenalties };
+      newStateWithoutMeta = { ...state, penalties: { ...state.penalties, [team]: sortedPenalties } };
       break;
     }
     case 'REORDER_PENALTIES': {
       const { team, startIndex, endIndex } = action.payload;
-      const currentPenalties = [...state[`${team}Penalties`]];
+      const currentPenalties = [...state.penalties[team]];
       const [removed] = currentPenalties.splice(startIndex, 1);
       if (removed) {
         currentPenalties.splice(endIndex, 0, removed);
       }
       let reorderedPenalties = updatePenaltyStatusesOnly(currentPenalties, state.maxConcurrentPenalties);
       reorderedPenalties = sortPenaltiesByStatus(reorderedPenalties);
-      newStateWithoutMeta = { ...state, [`${team}Penalties`]: reorderedPenalties };
+      newStateWithoutMeta = { ...state, penalties: { ...state.penalties, [team]: reorderedPenalties } };
       break;
     }
     case 'ACTIVATE_PENDING_PUCK_PENALTIES': {
       const activate = (penalties: Penalty[]): Penalty[] =>
         penalties.map(p => p._status === 'pending_puck' ? { ...p, _status: undefined } : p);
 
-      let homePenalties = activate(state.homePenalties);
-      let awayPenalties = activate(state.awayPenalties);
+      let homePenalties = activate(state.penalties.home);
+      let awayPenalties = activate(state.penalties.away);
 
       homePenalties = updatePenaltyStatusesOnly(homePenalties, state.maxConcurrentPenalties);
       homePenalties = sortPenaltiesByStatus(homePenalties);
       awayPenalties = updatePenaltyStatusesOnly(awayPenalties, state.maxConcurrentPenalties);
       awayPenalties = sortPenaltiesByStatus(awayPenalties);
 
-      newStateWithoutMeta = { ...state, homePenalties, awayPenalties };
+      newStateWithoutMeta = { ...state, penalties: { home: homePenalties, away: awayPenalties } };
       break;
     }
     case 'TICK': {
       let hasChanged = false;
       let newCalculatedTimeCs = state.clock.currentTime;
-      let homePenaltiesResult = [...state.homePenalties];
-      let awayPenaltiesResult = [...state.awayPenalties];
+      let homePenaltiesResult = [...state.penalties.home];
+      let awayPenaltiesResult = [...state.penalties.away];
       let newGameSummary: GameSummary = JSON.parse(JSON.stringify(state.gameSummary));
 
       if (state.clock.isClockRunning && state.clock.clockStartTimeMs && state.clock.remainingTimeAtStartCs !== null) {
@@ -1035,7 +1052,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       homePenaltiesResult = sortPenaltiesByStatus(homePenaltiesResult);
       awayPenaltiesResult = sortPenaltiesByStatus(awayPenaltiesResult);
       
-      if (!isEqual(homePenaltiesResult, state.homePenalties) || !isEqual(awayPenaltiesResult, state.awayPenalties)) {
+      if (!isEqual(homePenaltiesResult, state.penalties.home) || !isEqual(awayPenaltiesResult, state.penalties.away)) {
         hasChanged = true;
       }
 
@@ -1049,8 +1066,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         const stateBeforeTransition: GameState = {
           ...state,
           clock: newClockState,
-          homePenalties: homePenaltiesResult,
-          awayPenalties: awayPenaltiesResult,
+          penalties: { home: homePenaltiesResult, away: awayPenaltiesResult },
           gameSummary: newGameSummary,
         };
         const transitionResult = handleAutoTransition(stateBeforeTransition);
@@ -1061,8 +1077,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         newStateWithoutMeta = {
           ...state,
           clock: newClockState,
-          homePenalties: homePenaltiesResult,
-          awayPenalties: awayPenaltiesResult,
+          penalties: { home: homePenaltiesResult, away: awayPenaltiesResult },
           gameSummary: newGameSummary,
         };
         if (state.clock.isClockRunning && newCalculatedTimeCs <= 0) { 
@@ -1390,12 +1405,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ),
       };
       newStateWithoutMeta = { ...tempState, maxConcurrentPenalties: newValue };
-      let homePenalties = updatePenaltyStatusesOnly(state.homePenalties, newValue);
+      let homePenalties = updatePenaltyStatusesOnly(state.penalties.home, newValue);
       homePenalties = sortPenaltiesByStatus(homePenalties);
-      let awayPenalties = updatePenaltyStatusesOnly(state.awayPenalties, newValue);
+      let awayPenalties = updatePenaltyStatusesOnly(state.penalties.away, newValue);
       awayPenalties = sortPenaltiesByStatus(awayPenalties);
-      newStateWithoutMeta.homePenalties = homePenalties;
-      newStateWithoutMeta.awayPenalties = awayPenalties;
+      newStateWithoutMeta.penalties = { home: homePenalties, away: awayPenalties };
       break;
     }
     case 'SET_NUMBER_OF_REGULAR_PERIODS': {
@@ -1677,8 +1691,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         gameSummary: IN_CODE_INITIAL_GAME_SUMMARY,
       };
       const newMaxPen = tempState.maxConcurrentPenalties;
-      tempState.homePenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly([], newMaxPen));
-      tempState.awayPenalties = sortPenaltiesByStatus(updatePenaltyStatusesOnly([], newMaxPen));
+      tempState.penalties.home = sortPenaltiesByStatus(updatePenaltyStatusesOnly([], newMaxPen));
+      tempState.penalties.away = sortPenaltiesByStatus(updatePenaltyStatusesOnly([], newMaxPen));
       newStateWithoutMeta = tempState;
       break;
     }
@@ -1691,8 +1705,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       newStateWithoutMeta = {
         ...state, 
-        homeScore: 0,
-        awayScore: 0,
+        score: {
+          home: 0,
+          away: 0,
+        },
         clock: {
           currentTime: initialWarmUpDurationCs,
           currentPeriod: 0,
@@ -1702,8 +1718,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           clockStartTimeMs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? Date.now() : null,
           remainingTimeAtStartCs: (autoStartWarmUp && initialWarmUpDurationCs > 0) ? initialWarmUpDurationCs : null,
         },
-        homePenalties: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
-        awayPenalties: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
+        penalties: {
+          home: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
+          away: sortPenaltiesByStatus(updatePenaltyStatusesOnly([], state.maxConcurrentPenalties)),
+        },
         homeTeamName: 'Local',
         homeTeamSubName: undefined,
         awayTeamName: 'Visitante',
@@ -1849,8 +1867,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       if (action.type === 'TICK' && 
           state.clock.isClockRunning === newStateWithoutMeta.clock.isClockRunning && 
           state.clock.currentTime === newStateWithoutMeta.clock.currentTime &&
-          JSON.stringify(state.homePenalties) === JSON.stringify(newStateWithoutMeta.homePenalties) &&
-          JSON.stringify(state.awayPenalties) === JSON.stringify(newStateWithoutMeta.awayPenalties)) {
+          JSON.stringify(state.penalties.home) === JSON.stringify(newStateWithoutMeta.penalties.home) &&
+          JSON.stringify(state.penalties.away) === JSON.stringify(newStateWithoutMeta.penalties.away)) {
           return state;
       }
       return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, playPenaltyBeepTrigger: newPlayPenaltyBeepTrigger, _lastActionOriginator: undefined, _lastUpdatedTimestamp: (newStateWithoutMeta as GameState)._lastUpdatedTimestamp, _initialConfigLoadComplete: (newStateWithoutMeta as GameState)._initialConfigLoadComplete };
@@ -2014,14 +2032,18 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
             'numberOfOvertimePeriods', 'playersPerTeamOnIce'
         ];
         
-        const liveGameStateKeys: (keyof LiveGameState)[] = [
-            'homeScore', 'awayScore', 'clock', 'homePenalties', 'awayPenalties',
-            'homeTeamName', 'homeTeamSubName', 'awayTeamName', 'awayTeamSubName', 
-            'goals', 'gameSummary'
+        const liveGameStateKeys: (keyof Omit<LiveGameState, 'homeTeamName' | 'awayTeamName' | 'homeTeamSubName' | 'awayTeamSubName'>)[] = [
+            'score', 'clock', 'penalties', 'goals'
         ];
 
         const configChanged = configKeys.some(key => !isEqual(prevState[key as keyof GameState], state[key as keyof GameState]));
-        const gameStateChanged = liveGameStateKeys.some(key => !isEqual(prevState[key as keyof GameState], state[key as keyof GameState]));
+        
+        const liveGameStateChanged = liveGameStateKeys.some(key => !isEqual(prevState[key as keyof GameState], state[key as keyof GameState])) ||
+            prevState.homeTeamName !== state.homeTeamName ||
+            prevState.awayTeamName !== state.awayTeamName ||
+            prevState.homeTeamSubName !== state.homeTeamSubName ||
+            prevState.awayTeamSubName !== state.awayTeamSubName;
+
 
         if (configChanged) {
           const configPayload: Partial<ConfigFields> = {};
@@ -2033,14 +2055,18 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
           updateConfigOnServer(configPayload as ConfigFields).catch(err => console.error("Failed to sync config to server:", err));
         }
 
-        if (gameStateChanged) {
-          const liveStatePayload: Partial<LiveGameState> = {};
-          liveGameStateKeys.forEach(key => {
-             if (!isEqual(prevState[key as keyof GameState], state[key as keyof GameState])) {
-                (liveStatePayload as any)[key] = state[key as keyof GameState];
-             }
-          });
-          updateGameStateOnServer(liveStatePayload as LiveGameState).catch(err => console.error("Failed to sync game state to server:", err));
+        if (liveGameStateChanged) {
+          const liveStatePayload: LiveGameState = {
+              clock: state.clock,
+              score: state.score,
+              penalties: state.penalties,
+              goals: state.goals,
+              homeTeamName: state.homeTeamName,
+              awayTeamName: state.awayTeamName,
+              homeTeamSubName: state.homeTeamSubName,
+              awayTeamSubName: state.awayTeamSubName,
+          };
+          updateGameStateOnServer(liveStatePayload).catch(err => console.error("Failed to sync game state to server:", err));
         }
     }
 
@@ -2049,8 +2075,8 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
     if (state._lastActionOriginator === TAB_ID) {
         try {
             const stateForStorage: GameState = { ...state };
-            stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
-            stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
+            stateForStorage.penalties.home = cleanPenaltiesForStorage(state.penalties.home);
+            stateForStorage.penalties.away = cleanPenaltiesForStorage(state.penalties.away);
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
         } catch (error) {
             console.error("Error saving state to localStorage:", error);
@@ -2077,15 +2103,15 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         clearInterval(timerId);
       }
     };
-  }, [state.clock.isClockRunning, state.clock.currentTime, state.homePenalties, state.awayPenalties, isPageVisible, isLoading, state._initialConfigLoadComplete]);
+  }, [state.clock.isClockRunning, state.clock.currentTime, state.penalties.home, state.penalties.away, isPageVisible, isLoading, state._initialConfigLoadComplete]);
   
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (state._initialConfigLoadComplete) {
         try {
           const stateForStorage: GameState = { ...state };
-          stateForStorage.homePenalties = cleanPenaltiesForStorage(state.homePenalties);
-          stateForStorage.awayPenalties = cleanPenaltiesForStorage(state.awayPenalties);
+          stateForStorage.penalties.home = cleanPenaltiesForStorage(state.penalties.home);
+          stateForStorage.penalties.away = cleanPenaltiesForStorage(state.penalties.away);
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateForStorage));
         } catch (error) {
           console.error("Error saving state on beforeunload:", error);

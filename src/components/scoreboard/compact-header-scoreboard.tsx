@@ -11,10 +11,10 @@ export function CompactHeaderScoreboard() {
   const { state } = useGameState();
   const { scoreboardLayout } = state;
 
-  const activeHomePenaltiesCount = state.homePenalties.filter(p => p._status === 'running').length;
+  const activeHomePenaltiesCount = state.penalties.home.filter(p => p._status === 'running').length;
   const playersOnIceForHome = Math.max(0, state.playersPerTeamOnIce - activeHomePenaltiesCount);
 
-  const activeAwayPenaltiesCount = state.awayPenalties.filter(p => p._status === 'running').length;
+  const activeAwayPenaltiesCount = state.penalties.away.filter(p => p._status === 'running').length;
   const playersOnIceForAway = Math.max(0, state.playersPerTeamOnIce - activeAwayPenaltiesCount);
 
   const matchCategoryName = getCategoryNameById(state.selectedMatchCategory, state.availableCategories);
@@ -34,7 +34,7 @@ export function CompactHeaderScoreboard() {
         <TeamScoreDisplay 
           teamActualName={state.homeTeamName} 
           teamDisplayName="Local" 
-          score={state.homeScore}
+          score={state.score.home}
           playersOnIce={playersOnIceForHome}
           configuredPlayersPerTeam={state.playersPerTeamOnIce}
           layout={scoreboardLayout}
@@ -43,7 +43,7 @@ export function CompactHeaderScoreboard() {
         <TeamScoreDisplay 
           teamActualName={state.awayTeamName} 
           teamDisplayName="Visitante" 
-          score={state.awayScore} 
+          score={state.score.away} 
           playersOnIce={playersOnIceForAway}
           configuredPlayersPerTeam={state.playersPerTeamOnIce}
           layout={scoreboardLayout}

@@ -192,16 +192,23 @@ export interface ClockState {
   remainingTimeAtStartCs: number | null;
 }
 
+export interface ScoreState {
+  home: number;
+  away: number;
+}
+
+export interface PenaltiesState {
+  home: Penalty[];
+  away: Penalty[];
+}
+
 export interface LiveGameState {
-    homeScore: number;
-    awayScore: number;
     clock: ClockState;
-    homePenalties: Penalty[];
-    awayPenalties: Penalty[];
+    score: ScoreState;
+    penalties: PenaltiesState;
+    goals: GoalLog[];
     homeTeamName: string;
     homeTeamSubName?: string;
     awayTeamName: string;
     awayTeamSubName?: string;
-    goals: GoalLog[];
-    gameSummary: GameSummary;
 }

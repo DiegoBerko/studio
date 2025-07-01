@@ -461,10 +461,10 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
   );
   const commonSpanClass = cn(!(state.clock.isClockRunning || state.clock.periodDisplayOverride === "End of Game") && "cursor-pointer hover:underline");
 
-  const activeHomePenaltiesCount = state.homePenalties.filter(p => p._status === 'running').length;
+  const activeHomePenaltiesCount = state.penalties.home.filter(p => p._status === 'running').length;
   const playersOnIceForHome = Math.max(0, state.playersPerTeamOnIce - activeHomePenaltiesCount);
 
-  const activeAwayPenaltiesCount = state.awayPenalties.filter(p => p._status === 'running').length;
+  const activeAwayPenaltiesCount = state.penalties.away.filter(p => p._status === 'running').length;
   const playersOnIceForAway = Math.max(0, state.playersPerTeamOnIce - activeAwayPenaltiesCount);
 
   const handleMatchCategoryChange = (categoryId: string) => {
@@ -698,7 +698,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
             <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0 && state.homeTeamName.trim() ? 'Local' : state.homeTeamName.trim() || 'Local'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               <Button variant="link" className="p-0 h-auto text-4xl font-bold text-accent w-24 text-center tabular-nums hover:no-underline hover:text-accent/80" onClick={() => onScoreClick('home')}>
-                {state.homeScore}
+                {state.score.home}
               </Button>
             </div>
             {matchedHomeTeamId && isHomePlayersDialogOpen && (
@@ -887,7 +887,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
                   "text-xs mt-1 normal-case",
                   isPreTimeoutLastMinute ? "text-orange-500/80" : "text-muted-foreground"
                 )}>
-                Retornando a: {getPeriodText(state.clock.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.clock.preTimeoutState.time, { showTenths: isPreTimeoutLastMinute, includeMinutesForTenths: true })}
+                Retornando a: {getPeriodText(state.clock.preTimeoutState.period, state.numberOfRegularPeriods)} - {formatTime(state.clock.preTimeoutState.time, { showTenths: isPreTimeoutLastMinute, includeMinutesForTenths: false })}
                 {state.clock.preTimeoutState.override ? ` (${state.clock.preTimeoutState.override})` : ''}
               </div>
             )}
@@ -971,7 +971,7 @@ export function MiniScoreboard({ onScoreClick }: MiniScoreboardProps) {
             <p className="text-sm text-muted-foreground text-center my-1">({state.enableTeamSelectionInMiniScoreboard && state.teams.length > 0 && state.awayTeamName.trim() ? 'Visitante' : state.awayTeamName.trim() || 'Visitante'})</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               <Button variant="link" className="p-0 h-auto text-4xl font-bold text-accent w-24 text-center tabular-nums hover:no-underline hover:text-accent/80" onClick={() => onScoreClick('away')}>
-                {state.awayScore}
+                {state.score.away}
               </Button>
             </div>
              {matchedAwayTeamId && isAwayPlayersDialogOpen && (

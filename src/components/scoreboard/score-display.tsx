@@ -20,11 +20,11 @@ export function ScoreDisplay() {
   return (
     <Card className="bg-card shadow-xl">
       <CardContent className="p-3 md:p-4 flex justify-around items-start">
-        <TeamScoreDisplay teamActualName={state.homeTeamName} teamDisplayName="Local" score={state.homeScore} />
+        <TeamScoreDisplay teamActualName={state.homeTeamName} teamDisplayName="Local" score={state.score.home} />
         <div className="text-2xl md:text-4xl font-bold text-primary-foreground mx-1 md:mx-4 self-center pt-6 md:pt-10">
           VS
         </div>
-        <TeamScoreDisplay teamActualName={state.awayTeamName} teamDisplayName="Visitante" score={state.awayScore} />
+        <TeamScoreDisplay teamActualName={state.awayTeamName} teamDisplayName="Visitante" score={state.score.away} />
       </CardContent>
     </Card>
   );

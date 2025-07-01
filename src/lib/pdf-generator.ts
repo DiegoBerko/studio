@@ -1,4 +1,5 @@
 
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatTime, getCategoryNameById, getEndReasonText, type GameState } from '@/contexts/game-state-context';
@@ -86,7 +87,7 @@ export const exportGameSummaryPDF = (state: GameState) => {
     const dateString = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
     const filename = `${dateString} - Cat ${categoryName} - ${state.homeTeamName} vs ${state.awayTeamName}.pdf`;
 
-    const finalScore = `${state.homeScore} - ${state.awayScore}`;
+    const finalScore = `${state.score.home} - ${state.score.away}`;
 
     doc.text(`Resumen del Partido: ${teamTitle} (Cat. ${categoryName})`, 14, 15);
     doc.setFontSize(10);

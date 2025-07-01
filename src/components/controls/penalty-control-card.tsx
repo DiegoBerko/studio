@@ -71,7 +71,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
   const [isMassDeleteConfirmOpen, setIsMassDeleteConfirmOpen] = useState(false);
 
 
-  const penalties = team === 'home' ? state.homePenalties : state.awayPenalties;
+  const penalties = state.penalties[team];
   const teamSubName = team === 'home' ? state.homeTeamSubName : state.awayTeamSubName;
 
   const matchedTeam = useMemo(() => {
@@ -197,7 +197,7 @@ export function PenaltyControlCard({ team, teamName }: PenaltyControlCardProps) 
     if (isDeleteSelectionMode) return;
     e.preventDefault();
     if (draggedPenaltyId && draggedPenaltyId !== targetPenaltyId) {
-      const currentTeamPenalties = team === 'home' ? state.homePenalties : state.awayPenalties;
+      const currentTeamPenalties = state.penalties[team];
       const startIndex = currentTeamPenalties.findIndex(p => p.id === draggedPenaltyId);
       const endIndex = currentTeamPenalties.findIndex(p => p.id === targetPenaltyId);
 
