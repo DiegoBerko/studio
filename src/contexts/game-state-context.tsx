@@ -8,9 +8,6 @@ import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, F
 import { toast } from '@/hooks/use-toast';
 import isEqual from 'lodash.isequal';
 import { updateConfigOnServer, updateGameStateOnServer } from '@/app/actions';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 // --- Constantes para la sincronización local ---
@@ -36,102 +33,6 @@ if (typeof window !== 'undefined') {
   // For the server environment
   TAB_ID = 'server-tab-id-' + Math.random().toString(36).substring(2);
 }
-
-// --- Componente de Depuración ---
-function ServerSyncIndicator({ debugInfo }: { debugInfo: { type: string; payload: any } | null; }) {
-  const [isVisible, setIsVisible] = useState(false);
-  const [dataToShow, setDataToShow] = useState<{ type: string; payload: any } | null>(null);
-
-  useEffect(() => {
-    if (debugInfo) {
-      setIsVisible(true);
-      setDataToShow(debugInfo);
-      const timer = setTimeout(() => {
-        setIsVisible(false);
-      }, 5000); // Ocultar después de 5 segundos
-      return () => clearTimeout(timer);
-    }
-  }, [debugInfo]);
-
-  if (!isVisible || !dataToShow) {
-    return null;
-  }
-
-  // Sanitizar el payload para evitar referencias circulares en JSON.stringify
-  const getCircularReplacer = () => {
-    const seen = new WeakSet();
-    return (key: string, value: any) => {
-      if (typeof value === 'object' && value !== null) {
-        if (seen.has(value)) {
-          return '[Circular Reference]';
-        }
-        seen.add(value);
-      }
-      if (typeof value === 'function' || typeof value === 'symbol'){
-        return undefined;
-      }
-      return value;
-    };
-  };
-  
-  // Limpiar el payload para la visualización, truncando Data URLs largos
-  const cleanPayloadForDisplay = (payload: any) => {
-      const newPayload = {...payload};
-      
-      const cleanIndividualPayload = (payloadPart: any) => {
-        if (!payloadPart) return payloadPart;
-        const newPayloadPart = {...payloadPart};
-        if (newPayloadPart.customHornSoundDataUrl && typeof newPayloadPart.customHornSoundDataUrl === 'string') {
-            newPayloadPart.customHornSoundDataUrl = newPayloadPart.customHornSoundDataUrl.substring(0, 50) + '...[TRUNCATED]';
-        }
-        if (newPayloadPart.customPenaltyBeepSoundDataUrl && typeof newPayloadPart.customPenaltyBeepSoundDataUrl === 'string') {
-            newPayloadPart.customPenaltyBeepSoundDataUrl = newPayloadPart.customPenaltyBeepSoundDataUrl.substring(0, 50) + '...[TRUNCATED]';
-        }
-        if (newPayloadPart.teams && Array.isArray(newPayloadPart.teams)) {
-            newPayloadPart.teams = newPayloadPart.teams.map((team: any) => {
-                if (team.logoDataUrl && typeof team.logoDataUrl === 'string' && team.logoDataUrl.startsWith('data:')) {
-                    return { ...team, logoDataUrl: team.logoDataUrl.substring(0, 50) + '...[TRUNCATED]' };
-                }
-                return team;
-            });
-        }
-        return newPayloadPart;
-      }
-
-      if (newPayload.config) {
-        newPayload.config = cleanIndividualPayload(newPayload.config);
-      }
-       if (newPayload.gameState) {
-        newPayload.gameState = cleanIndividualPayload(newPayload.gameState);
-      }
-      
-      return newPayload;
-  }
-  
-  const displayPayload = cleanPayloadForDisplay(dataToShow.payload);
-
-  return (
-    <div className="fixed bottom-4 right-4 bg-card text-card-foreground p-3 rounded-lg shadow-lg z-50 border border-border text-sm flex items-center gap-4 animate-in fade-in-0 slide-in-from-bottom-5">
-      <p>📡 Info enviada al servidor: <span className="font-semibold">{dataToShow.type}</span></p>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm">Ver más</Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Datos enviados al servidor ({dataToShow.type})</DialogTitle>
-          </DialogHeader>
-          <ScrollArea className="flex-grow my-4 border rounded-md">
-            <pre className="p-4 text-xs whitespace-pre-wrap break-all">
-              {JSON.stringify(displayPayload, getCircularReplacer(), 2)}
-            </pre>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
 
 // Initial values (used as fallback if files are not found or are invalid)
 const IN_CODE_INITIAL_PROFILE_NAME = "Predeterminado (App)";
@@ -1956,7 +1857,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const [isPageVisible, setIsPageVisible] = useState(true);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const prevStateRef = useRef<GameState>(state);
-  const [debugInfo, setDebugInfo] = useState<{ type: string, payload: any } | null>(null);
 
 
   useEffect(() => {
@@ -2116,27 +2016,24 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         const configChanged = configKeys.some(key => !isEqual(prevState[key as keyof GameState], state[key as keyof GameState]));
         const gameStateChanged = liveGameStateKeys.some(key => !isEqual(prevState[key as keyof GameState], state[key as keyof GameState]));
 
-        let updateType = '';
-        const payloadForDebug: { config?: ConfigFields; gameState?: LiveGameState } = {};
-
         if (configChanged) {
-          updateType += 'Configuración';
-          const configPayload = {} as ConfigFields;
-          configKeys.forEach(key => ((configPayload as any)[key] = state[key as keyof GameState]));
-          updateConfigOnServer(configPayload).catch(err => console.error("Failed to sync config to server:", err));
-          payloadForDebug.config = configPayload;
+          const configPayload: Partial<ConfigFields> = {};
+          configKeys.forEach(key => {
+            if (!isEqual(prevState[key as keyof GameState], state[key as keyof GameState])) {
+                (configPayload as any)[key] = state[key as keyof GameState];
+            }
+          });
+          updateConfigOnServer(configPayload as ConfigFields).catch(err => console.error("Failed to sync config to server:", err));
         }
 
         if (gameStateChanged) {
-          updateType += (updateType ? ' y ' : '') + 'Estado del Juego';
-          const liveStatePayload = {} as LiveGameState;
-          liveGameStateKeys.forEach(key => ((liveStatePayload as any)[key] = state[key as keyof GameState]));
-          updateGameStateOnServer(liveStatePayload).catch(err => console.error("Failed to sync game state to server:", err));
-          payloadForDebug.gameState = liveStatePayload;
-        }
-
-        if (updateType) {
-            setDebugInfo({ type: `Actualización de ${updateType}`, payload: payloadForDebug });
+          const liveStatePayload: Partial<LiveGameState> = {};
+          liveGameStateKeys.forEach(key => {
+             if (!isEqual(prevState[key as keyof GameState], state[key as keyof GameState])) {
+                (liveStatePayload as any)[key] = state[key as keyof GameState];
+             }
+          });
+          updateGameStateOnServer(liveStatePayload as LiveGameState).catch(err => console.error("Failed to sync game state to server:", err));
         }
     }
 
@@ -2198,7 +2095,6 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   return (
     <GameStateContext.Provider value={{ state, dispatch, isLoading }}>
       {children}
-      {!isLoading && <ServerSyncIndicator debugInfo={debugInfo} />}
     </GameStateContext.Provider>
   );
 };
