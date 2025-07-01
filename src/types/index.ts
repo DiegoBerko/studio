@@ -162,8 +162,44 @@ export interface ConfigFields extends FormatAndTimingsProfileData {
   availableCategories: CategoryData[];
   selectedMatchCategory: string;
 
+  // Teams
+  teams: TeamData[];
+
   // Game Events
   goals: GoalLog[];
   // Game Summary
   gameSummary: GameSummary;
+}
+
+export type PeriodDisplayOverrideType = 'Warm-up' | 'Break' | 'Pre-OT Break' | 'Time Out' | 'End of Game' | null;
+
+export interface PreTimeoutState {
+  period: number;
+  time: number;
+  isClockRunning: boolean;
+  override: PeriodDisplayOverrideType;
+  clockStartTimeMs: number | null;
+  remainingTimeAtStartCs: number | null;
+}
+
+export interface LiveGameState {
+    homeScore: number;
+    awayScore: number;
+    currentTime: number;
+    currentPeriod: number;
+    isClockRunning: boolean;
+    homePenalties: Penalty[];
+    awayPenalties: Penalty[];
+    homeTeamName: string;
+    homeTeamSubName?: string;
+    awayTeamName: string;
+    awayTeamSubName?: string;
+    periodDisplayOverride: PeriodDisplayOverrideType;
+    preTimeoutState: PreTimeoutState | null;
+    clockStartTimeMs: number | null;
+    remainingTimeAtStartCs: number | null;
+    playHornTrigger: number;
+    playPenaltyBeepTrigger: number;
+    goals: GoalLog[];
+    gameSummary: GameSummary;
 }

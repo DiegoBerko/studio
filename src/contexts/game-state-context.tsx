@@ -4,7 +4,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
-import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings, ScoreboardLayoutProfile, GameSummary, GoalLog, PenaltyLog } from '@/types';
+import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings, ScoreboardLayoutProfile, GameSummary, GoalLog, PenaltyLog, LiveGameState, PreTimeoutState, PeriodDisplayOverrideType } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import isEqual from 'lodash.isequal';
 import { updateConfigOnServer, updateGameStateOnServer } from '@/app/actions';
@@ -205,39 +205,7 @@ const createDefaultScoreboardLayoutProfile = (id?: string, name?: string): Score
     ...IN_CODE_INITIAL_LAYOUT_SETTINGS
 });
 
-
-type PeriodDisplayOverrideType = "Warm-up" | "Break" | "Pre-OT Break" | "Time Out" | "End of Game" | null;
-
-interface PreTimeoutState {
-  period: number;
-  time: number; 
-  isClockRunning: boolean;
-  override: PeriodDisplayOverrideType;
-  clockStartTimeMs: number | null;
-  remainingTimeAtStartCs: number | null; 
-}
-
-export interface GameState extends ConfigFields {
-  homeScore: number;
-  awayScore: number;
-  currentTime: number; 
-  currentPeriod: number; 
-  isClockRunning: boolean;
-  homePenalties: Penalty[];
-  awayPenalties: Penalty[];
-  homeTeamName: string;
-  homeTeamSubName?: string;
-  awayTeamName: string;
-  awayTeamSubName?: string;
-  periodDisplayOverride: PeriodDisplayOverrideType;
-  preTimeoutState: PreTimeoutState | null;
-  clockStartTimeMs: number | null;
-  remainingTimeAtStartCs: number | null; 
-  playHornTrigger: number; 
-  playPenaltyBeepTrigger: number;
-  teams: TeamData[];
-  formatAndTimingsProfiles: FormatAndTimingsProfile[];
-  selectedFormatAndTimingsProfileId: string | null;
+export interface GameState extends ConfigFields, LiveGameState {
   _lastActionOriginator?: string;
   _lastUpdatedTimestamp?: number;
   _initialConfigLoadComplete?: boolean; // Flag to ensure initial load happens once
@@ -2109,41 +2077,45 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
 
     const prevState = prevStateRef.current;
     
-    // --- Server Sync Logic ---
     if (state._lastActionOriginator === TAB_ID) {
-        // Define keys for config vs. game state
-        const configKeys: (keyof GameState)[] = [
+        const configKeys: (keyof ConfigFields)[] = [
             'formatAndTimingsProfiles', 'selectedFormatAndTimingsProfileId',
             'playSoundAtPeriodEnd', 'customHornSoundDataUrl', 'enableTeamSelectionInMiniScoreboard',
             'enablePlayerSelectionForPenalties', 'showAliasInPenaltyPlayerSelector',
             'showAliasInControlsPenaltyList', 'showAliasInScoreboardPenalties', 'scoreboardLayout',
-            'scoreboardLayoutProfiles', 'selectedScoreboardLayoutProfileId', 'availableCategories', 'teams',
-            'enablePenaltyCountdownSound', 'penaltyCountdownStartTime', 'customPenaltyBeepSoundDataUrl'
+            'scoreboardLayoutProfiles', 'selectedScoreboardLayoutProfileId', 'availableCategories', 'selectedMatchCategory', 'teams',
+            'enablePenaltyCountdownSound', 'penaltyCountdownStartTime', 'customPenaltyBeepSoundDataUrl',
+            'defaultWarmUpDuration', 'defaultPeriodDuration', 'defaultOTPeriodDuration', 'defaultBreakDuration',
+            'defaultPreOTBreakDuration', 'defaultTimeoutDuration', 'maxConcurrentPenalties', 'autoStartWarmUp',
+            'autoStartBreaks', 'autoStartPreOTBreaks', 'autoStartTimeouts', 'numberOfRegularPeriods',
+            'numberOfOvertimePeriods', 'playersPerTeamOnIce'
         ];
         
-        const gameStateKeys: (keyof GameState)[] = [
+        const liveGameStateKeys: (keyof LiveGameState)[] = [
             'homeScore', 'awayScore', 'currentTime', 'currentPeriod', 'isClockRunning',
-            'homePenalties', 'awayPenalties', 'periodDisplayOverride', 'preTimeoutState',
+            'homePenalties', 'awayPenalties', 'homeTeamName', 'homeTeamSubName',
+            'awayTeamName', 'awayTeamSubName', 'periodDisplayOverride', 'preTimeoutState',
+            'clockStartTimeMs', 'remainingTimeAtStartCs', 'playHornTrigger', 'playPenaltyBeepTrigger',
             'goals', 'gameSummary'
         ];
 
-        // Check if any config-related part of the state has changed
-        const configChanged = configKeys.some(key => !isEqual(prevState[key], state[key]));
-        
-        // Check if any game-state-related part has changed
-        const gameStateChanged = gameStateKeys.some(key => !isEqual(prevState[key], state[key]));
+        const configChanged = configKeys.some(key => !isEqual(prevState[key as keyof GameState], state[key as keyof GameState]));
+        const gameStateChanged = liveGameStateKeys.some(key => !isEqual(prevState[key as keyof GameState], state[key as keyof GameState]));
 
         if (configChanged) {
-          updateConfigOnServer(state).catch(err => console.error("Failed to sync config to server:", err));
-          setDebugInfo({ type: 'Config Update', payload: state });
+          const configPayload = {} as ConfigFields;
+          configKeys.forEach(key => ((configPayload as any)[key] = state[key as keyof GameState]));
+          updateConfigOnServer(configPayload).catch(err => console.error("Failed to sync config to server:", err));
+          setDebugInfo({ type: 'Config Update', payload: configPayload });
         }
 
         if (gameStateChanged) {
-          updateGameStateOnServer(state).catch(err => console.error("Failed to sync game state to server:", err));
-          setDebugInfo({ type: 'Game State Update', payload: state });
+          const liveStatePayload = {} as LiveGameState;
+          liveGameStateKeys.forEach(key => ((liveStatePayload as any)[key] = state[key as keyof GameState]));
+          updateGameStateOnServer(liveStatePayload).catch(err => console.error("Failed to sync game state to server:", err));
+          setDebugInfo({ type: 'Game State Update', payload: liveStatePayload });
         }
     }
-    // --- End Server Sync Logic ---
 
 
     // The originating tab is responsible for saving state and broadcasting.

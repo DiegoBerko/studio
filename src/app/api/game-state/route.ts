@@ -1,11 +1,12 @@
 
+
 import { setGameState } from '@/lib/server-side-store';
 import { NextResponse } from 'next/server';
-import type { GameState } from '@/types';
+import type { LiveGameState } from '@/types';
 
 export async function POST(request: Request) {
   try {
-    const gameStateData = (await request.json()) as GameState;
+    const gameStateData = (await request.json()) as LiveGameState;
     if (!gameStateData) {
       return NextResponse.json({ message: 'Invalid game state data provided.' }, { status: 400 });
     }
