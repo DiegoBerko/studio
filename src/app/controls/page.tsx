@@ -66,8 +66,8 @@ export default function ControlsPage() {
                 const result = await saveGameSummary({
                     homeTeamName: state.homeTeamName,
                     awayTeamName: state.awayTeamName,
-                    homeScore: state.homeScore,
-                    awayScore: state.awayScore,
+                    homeScore: state.score.home,
+                    awayScore: state.score.away,
                     categoryName: categoryName,
                     gameSummary: state.gameSummary
                 });
@@ -104,8 +104,8 @@ export default function ControlsPage() {
       state.availableCategories, 
       state.homeTeamName, 
       state.awayTeamName, 
-      state.homeScore, 
-      state.awayScore, 
+      state.score.home, 
+      state.score.away, 
       state.gameSummary,
       toast
   ]);
@@ -295,9 +295,9 @@ export default function ControlsPage() {
   };
 
   const hasPendingPuckPenalties = useMemo(() => {
-    return state.homePenalties.some(p => p._status === 'pending_puck') ||
-           state.awayPenalties.some(p => p._status === 'pending_puck');
-  }, [state.homePenalties, state.awayPenalties]);
+    return state.penalties.home.some(p => p._status === 'pending_puck') ||
+           state.penalties.away.some(p => p._status === 'pending_puck');
+  }, [state.penalties.home, state.penalties.away]);
 
   const handleScoreClick = (team: Team) => {
     setEditingTeamForGoals(team);
