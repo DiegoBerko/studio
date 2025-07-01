@@ -77,20 +77,34 @@ function ServerSyncIndicator({ debugInfo }: { debugInfo: { type: string; payload
   // Limpiar el payload para la visualización, truncando Data URLs largos
   const cleanPayloadForDisplay = (payload: any) => {
       const newPayload = {...payload};
-      if (newPayload.customHornSoundDataUrl && typeof newPayload.customHornSoundDataUrl === 'string') {
-          newPayload.customHornSoundDataUrl = newPayload.customHornSoundDataUrl.substring(0, 50) + '...[TRUNCATED]';
+      
+      const cleanIndividualPayload = (payloadPart: any) => {
+        if (!payloadPart) return payloadPart;
+        const newPayloadPart = {...payloadPart};
+        if (newPayloadPart.customHornSoundDataUrl && typeof newPayloadPart.customHornSoundDataUrl === 'string') {
+            newPayloadPart.customHornSoundDataUrl = newPayloadPart.customHornSoundDataUrl.substring(0, 50) + '...[TRUNCATED]';
+        }
+        if (newPayloadPart.customPenaltyBeepSoundDataUrl && typeof newPayloadPart.customPenaltyBeepSoundDataUrl === 'string') {
+            newPayloadPart.customPenaltyBeepSoundDataUrl = newPayloadPart.customPenaltyBeepSoundDataUrl.substring(0, 50) + '...[TRUNCATED]';
+        }
+        if (newPayloadPart.teams && Array.isArray(newPayloadPart.teams)) {
+            newPayloadPart.teams = newPayloadPart.teams.map((team: any) => {
+                if (team.logoDataUrl && typeof team.logoDataUrl === 'string' && team.logoDataUrl.startsWith('data:')) {
+                    return { ...team, logoDataUrl: team.logoDataUrl.substring(0, 50) + '...[TRUNCATED]' };
+                }
+                return team;
+            });
+        }
+        return newPayloadPart;
       }
-      if (newPayload.customPenaltyBeepSoundDataUrl && typeof newPayload.customPenaltyBeepSoundDataUrl === 'string') {
-          newPayload.customPenaltyBeepSoundDataUrl = newPayload.customPenaltyBeepSoundDataUrl.substring(0, 50) + '...[TRUNCATED]';
+
+      if (newPayload.config) {
+        newPayload.config = cleanIndividualPayload(newPayload.config);
       }
-      if (newPayload.teams && Array.isArray(newPayload.teams)) {
-          newPayload.teams = newPayload.teams.map((team: any) => {
-              if (team.logoDataUrl && typeof team.logoDataUrl === 'string') {
-                  return { ...team, logoDataUrl: team.logoDataUrl.substring(0, 50) + '...[TRUNCATED]' };
-              }
-              return team;
-          });
+       if (newPayload.gameState) {
+        newPayload.gameState = cleanIndividualPayload(newPayload.gameState);
       }
+      
       return newPayload;
   }
   
@@ -2102,18 +2116,27 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         const configChanged = configKeys.some(key => !isEqual(prevState[key as keyof GameState], state[key as keyof GameState]));
         const gameStateChanged = liveGameStateKeys.some(key => !isEqual(prevState[key as keyof GameState], state[key as keyof GameState]));
 
+        let updateType = '';
+        const payloadForDebug: { config?: ConfigFields; gameState?: LiveGameState } = {};
+
         if (configChanged) {
+          updateType += 'Configuración';
           const configPayload = {} as ConfigFields;
           configKeys.forEach(key => ((configPayload as any)[key] = state[key as keyof GameState]));
           updateConfigOnServer(configPayload).catch(err => console.error("Failed to sync config to server:", err));
-          setDebugInfo({ type: 'Config Update', payload: configPayload });
+          payloadForDebug.config = configPayload;
         }
 
         if (gameStateChanged) {
+          updateType += (updateType ? ' y ' : '') + 'Estado del Juego';
           const liveStatePayload = {} as LiveGameState;
           liveGameStateKeys.forEach(key => ((liveStatePayload as any)[key] = state[key as keyof GameState]));
           updateGameStateOnServer(liveStatePayload).catch(err => console.error("Failed to sync game state to server:", err));
-          setDebugInfo({ type: 'Game State Update', payload: liveStatePayload });
+          payloadForDebug.gameState = liveStatePayload;
+        }
+
+        if (updateType) {
+            setDebugInfo({ type: `Actualización de ${updateType}`, payload: payloadForDebug });
         }
     }
 
