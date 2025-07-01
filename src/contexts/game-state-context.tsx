@@ -20,8 +20,16 @@ const DEFAULT_PENALTY_BEEP_FILE_PATH = '/audio/penalty_beep.wav';
 
 let TAB_ID: string;
 if (typeof window !== 'undefined') {
-  TAB_ID = crypto.randomUUID();
+  // crypto.randomUUID() is only available in secure contexts (HTTPS).
+  // Provide a fallback for insecure contexts (like some preview environments) or older browsers.
+  if (window.crypto && window.crypto.randomUUID) {
+    TAB_ID = window.crypto.randomUUID();
+  } else {
+    // A simple but effective fallback for generating a unique enough ID for the tab.
+    TAB_ID = `tab-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+  }
 } else {
+  // For the server environment
   TAB_ID = 'server-tab-id-' + Math.random().toString(36).substring(2);
 }
 
@@ -284,7 +292,7 @@ const initialGlobalState: GameState = {
   // Game Runtime State
   preTimeoutState: null,
   clockStartTimeMs: null,
-  remainingTimeAtStartCs: null,
+  remainingTimeAtStartCs: null, 
   playHornTrigger: 0,
   playPenaltyBeepTrigger: 0,
   teams: [],
