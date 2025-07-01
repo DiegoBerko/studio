@@ -5,9 +5,10 @@
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useReducer, useEffect, useRef, useState } from 'react';
 import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, FormatAndTimingsProfile, FormatAndTimingsProfileData, ScoreboardLayoutSettings, ScoreboardLayoutProfile, GameSummary, GoalLog, PenaltyLog } from '@/types';
-import { saveGameSummary } from '@/ai/flows/file-operations';
 import { toast } from '@/hooks/use-toast';
 import isEqual from 'lodash.isequal';
+import { updateConfigOnServer, updateGameStateOnServer } from '@/app/actions';
+
 
 // --- Constantes para la sincronización local ---
 const BROADCAST_CHANNEL_NAME = 'icevision-game-state-channel';
@@ -1888,6 +1889,8 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPageVisible, setIsPageVisible] = useState(true);
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const prevStateRef = useRef<GameState>(state);
+
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -2019,6 +2022,45 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    const prevState = prevStateRef.current;
+    
+    // --- Server Sync Logic ---
+    if (state._lastActionOriginator === TAB_ID) {
+        // Define keys for config vs. game state
+        const configKeys: (keyof GameState)[] = [
+            'formatAndTimingsProfiles', 'selectedFormatAndTimingsProfileId',
+            'playSoundAtPeriodEnd', 'customHornSoundDataUrl', 'enableTeamSelectionInMiniScoreboard',
+            'enablePlayerSelectionForPenalties', 'showAliasInPenaltyPlayerSelector',
+            'showAliasInControlsPenaltyList', 'showAliasInScoreboardPenalties', 'scoreboardLayout',
+            'scoreboardLayoutProfiles', 'selectedScoreboardLayoutProfileId', 'availableCategories', 'teams',
+            'enablePenaltyCountdownSound', 'penaltyCountdownStartTime', 'customPenaltyBeepSoundDataUrl'
+        ];
+        
+        const gameStateKeys: (keyof GameState)[] = [
+            'homeScore', 'awayScore', 'currentTime', 'currentPeriod', 'isClockRunning',
+            'homePenalties', 'awayPenalties', 'periodDisplayOverride', 'preTimeoutState',
+            'goals', 'gameSummary'
+        ];
+
+        // Check if any config-related part of the state has changed
+        const configChanged = configKeys.some(key => !isEqual(prevState[key], state[key]));
+        
+        // Check if any game-state-related part has changed
+        const gameStateChanged = gameStateKeys.some(key => !isEqual(prevState[key], state[key]));
+
+        if (configChanged) {
+          // Send the entire config object to the server
+          updateConfigOnServer(state).catch(err => console.error("Failed to sync config to server:", err));
+        }
+
+        if (gameStateChanged) {
+          // Send the entire game state object to the server
+          updateGameStateOnServer(state).catch(err => console.error("Failed to sync game state to server:", err));
+        }
+    }
+    // --- End Server Sync Logic ---
+
+
     // The originating tab is responsible for saving state and broadcasting.
     if (state._lastActionOriginator === TAB_ID) {
         try {
@@ -2034,6 +2076,9 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
             channelRef.current.postMessage(state);
         }
     }
+
+    // Update the ref for the next comparison
+    prevStateRef.current = state;
   }, [state, isLoading]);
 
   useEffect(() => {
