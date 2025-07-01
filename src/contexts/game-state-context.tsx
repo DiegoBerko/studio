@@ -8,6 +8,9 @@ import type { Penalty, Team, TeamData, PlayerData, CategoryData, ConfigFields, F
 import { toast } from '@/hooks/use-toast';
 import isEqual from 'lodash.isequal';
 import { updateConfigOnServer, updateGameStateOnServer } from '@/app/actions';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 // --- Constantes para la sincronización local ---
@@ -32,6 +35,87 @@ if (typeof window !== 'undefined') {
 } else {
   // For the server environment
   TAB_ID = 'server-tab-id-' + Math.random().toString(36).substring(2);
+}
+
+// --- Componente de Depuración ---
+function ServerSyncIndicator({ debugInfo }: { debugInfo: { type: string; payload: any } | null; }) {
+  const [isVisible, setIsVisible] = useState(false);
+  const [dataToShow, setDataToShow] = useState<{ type: string; payload: any } | null>(null);
+
+  useEffect(() => {
+    if (debugInfo) {
+      setIsVisible(true);
+      setDataToShow(debugInfo);
+      const timer = setTimeout(() => {
+        setIsVisible(false);
+      }, 5000); // Ocultar después de 5 segundos
+      return () => clearTimeout(timer);
+    }
+  }, [debugInfo]);
+
+  if (!isVisible || !dataToShow) {
+    return null;
+  }
+
+  // Sanitizar el payload para evitar referencias circulares en JSON.stringify
+  const getCircularReplacer = () => {
+    const seen = new WeakSet();
+    return (key: string, value: any) => {
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) {
+          return '[Circular Reference]';
+        }
+        seen.add(value);
+      }
+      if (typeof value === 'function' || typeof value === 'symbol'){
+        return undefined;
+      }
+      return value;
+    };
+  };
+  
+  // Limpiar el payload para la visualización, truncando Data URLs largos
+  const cleanPayloadForDisplay = (payload: any) => {
+      const newPayload = {...payload};
+      if (newPayload.customHornSoundDataUrl && typeof newPayload.customHornSoundDataUrl === 'string') {
+          newPayload.customHornSoundDataUrl = newPayload.customHornSoundDataUrl.substring(0, 50) + '...[TRUNCATED]';
+      }
+      if (newPayload.customPenaltyBeepSoundDataUrl && typeof newPayload.customPenaltyBeepSoundDataUrl === 'string') {
+          newPayload.customPenaltyBeepSoundDataUrl = newPayload.customPenaltyBeepSoundDataUrl.substring(0, 50) + '...[TRUNCATED]';
+      }
+      if (newPayload.teams && Array.isArray(newPayload.teams)) {
+          newPayload.teams = newPayload.teams.map((team: any) => {
+              if (team.logoDataUrl && typeof team.logoDataUrl === 'string') {
+                  return { ...team, logoDataUrl: team.logoDataUrl.substring(0, 50) + '...[TRUNCATED]' };
+              }
+              return team;
+          });
+      }
+      return newPayload;
+  }
+  
+  const displayPayload = cleanPayloadForDisplay(dataToShow.payload);
+
+  return (
+    <div className="fixed bottom-4 right-4 bg-card text-card-foreground p-3 rounded-lg shadow-lg z-50 border border-border text-sm flex items-center gap-4 animate-in fade-in-0 slide-in-from-bottom-5">
+      <p>📡 Info enviada al servidor: <span className="font-semibold">{dataToShow.type}</span></p>
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">Ver más</Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-3xl h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Datos enviados al servidor ({dataToShow.type})</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="flex-grow my-4 border rounded-md">
+            <pre className="p-4 text-xs whitespace-pre-wrap break-all">
+              {JSON.stringify(displayPayload, getCircularReplacer(), 2)}
+            </pre>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
 
@@ -1890,6 +1974,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   const [isPageVisible, setIsPageVisible] = useState(true);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const prevStateRef = useRef<GameState>(state);
+  const [debugInfo, setDebugInfo] = useState<{ type: string, payload: any } | null>(null);
 
 
   useEffect(() => {
@@ -2049,13 +2134,13 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
         const gameStateChanged = gameStateKeys.some(key => !isEqual(prevState[key], state[key]));
 
         if (configChanged) {
-          // Send the entire config object to the server
           updateConfigOnServer(state).catch(err => console.error("Failed to sync config to server:", err));
+          setDebugInfo({ type: 'Config Update', payload: state });
         }
 
         if (gameStateChanged) {
-          // Send the entire game state object to the server
           updateGameStateOnServer(state).catch(err => console.error("Failed to sync game state to server:", err));
+          setDebugInfo({ type: 'Game State Update', payload: state });
         }
     }
     // --- End Server Sync Logic ---
@@ -2118,6 +2203,7 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   return (
     <GameStateContext.Provider value={{ state, dispatch, isLoading }}>
       {children}
+      {!isLoading && <ServerSyncIndicator debugInfo={debugInfo} />}
     </GameStateContext.Provider>
   );
 };
