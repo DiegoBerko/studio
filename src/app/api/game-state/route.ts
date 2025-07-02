@@ -1,8 +1,23 @@
 
 
-import { setGameState } from '@/lib/server-side-store';
+import { setGameState, getGameState } from '@/lib/server-side-store';
 import { NextResponse } from 'next/server';
 import type { LiveGameState } from '@/types';
+
+export async function GET() {
+  try {
+    const gameState = getGameState();
+    if (gameState) {
+      return NextResponse.json(gameState, { status: 200 });
+    } else {
+      return NextResponse.json({ message: 'El estado del juego aún no está disponible.' }, { status: 404 });
+    }
+  } catch (error) {
+    console.error('API Error: Failed to get game state', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return NextResponse.json({ message: 'Failed to get game state.', error: errorMessage }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {
