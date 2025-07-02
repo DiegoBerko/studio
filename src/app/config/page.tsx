@@ -3,14 +3,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { DurationSettingsCard, type DurationSettingsCardRef } from "@/components/config/duration-settings-card";
-import { PenaltySettingsCard, type PenaltySettingsCardRef } from "@/components/config/penalty-settings-card";
-import { SoundSettingsCard, type SoundSettingsCardRef } from "@/components/config/sound-settings-card";
-import { PenaltyCountdownSoundCard, type PenaltyCountdownSoundCardRef } from "@/components/config/penalty-countdown-sound-card";
-import { TeamSettingsCard, type TeamSettingsCardRef } from "@/components/config/team-settings-card";
-import { CategorySettingsCard, type CategorySettingsCardRef } from "@/components/config/category-settings-card";
-import { LayoutSettingsCard, type LayoutSettingsCardRef } from "@/components/config/layout-settings-card";
-import { TeamsManagementTab } from '@/components/config/teams-management-tab';
+import dynamic from 'next/dynamic';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +35,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
 import isEqual from 'lodash.isequal';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import type { DurationSettingsCardRef } from "@/components/config/duration-settings-card";
+import type { PenaltySettingsCardRef } from "@/components/config/penalty-settings-card";
+import type { SoundSettingsCardRef } from "@/components/config/sound-settings-card";
+import type { PenaltyCountdownSoundCardRef } from "@/components/config/penalty-countdown-sound-card";
+import type { TeamSettingsCardRef } from "@/components/config/team-settings-card";
+import type { CategorySettingsCardRef } from "@/components/config/category-settings-card";
+import type { LayoutSettingsCardRef } from "@/components/config/layout-settings-card";
+
+
+// Lazy load heavy components
+const loadingComponent = () => <div className="flex justify-center items-center p-8"><LoadingSpinner /></div>;
+
+const DurationSettingsCard = dynamic(() => import('@/components/config/duration-settings-card').then(mod => mod.DurationSettingsCard), { loading: loadingComponent });
+const PenaltySettingsCard = dynamic(() => import('@/components/config/penalty-settings-card').then(mod => mod.PenaltySettingsCard), { loading: loadingComponent });
+const SoundSettingsCard = dynamic(() => import('@/components/config/sound-settings-card').then(mod => mod.SoundSettingsCard), { loading: loadingComponent });
+const PenaltyCountdownSoundCard = dynamic(() => import('@/components/config/penalty-countdown-sound-card').then(mod => mod.PenaltyCountdownSoundCard), { loading: loadingComponent });
+const TeamSettingsCard = dynamic(() => import('@/components/config/team-settings-card').then(mod => mod.TeamSettingsCard), { loading: loadingComponent });
+const CategorySettingsCard = dynamic(() => import('@/components/config/category-settings-card').then(mod => mod.CategorySettingsCard), { loading: loadingComponent });
+const LayoutSettingsCard = dynamic(() => import('@/components/config/layout-settings-card').then(mod => mod.LayoutSettingsCard), { loading: loadingComponent });
+const TeamsManagementTab = dynamic(() => import('@/components/config/teams-management-tab').then(mod => mod.TeamsManagementTab), { loading: loadingComponent });
 
 
 const VALID_TAB_VALUES = ["formatAndTimings", "soundAndDisplay", "categoriesAndTeams"];
