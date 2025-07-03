@@ -995,6 +995,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
     case 'TICK': {
       let hasChanged = false;
+      let significantChangeOccurred = false;
       let newCalculatedTimeCs = state.clock.currentTime;
       let homePenaltiesResult = [...state.penalties.home];
       let awayPenaltiesResult = [...state.penalties.away];
@@ -1036,6 +1037,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         return penalties.map(p => {
           if (p._status === 'running' && p.expirationTime === undefined) {
             hasChanged = true;
+            significantChangeOccurred = true;
             return {
               ...p,
               expirationTime: newCalculatedTimeCs - (p.initialDuration * 100),
@@ -1055,6 +1057,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         penalties.forEach(p => {
           if (p._status === 'running' && p.expirationTime !== undefined && newCalculatedTimeCs <= p.expirationTime) {
             hasChanged = true;
+            significantChangeOccurred = true;
             const logIndex = newGameSummary[team].penalties.findIndex(log => log.id === p.id && !log.endReason);
             if (logIndex > -1) {
               newGameSummary[team].penalties[logIndex] = {
@@ -1088,6 +1091,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       const newClockState = { ...state.clock, currentTime: newCalculatedTimeCs };
 
       if (state.clock.isClockRunning && newCalculatedTimeCs <= 0) {
+        significantChangeOccurred = true;
         newClockState.isClockRunning = false;
         newClockState.clockStartTimeMs = null;
         newClockState.remainingTimeAtStartCs = null;
@@ -1118,7 +1122,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       } else {
         return state; 
       }
-      break;
+      const originator = significantChangeOccurred ? TAB_ID : undefined;
+      const timestamp = significantChangeOccurred ? newTimestamp : state._lastUpdatedTimestamp;
+      return { ...newStateWithoutMeta, playHornTrigger: newPlayHornTrigger, playPenaltyBeepTrigger: newPlayPenaltyBeepTrigger, _lastActionOriginator: originator, _lastUpdatedTimestamp: timestamp, _initialConfigLoadComplete: state._initialConfigLoadComplete };
     }
     case 'SET_HOME_TEAM_NAME':
       newStateWithoutMeta = { ...state, homeTeamName: action.payload || 'Local' };
@@ -1890,7 +1896,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
   }
 
-  const nonOriginatingActionTypes: GameAction['type'][] = ['HYDRATE_FROM_STORAGE', 'SET_STATE_FROM_LOCAL_BROADCAST', 'TICK'];
+  const nonOriginatingActionTypes: GameAction['type'][] = ['HYDRATE_FROM_STORAGE', 'SET_STATE_FROM_LOCAL_BROADCAST'];
+  
+  if (action.type === 'TICK') {
+    return newStateWithoutMeta as GameState; // The TICK case now handles its own meta properties
+  }
   
   if (nonOriginatingActionTypes.includes(action.type)) {
       if (action.type === 'TICK' && 
@@ -2268,3 +2278,4 @@ export const getCategoryNameById = (categoryId: string, availableCategories: Cat
 };
 
 export { createDefaultFormatAndTimingsProfile, createDefaultScoreboardLayoutProfile };
+
