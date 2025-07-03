@@ -9,22 +9,46 @@ export async function GET(request: Request) {
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
+      let intervalId: NodeJS.Timeout;
 
-      // The listener function that will be called on each game state update
       const onUpdate = (state: LiveGameState) => {
+        // The try/catch is a good safeguard, but the main cleanup is handled elsewhere.
         try {
-          // Send the updated state to the client
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(state)}\n\n`));
         } catch (e) {
-          // If enqueue fails, it means the client has disconnected.
-          // We remove the listener to prevent memory leaks.
-          console.log('Client disconnected, removing listener.');
-          gameStateEmitter.off('update', onUpdate);
+          console.error("Failed to enqueue data, stream might be closed.", e);
         }
+      };
+
+      const cleanup = () => {
+        console.log('SSE: Cleaning up resources.');
+        clearInterval(intervalId);
+        gameStateEmitter.off('update', onUpdate);
       };
 
       // Subscribe to game state updates
       gameStateEmitter.on('update', onUpdate);
+
+      // Send a ping every 10 seconds to keep the connection alive
+      intervalId = setInterval(() => {
+        try {
+            // This also acts as a check to see if the connection is still alive.
+            controller.enqueue(encoder.encode(':ping\n\n'));
+        } catch (e) {
+            // If this fails, the client has disconnected.
+            console.log('SSE: Ping failed, client disconnected.');
+            cleanup();
+            // We don't need to call controller.close() because this error
+            // means the controller is already in a closed/errored state.
+        }
+      }, 10000);
+
+      // Handle client disconnection (the primary way)
+      request.signal.onabort = () => {
+        console.log('SSE: Client disconnected via abort signal.');
+        cleanup();
+        // The stream is automatically closed by the browser on abort, no need to call controller.close().
+      };
 
       // Send the current state immediately on connection
       const currentState = getGameState();
@@ -32,31 +56,12 @@ export async function GET(request: Request) {
         try {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(currentState)}\n\n`));
         } catch (e) {
-          // It's possible the client disconnected immediately after connecting
-          console.log('Client disconnected before initial state could be sent.');
-          gameStateEmitter.off('update', onUpdate);
+          // This can happen if the client disconnects immediately after connecting.
+          console.log('SSE: Could not send initial state, client disconnected early.');
+          cleanup();
         }
       }
-
-      // Handle client disconnection (e.g., closing the tab)
-      request.signal.onabort = () => {
-        console.log('Client disconnected (onabort signal).');
-        gameStateEmitter.off('update', onUpdate);
-        try {
-          if (controller.desiredSize !== null) {
-            controller.close();
-          }
-        } catch (e) {
-          // Ignore error, controller is likely already closed.
-        }
-      };
     },
-    cancel() {
-      // This is less common but good practice to have.
-      // It handles cases where the stream is canceled programmatically.
-      console.log('Stream canceled by consumer.');
-      // The onabort handler should already have cleaned up listeners, but this is a safeguard.
-    }
   });
 
   return new NextResponse(stream, {
