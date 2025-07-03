@@ -17,7 +17,7 @@ export function PenaltiesDisplay({ teamDisplayType, teamName, penalties }: Penal
   const { scoreboardLayout } = state;
 
   return (
-      <Card className="bg-card shadow-lg flex-1 min-w-[300px]">
+      <Card className="bg-card shadow-lg flex-1">
         <CardHeader className="flex flex-row justify-between items-center">
           <CardTitle 
             className="text-primary-foreground"
