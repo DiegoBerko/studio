@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import type { ReactNode } from 'react';
 import React, { useEffect } from 'react';
-import { SoundPlayer } from '@/components/audio/sound-player'; // Import SoundPlayer
 import { useGameState } from '@/contexts/game-state-context';
 
 export function MainWrapper({ children }: { children: ReactNode }) {
@@ -31,11 +30,8 @@ export function MainWrapper({ children }: { children: ReactNode }) {
   }
 
   return (
-    <>
-      <SoundPlayer /> {/* Add SoundPlayer here so it's always mounted */}
-      <main className={cn("flex-1", mainClassName)}>
-        {children}
-      </main>
-    </>
+    <main className={cn("flex-1", mainClassName)}>
+      {children}
+    </main>
   );
 }
