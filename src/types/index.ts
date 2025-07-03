@@ -211,4 +211,6 @@ export interface LiveGameState {
     homeTeamSubName?: string;
     awayTeamName: string;
     awayTeamSubName?: string;
+    playersPerTeamOnIce?: number; // Optional: For mobile client
+    numberOfRegularPeriods?: number; // Optional: For mobile client
 }

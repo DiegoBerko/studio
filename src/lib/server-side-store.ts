@@ -13,7 +13,8 @@ export function getConfig(): ConfigFields | null {
 }
 
 export function setConfig(newConfig: ConfigFields): void {
-  console.log("Server-side config updated.");
+  // To avoid verbose logging on every config change, we can remove this log
+  // console.log("Server-side config updated.");
   storedConfig = newConfig;
 }
 
@@ -22,6 +23,7 @@ export function getGameState(): LiveGameState | null {
 }
 
 export function setGameState(newGameState: LiveGameState): void {
-  console.log("Server-side game state updated.");
+  // To avoid verbose logging on every game state change, we can remove this log
+  // console.log("Server-side game state updated.");
   storedGameState = newGameState;
 }
