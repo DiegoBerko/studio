@@ -1,12 +1,12 @@
 
-
-
-import { setGameState, getConfig } from '@/lib/server-side-store';
+import { getGameState, setGameState, getConfig } from '@/lib/server-side-store';
 import { NextResponse } from 'next/server';
 import type { LiveGameState } from '@/types';
 
-// The GET handler is removed as its functionality is now handled by the SSE endpoint
-// at /api/game-state/events
+export async function GET(request: Request) {
+  const gameState = getGameState();
+  return NextResponse.json(gameState);
+}
 
 export async function POST(request: Request) {
   try {

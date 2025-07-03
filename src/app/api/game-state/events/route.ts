@@ -50,17 +50,7 @@ export async function GET(request: Request) {
         // The stream is automatically closed by the browser on abort, no need to call controller.close().
       };
 
-      // Send the current state immediately on connection
-      const currentState = getGameState();
-      if (currentState) {
-        try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(currentState)}\n\n`));
-        } catch (e) {
-          // This can happen if the client disconnects immediately after connecting.
-          console.log('SSE: Could not send initial state, client disconnected early.');
-          cleanup();
-        }
-      }
+      // Initial state is no longer sent from here. The client will fetch it separately.
     },
   });
 

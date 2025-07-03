@@ -13,38 +13,62 @@ export default function MobileScoreboard() {
   const [gameState, setGameState] = useState<LiveGameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Effect for SSE subscription
+  // Effect for initial fetch and SSE subscription
   useEffect(() => {
-    const eventSource = new EventSource('/api/game-state/events');
+    let eventSource: EventSource;
 
-    eventSource.onopen = () => {
-      setError(null);
-      setIsConnected(true);
-    };
-
-    eventSource.onmessage = (event) => {
+    const connect = async () => {
+      setIsLoading(true);
       try {
-        const data: LiveGameState = JSON.parse(event.data);
+        const response = await fetch('/api/game-state');
+        if (!response.ok) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+        const data: LiveGameState | null = await response.json();
         setGameState(data);
       } catch (e) {
-        console.error("Failed to parse game state from server event:", e);
-        setError("Datos del servidor corruptos.");
+        console.error("Failed to fetch initial game state:", e);
+        setError("No se pudo obtener el estado inicial del servidor.");
+      } finally {
+        setIsLoading(false);
       }
+
+      // Subscribe to future updates
+      eventSource = new EventSource('/api/game-state/events');
+
+      eventSource.onopen = () => {
+        setError(null);
+        setIsConnected(true);
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data: LiveGameState = JSON.parse(event.data);
+          setGameState(data);
+        } catch (e) {
+          console.error("Failed to parse game state from server event:", e);
+          setError("Datos del servidor corruptos.");
+        }
+      };
+
+      eventSource.onerror = () => {
+        console.error("EventSource failed.");
+        setError("No se pudo conectar con el servidor.");
+        setIsConnected(false);
+      };
     };
 
-    eventSource.onerror = () => {
-      console.error("EventSource failed.");
-      setError("No se pudo conectar con el servidor.");
-      setIsConnected(false);
-      // EventSource will automatically try to reconnect.
-    };
+    connect();
 
     // Cleanup on component unmount
     return () => {
-      eventSource.close();
+      if (eventSource) {
+        eventSource.close();
+      }
     };
-  }, []); // Empty dependency array means this effect runs once on mount
+  }, []);
 
   // Effect for the client-side visual timer tick
   useEffect(() => {
@@ -76,8 +100,17 @@ export default function MobileScoreboard() {
 
     return () => clearInterval(timerId);
   }, [gameState?.clock.isClockRunning, gameState?.clock.currentTime]);
+  
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-screen p-4 gap-4 bg-background items-center justify-center">
+        <LoadingSpinner className="h-12 w-12 text-primary" />
+        <p className="text-muted-foreground mt-4">Obteniendo datos del partido...</p>
+      </div>
+    );
+  }
 
-  if (error && !isConnected) {
+  if (error && !isConnected && !gameState) {
     return (
       <div className="flex flex-col h-screen p-4 gap-4 bg-background text-destructive items-center justify-center text-center">
         <WifiOff className="h-16 w-16" />
@@ -90,9 +123,11 @@ export default function MobileScoreboard() {
 
   if (!gameState) {
     return (
-      <div className="flex flex-col h-screen p-4 gap-4 bg-background items-center justify-center">
-        <LoadingSpinner className="h-12 w-12 text-primary" />
-        <p className="text-muted-foreground mt-4">Esperando datos del partido...</p>
+      <div className="flex flex-col h-screen p-4 gap-4 bg-background items-center justify-center text-center">
+        <WifiOff className="h-16 w-16 text-primary" />
+        <h1 className="text-2xl font-bold">No hay partido en curso</h1>
+        <p className="text-muted-foreground/80">Esperando que inicie un partido. La página se actualizará automáticamente.</p>
+        {error && <p className="text-destructive mt-2">{error}</p>}
       </div>
     );
   }
