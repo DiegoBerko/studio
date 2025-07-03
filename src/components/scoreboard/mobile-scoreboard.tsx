@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import type { LiveGameState } from '@/types';
+import type { LiveGameState, ClockState } from '@/types';
 import { formatTime, getActualPeriodText } from '@/contexts/game-state-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { PenaltiesDisplay } from './penalties-display';
@@ -12,6 +12,7 @@ export function MobileScoreboard() {
   const [gameState, setGameState] = useState<LiveGameState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Effect for polling server data to sync state
   useEffect(() => {
     const fetchGameState = async () => {
       try {
@@ -20,23 +21,52 @@ export function MobileScoreboard() {
           throw new Error(`Server responded with status: ${response.status}`);
         }
         const data: LiveGameState = await response.json();
+        
+        // This is the periodic sync with the server.
+        // It ensures our local timer doesn't drift and other state (score, penalties) is updated.
         setGameState(data);
-        setError(null); // Clear previous errors on successful fetch
+        setError(null);
       } catch (err) {
         console.error("Failed to fetch game state:", err);
         setError("No se pudo conectar con el servidor.");
       }
     };
 
-    // Fetch immediately on mount
-    fetchGameState();
-
-    // Poll for updates every 2 seconds
-    const intervalId = setInterval(fetchGameState, 2000);
-
-    // Cleanup interval on component unmount
-    return () => clearInterval(intervalId);
+    fetchGameState(); // Initial fetch
+    const pollIntervalId = setInterval(fetchGameState, 2000); // Re-sync every 2 seconds
+    return () => clearInterval(pollIntervalId);
   }, []);
+
+  // Effect for the client-side visual timer tick
+  useEffect(() => {
+    // Stop if we have no state, or if the clock shouldn't be running.
+    if (!gameState || !gameState.clock.isClockRunning || gameState.clock.currentTime <= 0) {
+      return;
+    }
+
+    // This interval makes the clock tick down smoothly on the client's screen.
+    const timerId = setInterval(() => {
+      setGameState(prevState => {
+        // Double-check state in case it became null between ticks
+        if (!prevState || !prevState.clock.isClockRunning || prevState.clock.currentTime <= 0) {
+          return prevState;
+        }
+
+        // Decrement by 10 centiseconds (because the interval is 100ms)
+        const newTime = prevState.clock.currentTime - 10;
+
+        return {
+          ...prevState,
+          clock: {
+            ...prevState.clock,
+            currentTime: Math.max(0, newTime),
+          }
+        };
+      });
+    }, 100);
+
+    return () => clearInterval(timerId);
+  }, [gameState?.clock.isClockRunning, gameState?.clock.currentTime]); // This effect re-runs if the running state or time is changed by the server fetch.
 
   if (error && !gameState) {
     return (
@@ -59,7 +89,7 @@ export function MobileScoreboard() {
   }
 
   // Calculate players on ice
-  const playersPerTeam = gameState.playersPerTeamOnIce || 5; // Default to 5 if not provided
+  const playersPerTeam = gameState.playersPerTeamOnIce || 5;
   const activeHomePenaltiesCount = gameState.penalties.home.filter(p => p._status === 'running').length;
   const playersOnIceForHome = Math.max(0, playersPerTeam - activeHomePenaltiesCount);
 
@@ -109,8 +139,8 @@ export function MobileScoreboard() {
 
       {/* Penalties */}
       <div className="flex-grow grid grid-cols-1 gap-4 overflow-y-auto pb-4">
-         <PenaltiesDisplay teamDisplayType="Local" teamName={gameState.homeTeamName} penalties={gameState.penalties.home} mode="mobile" />
-         <PenaltiesDisplay teamDisplayType="Visitante" teamName={gameState.awayTeamName} penalties={gameState.penalties.away} mode="mobile" />
+         <PenaltiesDisplay teamDisplayType="Local" teamName={gameState.homeTeamName} penalties={gameState.penalties.home} mode="mobile" clock={gameState.clock} />
+         <PenaltiesDisplay teamDisplayType="Visitante" teamName={gameState.awayTeamName} penalties={gameState.penalties.away} mode="mobile" clock={gameState.clock} />
       </div>
     </div>
   );

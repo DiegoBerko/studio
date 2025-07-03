@@ -1,6 +1,6 @@
 "use client";
 
-import type { Penalty } from '@/types';
+import type { Penalty, ClockState } from '@/types';
 import { useGameState } from '@/contexts/game-state-context';
 import { PenaltyCard } from './penalty-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,9 +10,10 @@ interface PenaltiesDisplayProps {
   teamName: string;
   penalties: Penalty[];
   mode?: 'desktop' | 'mobile';
+  clock?: ClockState; // Optional clock state for mobile view
 }
 
-export function PenaltiesDisplay({ teamDisplayType, teamName, penalties, mode = 'desktop' }: PenaltiesDisplayProps) {
+export function PenaltiesDisplay({ teamDisplayType, teamName, penalties, mode = 'desktop', clock }: PenaltiesDisplayProps) {
   const { state } = useGameState();
   const isMobile = mode === 'mobile';
 
@@ -43,7 +44,7 @@ export function PenaltiesDisplay({ teamDisplayType, teamName, penalties, mode = 
             </p>
           ) : (
             penaltiesToShow.map(penalty => (
-              <PenaltyCard key={penalty.id} penalty={penalty} teamName={teamName} mode={mode} />
+              <PenaltyCard key={penalty.id} penalty={penalty} teamName={teamName} mode={mode} clock={clock} />
             ))
           )}
           {!isMobile && penalties.length > 3 && (

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Penalty } from '@/types';
+import type { Penalty, ClockState } from '@/types';
 import { useGameState, formatTime } from '@/contexts/game-state-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { Clock } from 'lucide-react';
@@ -11,6 +11,7 @@ interface PenaltyCardProps {
   penalty: Penalty;
   teamName: string; 
   mode?: 'desktop' | 'mobile';
+  clock?: ClockState; // Optional clock state for mobile view
 }
 
 const CagedUserIcon = ({ size, className }: { size: number; className?: string }) => (
@@ -33,9 +34,10 @@ const CagedUserIcon = ({ size, className }: { size: number; className?: string }
 );
 
 
-export function PenaltyCard({ penalty, teamName, mode = 'desktop' }: PenaltyCardProps) {
+export function PenaltyCard({ penalty, teamName, mode = 'desktop', clock: mobileClock }: PenaltyCardProps) {
   const { state } = useGameState();
-  const { clock } = state;
+  // Use the passed-in mobile clock if available, otherwise use the global context clock from desktop.
+  const clock = mobileClock || state.clock;
   const isMobile = mode === 'mobile';
 
   const currentTeamSubName = state.homeTeamName === teamName ? state.homeTeamSubName : state.awayTeamName;
@@ -90,7 +92,8 @@ export function PenaltyCard({ penalty, teamName, mode = 'desktop' }: PenaltyCard
     return null;
   }
   const statusText = getStatusTextForScoreboard();
-  const remainingTimeCs = penalty.expirationTime !== undefined
+  
+  const remainingTimeCs = penalty._status === 'running' && penalty.expirationTime !== undefined
     ? Math.max(0, clock.currentTime - penalty.expirationTime)
     : penalty.initialDuration * 100;
 
