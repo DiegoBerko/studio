@@ -12,6 +12,7 @@ import React from 'react';
 interface PenaltyCardProps {
   penalty: Penalty;
   teamName: string; 
+  mode?: 'desktop' | 'mobile';
 }
 
 const CagedUserIcon = ({ size, className }: { size: number; className?: string }) => (
@@ -34,9 +35,10 @@ const CagedUserIcon = ({ size, className }: { size: number; className?: string }
 );
 
 
-export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
+export function PenaltyCard({ penalty, teamName, mode = 'desktop' }: PenaltyCardProps) {
   const { state } = useGameState();
   const { scoreboardLayout, clock } = state;
+  const isMobile = mode === 'mobile';
 
   const currentTeamSubName = state.homeTeamName === teamName ? state.homeTeamSubName : state.awayTeamName;
 
@@ -94,15 +96,24 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
     ? Math.max(0, clock.currentTime - penalty.expirationTime)
     : penalty.initialDuration * 100;
 
+  const styles = {
+    playerIconSize: isMobile ? 2 : scoreboardLayout.penaltyPlayerIconSize,
+    playerNumberSize: isMobile ? '1.5rem' : `${scoreboardLayout.penaltyPlayerNumberSize}rem`,
+    timeSize: isMobile ? '1.5rem' : `${scoreboardLayout.penaltyTimeSize}rem`,
+    clockIconSize: isMobile ? '1.25rem' : `${scoreboardLayout.penaltyTimeSize * 0.5}rem`,
+    totalDurationSize: isMobile ? '0.75rem' : `${scoreboardLayout.penaltyTimeSize * 0.4}rem`,
+    statusSize: isMobile ? '0.75rem' : `${scoreboardLayout.penaltyTimeSize * 0.4}rem`,
+  };
+
   return (
     <Card className={cardClasses}>
-      <CardContent className="p-3 md:p-4">
+      <CardContent className="p-2 md:p-3 lg:p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
-            <CagedUserIcon size={scoreboardLayout.penaltyPlayerIconSize} className="text-primary-foreground" />
+            <CagedUserIcon size={styles.playerIconSize} className="text-primary-foreground" />
             <span 
               className="font-semibold"
-              style={{ fontSize: `${scoreboardLayout.penaltyPlayerNumberSize}rem`, lineHeight: 1 }}
+              style={{ fontSize: styles.playerNumberSize, lineHeight: 1 }}
             >
               {penalty.playerNumber || 'S/N'}
               {renderPlayerAlias()}
@@ -110,13 +121,13 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
           </div>
           <div 
             className="flex items-center gap-1 md:gap-2 text-accent font-mono"
-            style={{ fontSize: `${scoreboardLayout.penaltyTimeSize}rem`, lineHeight: 1 }}
+            style={{ fontSize: styles.timeSize, lineHeight: 1 }}
           >
             <Clock 
               className="text-accent"
               style={{
-                height: `${scoreboardLayout.penaltyTimeSize * 0.5}rem`,
-                width: `${scoreboardLayout.penaltyTimeSize * 0.5}rem`,
+                height: styles.clockIconSize,
+                width: styles.clockIconSize,
               }}
             />
             {formatTime(remainingTimeCs, { showTenths: false })}
@@ -125,7 +136,7 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
         <div className="flex justify-between items-center">
           <div 
             className="text-muted-foreground mt-1"
-            style={{ fontSize: `${scoreboardLayout.penaltyTimeSize * 0.4}rem` }}
+            style={{ fontSize: styles.totalDurationSize }}
           >
             ({formatTime(penalty.initialDuration * 100, { showTenths: false })} Min)
           </div>
@@ -134,7 +145,7 @@ export function PenaltyCard({ penalty, teamName }: PenaltyCardProps) {
                 "mt-1 italic",
                  isPendingPuck ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground/80"
               )}
-              style={{ fontSize: `${scoreboardLayout.penaltyTimeSize * 0.4}rem` }}
+              style={{ fontSize: styles.statusSize }}
             >
               {statusText}
             </div>

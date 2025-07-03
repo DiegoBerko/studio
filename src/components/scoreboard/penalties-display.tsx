@@ -10,39 +10,49 @@ interface PenaltiesDisplayProps {
   teamDisplayType: "Local" | "Visitante";
   teamName: string;
   penalties: Penalty[];
+  mode?: 'desktop' | 'mobile';
 }
 
-export function PenaltiesDisplay({ teamDisplayType, teamName, penalties }: PenaltiesDisplayProps) {
+export function PenaltiesDisplay({ teamDisplayType, teamName, penalties, mode = 'desktop' }: PenaltiesDisplayProps) {
   const { state } = useGameState();
   const { scoreboardLayout } = state;
 
+  const isMobile = mode === 'mobile';
+
+  // Define styles based on mode
+  const titleStyle = isMobile ? { fontSize: '1.125rem' } : { fontSize: `${scoreboardLayout.penaltiesTitleSize}rem` };
+  const noPenaltiesStyle = isMobile ? { fontSize: '0.875rem' } : { fontSize: `${scoreboardLayout.penaltyPlayerNumberSize * 0.5}rem` };
+  const morePenaltiesStyle = { fontSize: `${scoreboardLayout.penaltyPlayerNumberSize * 0.4}rem` };
+  
+  const penaltiesToShow = isMobile ? penalties : penalties.slice(0, 3);
+
   return (
       <Card className="bg-card shadow-lg flex-1">
-        <CardHeader className="flex flex-row justify-between items-center">
+        <CardHeader className="flex flex-row justify-between items-center p-3 md:p-6">
           <CardTitle 
             className="text-primary-foreground"
-            style={{ fontSize: `${scoreboardLayout.penaltiesTitleSize}rem` }}
+            style={titleStyle}
           >
-            Penalidades
+            {isMobile ? `Penalidades ${teamName}` : 'Penalidades'}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 lg:space-y-4">
+        <CardContent className="space-y-2 p-3 pt-0 md:p-6 md:pt-0 md:space-y-3 lg:space-y-4">
           {penalties.length === 0 ? (
             <p 
               className="text-muted-foreground"
-              style={{ fontSize: `${scoreboardLayout.penaltyPlayerNumberSize * 0.5}rem` }}
+              style={noPenaltiesStyle}
             >
               Ninguna
             </p>
           ) : (
-            penalties.slice(0, 3).map(penalty => (
-              <PenaltyCard key={penalty.id} penalty={penalty} teamName={teamName} />
+            penaltiesToShow.map(penalty => (
+              <PenaltyCard key={penalty.id} penalty={penalty} teamName={teamName} mode={mode} />
             ))
           )}
-          {penalties.length > 3 && (
+          {!isMobile && penalties.length > 3 && (
             <p 
               className="text-muted-foreground text-center pt-2"
-              style={{ fontSize: `${scoreboardLayout.penaltyPlayerNumberSize * 0.4}rem` }}
+              style={morePenaltiesStyle}
             >
               +{penalties.length - 3} más...
             </p>

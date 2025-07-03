@@ -9,7 +9,7 @@ export function MobileScoreboard() {
   const { clock, score, penalties, homeTeamName, awayTeamName } = state;
 
   return (
-    <div className="flex flex-col h-svh p-2 sm:p-4 gap-4 bg-background text-foreground">
+    <div className="flex flex-col h-screen p-2 sm:p-4 gap-4 bg-background text-foreground">
       {/* Main Info Card: Clock and Scores */}
       <Card className="bg-card shadow-lg">
         <CardContent className="p-4">
@@ -38,8 +38,8 @@ export function MobileScoreboard() {
 
       {/* Penalties */}
       <div className="flex-grow grid grid-cols-1 gap-4 overflow-y-auto pb-4">
-         <PenaltiesDisplay teamDisplayType="Local" teamName={state.homeTeamName} penalties={penalties.home} />
-         <PenaltiesDisplay teamDisplayType="Visitante" teamName={state.awayTeamName} penalties={penalties.away} />
+         <PenaltiesDisplay teamDisplayType="Local" teamName={state.homeTeamName} penalties={penalties.home} mode="mobile" />
+         <PenaltiesDisplay teamDisplayType="Visitante" teamName={state.awayTeamName} penalties={penalties.away} mode="mobile" />
       </div>
     </div>
   );
