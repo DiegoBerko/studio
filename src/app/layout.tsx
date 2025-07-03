@@ -5,7 +5,6 @@ import { GameStateProvider } from '@/contexts/game-state-context';
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from '@/lib/utils';
 import { PageShell } from '@/components/layout/page-shell';
-import { SoundPlayer } from '@/components/audio/sound-player';
 
 export const metadata: Metadata = {
   title: 'IceVision - Hockey Scoreboard',
@@ -26,7 +25,7 @@ export default function RootLayout({
       </head>
       <body className={cn("min-h-screen bg-background font-body antialiased")}>
         <GameStateProvider>
-          <SoundPlayer />
+          {/* SoundPlayer moved to PageShell to be conditional */}
           <PageShell>{children}</PageShell>
           <Toaster />
         </GameStateProvider>
