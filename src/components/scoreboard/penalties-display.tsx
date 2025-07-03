@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { Penalty } from '@/types';
@@ -15,14 +14,12 @@ interface PenaltiesDisplayProps {
 
 export function PenaltiesDisplay({ teamDisplayType, teamName, penalties, mode = 'desktop' }: PenaltiesDisplayProps) {
   const { state } = useGameState();
-  const { scoreboardLayout } = state;
-
   const isMobile = mode === 'mobile';
 
-  // Define styles based on mode
-  const titleStyle = isMobile ? { fontSize: '1.125rem' } : { fontSize: `${scoreboardLayout.penaltiesTitleSize}rem` };
-  const noPenaltiesStyle = isMobile ? { fontSize: '0.875rem' } : { fontSize: `${scoreboardLayout.penaltyPlayerNumberSize * 0.5}rem` };
-  const morePenaltiesStyle = { fontSize: `${scoreboardLayout.penaltyPlayerNumberSize * 0.4}rem` };
+  // Define styles based on mode, accessing scoreboardLayout only when needed
+  const titleStyle = isMobile ? { fontSize: '1.125rem' } : { fontSize: `${state.scoreboardLayout.penaltiesTitleSize}rem` };
+  const noPenaltiesStyle = isMobile ? { fontSize: '0.875rem' } : { fontSize: `${state.scoreboardLayout.penaltyPlayerNumberSize * 0.5}rem` };
+  const morePenaltiesStyle = isMobile ? {} : { fontSize: `${state.scoreboardLayout.penaltyPlayerNumberSize * 0.4}rem` };
   
   const penaltiesToShow = isMobile ? penalties : penalties.slice(0, 3);
 

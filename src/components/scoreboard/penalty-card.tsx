@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import type { Penalty } from '@/types';
@@ -37,7 +35,7 @@ const CagedUserIcon = ({ size, className }: { size: number; className?: string }
 
 export function PenaltyCard({ penalty, teamName, mode = 'desktop' }: PenaltyCardProps) {
   const { state } = useGameState();
-  const { scoreboardLayout, clock } = state;
+  const { clock } = state;
   const isMobile = mode === 'mobile';
 
   const currentTeamSubName = state.homeTeamName === teamName ? state.homeTeamSubName : state.awayTeamName;
@@ -97,12 +95,12 @@ export function PenaltyCard({ penalty, teamName, mode = 'desktop' }: PenaltyCard
     : penalty.initialDuration * 100;
 
   const styles = {
-    playerIconSize: isMobile ? 2 : scoreboardLayout.penaltyPlayerIconSize,
-    playerNumberSize: isMobile ? '1.5rem' : `${scoreboardLayout.penaltyPlayerNumberSize}rem`,
-    timeSize: isMobile ? '1.5rem' : `${scoreboardLayout.penaltyTimeSize}rem`,
-    clockIconSize: isMobile ? '1.25rem' : `${scoreboardLayout.penaltyTimeSize * 0.5}rem`,
-    totalDurationSize: isMobile ? '0.75rem' : `${scoreboardLayout.penaltyTimeSize * 0.4}rem`,
-    statusSize: isMobile ? '0.75rem' : `${scoreboardLayout.penaltyTimeSize * 0.4}rem`,
+    playerIconSize: isMobile ? 2 : state.scoreboardLayout.penaltyPlayerIconSize,
+    playerNumberSize: isMobile ? '1.5rem' : `${state.scoreboardLayout.penaltyPlayerNumberSize}rem`,
+    timeSize: isMobile ? '1.5rem' : `${state.scoreboardLayout.penaltyTimeSize}rem`,
+    clockIconSize: isMobile ? '1.25rem' : `${state.scoreboardLayout.penaltyTimeSize * 0.5}rem`,
+    totalDurationSize: isMobile ? '0.75rem' : `${state.scoreboardLayout.penaltyTimeSize * 0.4}rem`,
+    statusSize: isMobile ? '0.75rem' : `${state.scoreboardLayout.penaltyTimeSize * 0.4}rem`,
   };
 
   return (
