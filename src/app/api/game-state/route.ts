@@ -1,30 +1,12 @@
 
 
-import { setGameState, getGameState, getConfig } from '@/lib/server-side-store';
+
+import { setGameState, getConfig } from '@/lib/server-side-store';
 import { NextResponse } from 'next/server';
 import type { LiveGameState } from '@/types';
 
-export async function GET() {
-  try {
-    const gameState = getGameState();
-    const config = getConfig();
-    if (gameState) {
-      // Add necessary config fields to the response for the mobile client
-      const mobileResponse = {
-        ...gameState,
-        playersPerTeamOnIce: config?.playersPerTeamOnIce,
-        numberOfRegularPeriods: config?.numberOfRegularPeriods,
-      };
-      return NextResponse.json(mobileResponse, { status: 200 });
-    } else {
-      return NextResponse.json({ message: 'El estado del juego aún no está disponible.' }, { status: 404 });
-    }
-  } catch (error) {
-    console.error('API Error: Failed to get game state', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-    return NextResponse.json({ message: 'Failed to get game state.', error: errorMessage }, { status: 500 });
-  }
-}
+// The GET handler is removed as its functionality is now handled by the SSE endpoint
+// at /api/game-state/events
 
 export async function POST(request: Request) {
   try {
@@ -33,6 +15,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid game state data provided.' }, { status: 400 });
     }
 
+    // setGameState now also handles broadcasting the update to SSE subscribers
     setGameState(gameStateData);
 
     return NextResponse.json({ message: 'Game state updated successfully.' }, { status: 200 });
