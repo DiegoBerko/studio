@@ -1,5 +1,4 @@
 
-
 import type { LiveGameState, ConfigFields } from '@/types';
 
 // This is an in-memory store that runs on the server.
@@ -19,14 +18,10 @@ function broadcastUpdate(state: LiveGameState) {
         try {
             controller.enqueue(messageBytes);
         } catch (e) {
-            console.error(`Failed to send update to subscriber ${id}, it might have disconnected. Removing it.`, e);
-            // If enqueue fails, the client has likely disconnected.
-            // We should remove them and close the stream.
-            try {
-              controller.close();
-            } catch (closeError) {
-              // Ignore if already closed
-            }
+            // This error means the stream is probably closed.
+            // The `onabort` in the route handler is responsible for the full cleanup.
+            // We just remove it from the map here to stop trying to send messages.
+            console.error(`Failed to send update to subscriber ${id}. Removing from broadcast list.`, e);
             subscribers.delete(id);
         }
     });
