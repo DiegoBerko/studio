@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       // Subscribe to game state updates
       gameStateEmitter.on('update', onUpdate);
 
-      // Send a ping every 10 seconds to keep the connection alive
+      // Send a ping every 30 seconds to keep the connection alive
       intervalId = setInterval(() => {
         try {
             // This also acts as a check to see if the connection is still alive.
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
             // We don't need to call controller.close() because this error
             // means the controller is already in a closed/errored state.
         }
-      }, 10000);
+      }, 30000);
 
       // Handle client disconnection (the primary way)
       request.signal.onabort = () => {
