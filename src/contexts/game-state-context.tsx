@@ -950,16 +950,29 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       break;
     }
     case 'ACTIVATE_PENDING_PUCK_PENALTIES': {
-      const activate = (penalties: Penalty[]): Penalty[] =>
-        penalties.map(p => p._status === 'pending_puck' ? { ...p, _status: undefined } : p);
+      const currentTimeCs = state.clock.currentTime;
 
-      let homePenalties = activate(state.penalties.home);
-      let awayPenalties = activate(state.penalties.away);
+      const activateAndSetExpirations = (penalties: Penalty[]): Penalty[] => {
+        const originalStatuses = new Map(penalties.map(p => [p.id, p._status]));
+        
+        let updatedPenalties = penalties.map(p => 
+            p._status === 'pending_puck' ? { ...p, _status: undefined } : p
+        );
 
-      homePenalties = updatePenaltyStatusesOnly(homePenalties, state.maxConcurrentPenalties);
-      homePenalties = sortPenaltiesByStatus(homePenalties);
-      awayPenalties = updatePenaltyStatusesOnly(awayPenalties, state.maxConcurrentPenalties);
-      awayPenalties = sortPenaltiesByStatus(awayPenalties);
+        updatedPenalties = updatePenaltyStatusesOnly(updatedPenalties, state.maxConcurrentPenalties);
+
+        updatedPenalties = updatedPenalties.map(p => {
+          if (p._status === 'running' && originalStatuses.get(p.id) !== 'running') {
+            return { ...p, expirationTime: currentTimeCs - (p.initialDuration * 100) };
+          }
+          return p;
+        });
+
+        return sortPenaltiesByStatus(updatedPenalties);
+      };
+      
+      const homePenalties = activateAndSetExpirations(state.penalties.home);
+      const awayPenalties = activateAndSetExpirations(state.penalties.away);
 
       newStateWithoutMeta = { ...state, penalties: { home: homePenalties, away: awayPenalties } };
       break;
