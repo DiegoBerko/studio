@@ -8,10 +8,19 @@ import { EventEmitter } from 'events';
 let storedConfig: ConfigFields | null = null;
 let storedGameState: LiveGameState | null = null;
 
-// Use an EventEmitter to broadcast updates.
-// This is more robust than manually managing subscribers.
-class GameStateEmitter extends EventEmitter {}
-export const gameStateEmitter = new GameStateEmitter();
+// To avoid issues with Next.js dev server Hot Module Replacement (HMR),
+// we store the emitter on the global object to make it a true singleton,
+// ensuring it persists across reloads in development environments.
+const globalForEmitter = globalThis as unknown as {
+  gameStateEmitter: EventEmitter | undefined;
+};
+
+export const gameStateEmitter =
+  globalForEmitter.gameStateEmitter ?? new EventEmitter();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForEmitter.gameStateEmitter = gameStateEmitter;
+}
 
 
 export function getConfig(): ConfigFields | null {
