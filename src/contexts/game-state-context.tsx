@@ -1889,7 +1889,11 @@ export const GameStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (typeof document !== 'undefined') {
-        setIsPageVisible(!document.hidden);
+        const isVisible = !document.hidden;
+        setIsPageVisible(isVisible);
+        if (isVisible) {
+            dispatch({ type: 'TICK' });
+        }
       }
     };
 
