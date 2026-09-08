@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ImportTeamsDialog } from "@/components/teams/import-teams-dialog";
+import { useAdminMode } from "@/hooks/use-admin-mode";
 
 const ALL_CATEGORIES_FILTER_KEY = "__ALL_CATEGORIES_FILTER_KEY__";
 const NO_CATEGORIES_PLACEHOLDER_VALUE_TAB = "__NO_CATEGORIES_DEFINED_TAB__";
@@ -47,7 +48,7 @@ export function TeamsManagementTab({ tournamentId }: TeamsManagementTabProps = {
   const router = useRouter();
   const { toast } = useToast();
 
-  const isReadOnly = process.env.NEXT_PUBLIC_READ_ONLY === 'true';
+  const { isReadOnly } = useAdminMode();
 
   // Use tournamentId prop if provided, otherwise fall back to selectedTournamentId from state
   const activeTournamentId = tournamentId || selectedTournamentId;

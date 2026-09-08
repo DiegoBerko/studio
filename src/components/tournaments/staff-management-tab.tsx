@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Users, Plus, Trash2, Edit3, CheckCircle, XCircle } from "lucide-react";
 import { useGameState } from "@/contexts/game-state-context";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminMode } from "@/hooks/use-admin-mode";
 import type { StaffMember, StaffRole } from "@/types";
 
 interface StaffManagementTabProps {
@@ -18,7 +19,7 @@ interface StaffManagementTabProps {
 export function StaffManagementTab({ tournamentId }: StaffManagementTabProps) {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
-  const isReadOnly = process.env.NEXT_PUBLIC_READ_ONLY === 'true';
+  const { isReadOnly } = useAdminMode();
 
   const tournament = state.config.activeTournament;
   const staff = tournament?.staff || [];

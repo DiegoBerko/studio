@@ -23,12 +23,10 @@ interface ClubsManagementTabProps {
   tournamentId: string;
 }
 
-const isReadOnly = process.env.NEXT_PUBLIC_READ_ONLY === 'true';
-
 export function ClubsManagementTab({ tournamentId }: ClubsManagementTabProps) {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
-  const { isAdminMode } = useAdminMode();
+  const { isAdminMode, isReadOnly } = useAdminMode();
   const clubs = state.config.activeTournament?.clubs || [];
 
   // Get tournament code for pre-match links (from meta list which always has code)
