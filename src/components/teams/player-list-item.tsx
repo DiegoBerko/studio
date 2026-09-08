@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { User, Shield, Trash2, CheckCircle, XCircle, Edit3, Upload, X } from "lucide-react";
 import { useGameState } from "@/contexts/game-state-context";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminMode } from "@/hooks/use-admin-mode";
 import Image from "next/image";
 
 interface PlayerListItemProps {
@@ -21,7 +22,7 @@ interface PlayerListItemProps {
 export function PlayerListItem({ player, teamId, onRemovePlayer, allPlayers = [] }: PlayerListItemProps) {
   const { state, dispatch } = useGameState();
   const { toast } = useToast();
-  const isReadOnly = process.env.NEXT_PUBLIC_READ_ONLY === 'true';
+  const { isReadOnly } = useAdminMode();
 
   const [isEditing, setIsEditing] = useState(false);
   const [editableNumber, setEditableNumber] = useState(player.number);

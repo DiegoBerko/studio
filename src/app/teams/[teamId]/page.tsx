@@ -32,6 +32,7 @@ import { Separator } from "@/components/ui/separator";
 import { type PlayerData, type Tournament, isTournamentHydrated } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { HockeyPuckSpinner } from "@/components/ui/hockey-puck-spinner";
+import { useAdminMode } from "@/hooks/use-admin-mode";
 
 type ViewMode = 'list' | 'grid';
 
@@ -40,7 +41,7 @@ export default function ManageTeamPage() {
   const router = useRouter();
   const { state, dispatch, isLoading } = useGameState();
   const { toast } = useToast();
-  const isReadOnly = process.env.NEXT_PUBLIC_READ_ONLY === 'true';
+  const { isReadOnly } = useAdminMode();
   const { activeTournament, tournaments } = state.config;
 
   const teamId = typeof params.teamId === 'string' ? params.teamId : undefined;
