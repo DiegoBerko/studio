@@ -163,7 +163,7 @@ export function PlayersControlCard({ team, teamName }: PlayersControlCardProps) 
     //    a) it added non-present players to attendance, and
     //    b) its collision resolution cleared present players' numbers when a non-present player
     //       "took" their number, making present players disappear from the list.
-    const currentRoster: PlayerData[] = (matchContext as any)[rosterKey] || [];
+    const currentRoster: PlayerData[] = team === 'home' ? matchContext.homeRoster : matchContext.awayRoster;
     const updatedRoster = currentRoster.map((player: PlayerData) => {
       const entry = preMatchData.players.find(p => p.playerId === player.id);
       return entry && entry.number ? { ...player, number: entry.number } : player;
