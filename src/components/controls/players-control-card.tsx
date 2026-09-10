@@ -151,43 +151,46 @@ export function PlayersControlCard({ team, teamName }: PlayersControlCardProps) 
   }, [periodOverride, fetchPreMatchData]);
 
   const handleApplyPreMatchData = async () => {
-    if (!preMatchData || !teamData) return;
+    if (!preMatchData || !teamData || !matchContext) return;
 
-    // 1. Apply attendance
+    const rosterKey = team === 'home' ? 'homeRoster' : 'awayRoster';
+    const coachKey = team === 'home' ? 'homeCoach' : 'awayCoach';
+    const asst1Key = team === 'home' ? 'homeAssistant1' : 'awayAssistant1';
+    const asst2Key = team === 'home' ? 'homeAssistant2' : 'awayAssistant2';
+
+    // 1. Update roster numbers from pre-match data via UPDATE_LIVE_STATE (no attendance side-effects,
+    //    no collision resolution). Using UPDATE_ATTENDANCE_PLAYER here was causing two bugs:
+    //    a) it added non-present players to attendance, and
+    //    b) its collision resolution cleared present players' numbers when a non-present player
+    //       "took" their number, making present players disappear from the list.
+    const currentRoster: PlayerData[] = (matchContext as any)[rosterKey] || [];
+    const updatedRoster = currentRoster.map((player: PlayerData) => {
+      const entry = preMatchData.players.find(p => p.playerId === player.id);
+      return entry && entry.number ? { ...player, number: entry.number } : player;
+    });
+
+    dispatch({
+      type: 'UPDATE_LIVE_STATE',
+      payload: {
+        matchContext: {
+          ...matchContext,
+          [rosterKey]: updatedRoster,
+          ...(preMatchData.coach ? {
+            [coachKey]: preMatchData.coach,
+            [asst1Key]: preMatchData.assistant1 ?? undefined,
+            [asst2Key]: preMatchData.assistant2 ?? undefined,
+          } : {}),
+        },
+      },
+    });
+
+    // 2. Set attendance to exactly the present players' pre-match numbers.
+    //    This runs after the roster update so the numbers match.
     const presentNumbers = preMatchData.players
       .filter(p => p.isPresent)
       .map(p => p.number)
       .filter(Boolean);
     dispatch({ type: 'SET_TEAM_ATTENDANCE', payload: { team, playerNumbers: presentNumbers } });
-
-    // 2. Apply number corrections (only for players whose number changed)
-    for (const entry of preMatchData.players) {
-      const rosterPlayer = teamData.players.find(p => p.id === entry.playerId);
-      if (rosterPlayer && entry.number && entry.number !== rosterPlayer.number) {
-        dispatch({
-          type: 'UPDATE_ATTENDANCE_PLAYER',
-          payload: { team, playerName: rosterPlayer.name, updates: { number: entry.number } },
-        });
-      }
-    }
-
-    // 3. Apply coach info to matchContext
-    if (preMatchData.coach && matchContext) {
-      const coachKey = team === 'home' ? 'homeCoach' : 'awayCoach';
-      const asst1Key = team === 'home' ? 'homeAssistant1' : 'awayAssistant1';
-      const asst2Key = team === 'home' ? 'homeAssistant2' : 'awayAssistant2';
-      dispatch({
-        type: 'UPDATE_LIVE_STATE',
-        payload: {
-          matchContext: {
-            ...matchContext,
-            [coachKey]: preMatchData.coach,
-            [asst1Key]: preMatchData.assistant1 ?? undefined,
-            [asst2Key]: preMatchData.assistant2 ?? undefined,
-          },
-        },
-      });
-    }
 
     // 4. Store extra players for display (operator adds them manually)
     if (preMatchData.extraPlayers.length > 0) {
