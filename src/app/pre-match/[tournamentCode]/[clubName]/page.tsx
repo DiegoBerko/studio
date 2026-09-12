@@ -215,11 +215,11 @@ export default function PreMatchPage() {
 
                   {/* Match info */}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">
-                      {role === 'home' ? 'vs' : 'vs'} {opponentName ?? '—'}
+                    <p className="font-semibold text-sm truncate">
+                      {team.subName ? `${team.name} ${team.subName}` : team.name}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {role === 'home' ? 'Local' : 'Visitante'} · {team.category}
+                    <p className="text-xs text-muted-foreground truncate">
+                      vs {opponentName ?? '—'} · {role === 'home' ? 'Local' : 'Visitante'} · {team.category}
                     </p>
                     {isSaved && (
                       <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1">
