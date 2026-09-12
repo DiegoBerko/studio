@@ -18,7 +18,7 @@ interface MatchEntry {
 }
 
 interface InitialDataMap {
-  [matchId: string]: PreMatchData | null;
+  [matchTeamKey: string]: PreMatchData | null;
 }
 
 function formatTime(dateStr: string) {
@@ -49,7 +49,7 @@ export default function PreMatchPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [matchEntries, setMatchEntries] = useState<MatchEntry[]>([]);
   const [initialDataMap, setInitialDataMap] = useState<InitialDataMap>({});
-  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [clubPassword, setClubPassword] = useState('IceVision');
 
@@ -83,17 +83,18 @@ export default function PreMatchPage() {
 
       const dataMap: InitialDataMap = {};
       await Promise.all(
-        json.matches.map(async ({ match }: MatchEntry) => {
+        json.matches.map(async ({ match, team }: MatchEntry) => {
+          const key = `${match.id}::${team.id}`;
           try {
-            const r = await fetch(`/api/pre-match/club/${tournamentCode}/${clubName}/${match.id}`);
+            const r = await fetch(`/api/pre-match/club/${tournamentCode}/${clubName}/${match.id}?teamId=${team.id}`);
             if (r.ok) {
               const d = await r.json();
-              dataMap[match.id] = d.exists ? d.data : null;
+              dataMap[key] = d.exists ? d.data : null;
             } else {
-              dataMap[match.id] = null;
+              dataMap[key] = null;
             }
           } catch {
-            dataMap[match.id] = null;
+            dataMap[key] = null;
           }
         })
       );
@@ -116,7 +117,7 @@ export default function PreMatchPage() {
 
   function handleSaved() {
     loadData();
-    setSelectedMatchId(null);
+    setSelectedKey(null);
   }
 
   if (!isAuthenticated) {
@@ -145,13 +146,15 @@ export default function PreMatchPage() {
   }
 
   // Match detail view
-  const selectedEntry = matchEntries.find(e => e.match.id === selectedMatchId);
-  if (selectedMatchId && selectedEntry) {
+  const selectedEntry = selectedKey
+    ? matchEntries.find(e => `${e.match.id}::${e.team.id}` === selectedKey)
+    : undefined;
+  if (selectedKey && selectedEntry) {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-lg mx-auto p-4 space-y-4">
           <button
-            onClick={() => setSelectedMatchId(null)}
+            onClick={() => setSelectedKey(null)}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground pt-4"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -160,11 +163,12 @@ export default function PreMatchPage() {
 
           <PreMatchForm
             apiBase={`/api/pre-match/club/${tournamentCode}/${clubName}`}
+            postUrl={`/api/pre-match/club/${tournamentCode}/${clubName}/${selectedEntry.match.id}?teamId=${selectedEntry.team.id}`}
             match={selectedEntry.match}
             team={selectedEntry.team}
             teamRole={selectedEntry.role}
             opponentName={selectedEntry.opponentName}
-            initialData={initialDataMap[selectedMatchId] ?? null}
+            initialData={initialDataMap[selectedKey] ?? null}
             onSaved={handleSaved}
             password={clubPassword}
           />
@@ -195,13 +199,14 @@ export default function PreMatchPage() {
         ) : (
           <div className="space-y-3">
             {matchEntries.map(({ match, team, role, opponentName }) => {
-              const isSaved = !!initialDataMap[match.id];
-              const savedCount = initialDataMap[match.id]?.players.filter(p => p.isPresent).length ?? 0;
+              const entryKey = `${match.id}::${team.id}`;
+              const isSaved = !!initialDataMap[entryKey];
+              const savedCount = initialDataMap[entryKey]?.players.filter(p => p.isPresent).length ?? 0;
 
               return (
                 <button
-                  key={match.id}
-                  onClick={() => setSelectedMatchId(match.id)}
+                  key={entryKey}
+                  onClick={() => setSelectedKey(entryKey)}
                   className={cn(
                     'w-full text-left border rounded-lg p-4 flex items-center gap-4 transition-colors hover:bg-muted/50',
                     isSaved ? 'border-green-500/40 bg-green-500/5' : 'border-border bg-card'

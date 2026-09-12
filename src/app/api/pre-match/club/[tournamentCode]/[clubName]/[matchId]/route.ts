@@ -9,7 +9,7 @@ const DEFAULT_PASSWORD = 'IceVision';
 
 const normalize = (s: string) => decodeURIComponent(s).toLowerCase().replace(/\s+/g, '');
 
-async function resolveIds(tournamentCode: string, clubName: string, matchId: string) {
+async function resolveIds(tournamentCode: string, clubName: string, matchId: string, explicitTeamId?: string) {
   const tournamentId = await findTournamentByCode(tournamentCode);
   if (!tournamentId) return null;
   const tournament = await readTournament(tournamentId, { includeSummaries: false });
@@ -18,8 +18,17 @@ async function resolveIds(tournamentCode: string, clubName: string, matchId: str
   const match = (tournament.matches ?? []).find(m => m.id === matchId);
   if (!match) return null;
 
-  // Find by clubId first
   const club = (tournament.clubs ?? []).find((c: any) => normalize(c.name) === normalizedClubName);
+
+  // If caller provides explicit teamId (e.g. both teams belong to same club), use it directly
+  if (explicitTeamId) {
+    const team = (tournament.teams ?? []).find(
+      (t: TeamData) => t.id === explicitTeamId && (t.id === match.homeTeamId || t.id === match.awayTeamId)
+    );
+    if (team) return { tournamentId, teamId: team.id, clubPassword: club?.password || DEFAULT_PASSWORD };
+  }
+
+  // Fallback: find first team of the club in this match
   let matchingTeam;
   if (club) {
     matchingTeam = (tournament.teams ?? []).find(
@@ -36,11 +45,12 @@ async function resolveIds(tournamentCode: string, clubName: string, matchId: str
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ tournamentCode: string; clubName: string; matchId: string }> }
 ) {
   const { tournamentCode, clubName, matchId } = await params;
-  const ids = await resolveIds(tournamentCode, clubName, matchId);
+  const teamId = new URL(request.url).searchParams.get('teamId') ?? undefined;
+  const ids = await resolveIds(tournamentCode, clubName, matchId, teamId);
   if (!ids) return NextResponse.json({ exists: false }, { status: 404 });
 
   const data = await readPreMatchData(ids.tournamentId, matchId, ids.teamId);
@@ -53,7 +63,8 @@ export async function POST(
   { params }: { params: Promise<{ tournamentCode: string; clubName: string; matchId: string }> }
 ) {
   const { tournamentCode, clubName, matchId } = await params;
-  const ids = await resolveIds(tournamentCode, clubName, matchId);
+  const teamId = new URL(request.url).searchParams.get('teamId') ?? undefined;
+  const ids = await resolveIds(tournamentCode, clubName, matchId, teamId);
   if (!ids) return NextResponse.json({ message: 'Partido o club no encontrado' }, { status: 404 });
   if (request.headers.get('x-pre-match-password') !== ids.clubPassword) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
@@ -85,7 +96,8 @@ export async function DELETE(
   { params }: { params: Promise<{ tournamentCode: string; clubName: string; matchId: string }> }
 ) {
   const { tournamentCode, clubName, matchId } = await params;
-  const ids = await resolveIds(tournamentCode, clubName, matchId);
+  const teamId = new URL(request.url).searchParams.get('teamId') ?? undefined;
+  const ids = await resolveIds(tournamentCode, clubName, matchId, teamId);
   if (!ids) return NextResponse.json({ message: 'Not found' }, { status: 404 });
   if (request.headers.get('x-pre-match-password') !== ids.clubPassword) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
