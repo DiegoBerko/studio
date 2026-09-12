@@ -54,22 +54,29 @@ export async function GET(
         (m.awayTeamId && matchingTeamIds.has(m.awayTeamId))
       );
     })
-    .map((m: MatchData) => {
-      const teamId = matchingTeamIds.has(m.homeTeamId ?? '') ? m.homeTeamId! : m.awayTeamId!;
-      const team = matchingTeams.find((t: TeamData) => t.id === teamId)!;
-      const role = m.homeTeamId === teamId ? 'home' : 'away';
+    .flatMap((m: MatchData) => {
+      const roles: Array<{ teamId: string; role: 'home' | 'away' }> = [];
+      if (m.homeTeamId && matchingTeamIds.has(m.homeTeamId)) {
+        roles.push({ teamId: m.homeTeamId, role: 'home' });
+      }
+      if (m.awayTeamId && matchingTeamIds.has(m.awayTeamId)) {
+        roles.push({ teamId: m.awayTeamId, role: 'away' });
+      }
 
-      const opponentId = role === 'home' ? m.awayTeamId : m.homeTeamId;
-      const opponent = (tournament.teams ?? []).find((t: TeamData) => t.id === opponentId);
-      const opponentDisplayName = opponent
-        ? (opponent.subName ? `${opponent.name} ${opponent.subName}` : opponent.name)
-        : null;
+      return roles.map(({ teamId, role }) => {
+        const team = matchingTeams.find((t: TeamData) => t.id === teamId)!;
+        const opponentId = role === 'home' ? m.awayTeamId : m.homeTeamId;
+        const opponent = (tournament.teams ?? []).find((t: TeamData) => t.id === opponentId);
+        const opponentDisplayName = opponent
+          ? (opponent.subName ? `${opponent.name} ${opponent.subName}` : opponent.name)
+          : null;
 
-      const categoryName = (tournament.categories ?? []).find(
-        (c: { id: string; name: string }) => c.id === team.category
-      )?.name ?? team.category;
+        const categoryName = (tournament.categories ?? []).find(
+          (c: { id: string; name: string }) => c.id === team.category
+        )?.name ?? team.category;
 
-      return { match: m, team: { ...team, category: categoryName }, role, opponentName: opponentDisplayName };
+        return { match: m, team: { ...team, category: categoryName }, role, opponentName: opponentDisplayName };
+      });
     });
 
   return NextResponse.json({ tournamentId, matches: todayMatches, password: club.password || 'IceVision' });
